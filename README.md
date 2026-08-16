@@ -69,7 +69,7 @@ worth about as much as no patch.
 |---|---|---|
 | [#1 Method constants & route matching](../../issues/1) — gap 2, the most contested call | core | Core patch v1 |
 | [#2 Request body parsing](../../issues/2) — gap 3, one line | core | Core patch v1 |
-| [#3 CORS preflight](../../issues/3) — gap 1, independently landable; **[Trac#46992](https://core.trac.wordpress.org/ticket/46992) already declined the obvious fix** | core | Core patch v1 |
+| [#3 CORS preflight](../../issues/3) — gap 1, independently landable; prior art is **more favorable than it looked** — see [Trac#46992](https://core.trac.wordpress.org/ticket/46992) and [#43428](https://core.trac.wordpress.org/ticket/43428) | core | Core patch v1 |
 | [#4 Cache safety & `Accept-Query`](../../issues/4) — security-relevant | core | Core patch v1 |
 | [#5 Feature plugin demo](../../issues/5) — the strongest artifact for Trac | this repo | Core patch v1 |
 | [#6 PHP client — `WP_Http` / Requests](../../issues/6) — review, not authorship | WpOrg/Requests | Ecosystem |
@@ -82,8 +82,9 @@ leftovers, [#34](../../issues/34) `/wp/v2/search` as first adopter.
 **Milestones.** *Core patch v1* must be done before posting anything to Trac#65616. *Ecosystem*
 runs in parallel and gates nothing. *Deferred* is named so it is not rediscovered as a gap.
 
-[#8](../../issues/8) — reading Trac#65616 in a browser — is the project's only hard blocker and
-needs a human; see the verification note below.
+~~[#8](../../issues/8) — reading Trac#65616 in a browser — is the project's only hard blocker.~~
+**Closed 2026-08-16.** The project has no external blockers left; what remains is
+[ADRs 0001–0004](docs/decisions/) and the patch.
 
 ### Explicitly not doing
 
@@ -104,14 +105,15 @@ Full reasoning in [scope.md](docs/scope.md) §3 and §6.
 Upstream tickets this project drives or is blocked on. **Re-check state before citing** —
 see [docs/ecosystem.md](docs/ecosystem.md) for the re-verification protocol.
 
-> **Verification note.** GitHub rows below were fetched and confirmed directly. **WordPress
-> Trac cannot be fetched by any tool on this project** — it returns HTTP 403 with a
-> "Checking your browser…" challenge to curl and to automated fetchers alike. Any Trac detail
-> here must be entered by a human from a real browser, and is marked unverified until then.
+> **Verification note.** All rows below were fetched and confirmed directly. **Trac 403s
+> automated fetchers** — it serves a proof-of-work challenge — but a human-driven browser clears
+> it once and the `_hcc` cookie makes the rest of the session ordinary browsing. Trac rows were
+> read that way on **2026-08-16**, comment threads included. Re-verification needs a person at a
+> browser, not a fetch tool.
 
 | Ticket | Where | Title | State | Notes |
 |---|---|---|---|---|
-| [Trac#65616](https://core.trac.wordpress.org/ticket/65616) | Core — *presumed* REST API | ⚠️ **unverified** | ⚠️ **unverified** | **Trac 403s automated fetches** (bot challenge), so nothing about this ticket has been confirmed. Only the number is known. **Open it in a browser and fill this row in.** See [scope.md](docs/scope.md) Q3. |
+| [Trac#65616](https://core.trac.wordpress.org/ticket/65616) | Core — REST API | "Support the HTTP `QUERY` method for read/search REST endpoints (RFC 10008)" | **New**, unowned — opened 2026-07-13 by **khokansardar** | ✅ Verified 2026-08-16. Enhancement, milestone **Awaiting Review**, focuses `rest-api` + `performance`, keywords **`early`**, **`2nd-opinion`**. **Zero comments** — no committer response, no patch, nothing rejected. Gap analysis independently matches ours. Proposes `QUERYABLE`, a `QUERY → GET` fallback ([ADR 0002](docs/decisions/0002-allmethods-vs-queryable.md) option E), and route-derived CORS advertising. See [scope.md](docs/scope.md) Q3. |
 | [Requests#1074](https://github.com/WordPress/Requests/issues/1074) | WpOrg/Requests | "Support fror QUERY HTTP method" *[sic]* | **Open** — opened 2026-08-10 | Milestone **2.1.0**. Component: Core, Type: enhancement. Links to Trac#65616. |
 | [Requests#1075](https://github.com/WordPress/Requests/pull/1075) | WpOrg/Requests | "Add QUERY HTTP method to the list of allowed methods" | **Open PR** — opened 2026-08-10 | Implements #1074: adds the constant + a helper method. Author **dingo-d**, branch `feature/add-query-http-method`. Triaged by **jrfnl** (Status: triage, milestone 2.1.0), who asked for canonical RFC links — addressed in `9483ea8`. |
 | [test-server#13](https://github.com/RequestsPHP/test-server/pull/13) | RequestsPHP/test-server | Companion to #1075 | Open | Blocks CI verification of #1075; author reports local testing issues pending this. |
@@ -131,6 +133,24 @@ Three consequences worth carrying:
 
 > `WordPress/Requests` and `WpOrg/Requests` both resolve; GitHub redirects between them.
 > Docs use `WpOrg/Requests` as canonical.
+
+### CORS prior art (cited, not driven)
+
+Gap 1's supporting record, all read in full on 2026-08-16. Reasoning in
+[scope.md](docs/scope.md) §2.
+
+| Ticket | State | Why it matters |
+|---|---|---|
+| [Trac#43428](https://core.trac.wordpress.org/ticket/43428) | **Open**, Awaiting Review, unowned, stalled since 2018 | Asks to control CORS headers "from only one place, with one hook" — our gap-1 ask, already filed. **Best venue for [#16](../../issues/16); reviving beats opening a new ticket.** |
+| [Trac#46992](https://core.trac.wordpress.org/ticket/46992) | Closed `invalid`, 2019 | Closed citing `rest_post_dispatch` — but **TimothyBlynJacobs raised our exact objection in comments 5 and 7 and it was never rebutted.** The close answers a different question than the ticket asked. Cite him, don't re-derive it. |
+| [Trac#38546](https://core.trac.wordpress.org/ticket/38546) | **Fixed**, 4.7, [39042] | PATCH added to the CORS list because "editable resources accept PATCH but the CORS headers don't mention it." Our argument, verb swapped. Landed in days, uncontested. |
+| [Trac#57752](https://core.trac.wordpress.org/ticket/57752) | **Fixed**, 6.3, [56096] | Improved the two *sibling* CORS filters in 2023 and left `Access-Control-Allow-Methods` out again. Best evidence the omission is oversight, not policy. |
+| [Trac#38060](https://core.trac.wordpress.org/ticket/38060) | **Fixed**, 4.7, [38806] | Source of the lone `$replace = false` on `Vary: Origin`. A `Vary`-specific correctness need — **do not cite it as deliberate intent about header replacement.** |
+
+**Nobody has reported the clobber.** Four searches turned up nothing describing the ordering
+problem, so [#16](../../issues/16) is a new finding — but the weaker claim it rests on
+("`rest_post_dispatch` doesn't reach CORS headers") is 2019 committer testimony and should be
+quoted as such.
 
 ### Ecosystem tickets (watched, not gating)
 
@@ -172,13 +192,13 @@ plugin/               Feature plugin — proves the path end-to-end on stock cor
 |---|---|
 | Scope defined | Done — [docs/scope.md](docs/scope.md) |
 | Trunk gap analysis | Done — three sites identified, verified against `7.2-alpha-63166` |
-| Prior-art search (Trac) | **Partially answered** — [Trac#65616](https://core.trac.wordpress.org/ticket/65616) exists and is the core-side ask. Still need the `ALLMETHODS` rationale, see scope Q3 |
+| Prior-art search (Trac) | **Done 2026-08-16** — [Trac#65616](https://core.trac.wordpress.org/ticket/65616) read in full (new, unowned, no comments, `2nd-opinion`), plus five CORS tickets. The `ALLMETHODS` rationale is **not on Trac and probably was never written down**; ADR 0002 proceeds without it. Scope Q3 answered |
 | Test matrix — Axis A (SAPI) | **Run 2026-08-16. `QUERY` + body reach PHP intact on nginx, Apache (both SAPIs) and Caddy**, up to 64 KiB. `php -S` 501s; `GET POST` hardening allowlists 403. [Results](matrix/results/MATRIX.md) |
 | Test matrix — Axis B (CDN/WAF) | **Out of scope** — outside the WordPress boundary, and Axis A is sufficient for a readiness claim. See [scope.md](docs/scope.md) §6 |
 | Test matrix — Axis C (clients) | Partly outstanding; `WP_Http` cases belong with the feature plugin |
 | Requests upstream PR | **In flight upstream, not ours** — [#1075](https://github.com/WordPress/Requests/pull/1075) open, milestone 2.1.0, CI-blocked on [test-server#13](https://github.com/RequestsPHP/test-server/pull/13) |
 | Feature plugin | Scaffolded |
-| Core patch | Blocked on ADRs 0001, 0002 |
+| Core patch | Blocked on ADRs 0001, 0002 — both now decidable; ADR 0002's external blocker cleared 2026-08-16 |
 | Trac ticket | Not filed |
 
 ## Quick start

@@ -83,24 +83,82 @@ before asking anyone to change core, which materially lowers the bar for accepta
 Gap 3 only affects non-JSON bodies. The fix is one line; the design decision behind it
 ([ADR 0001](decisions/0001-query-body-media-type.md)) is not.
 
-**Gap 1 has prior art, and it is unfavorable to the obvious fix.** A Trac search on 2026-08-16
-turned up two tickets that must be read before anything is proposed:
+**Gap 1 has prior art, and reading it in full turned it from unfavorable to favorable.** All
+tickets below were read in a browser on 2026-08-16 and are verified.
 
 - **[#46992](https://core.trac.wordpress.org/ticket/46992)** — "Add a filter which allows the
-  HTTP headers for REST API Endpoints to be changed" — **closed as `invalid`.** Nearly the same
-  complaint, and core's recorded answer was *"use `rest_post_dispatch`."* So "add a filter" has
-  been asked and declined.
+  HTTP headers for REST API Endpoints to be changed" (sudar, 2019-04-19), proposing a
+  `wp_rest_headers` filter. **Closed `invalid`** 2019-07-08 by adamsilverstein, citing
+  `rest_post_dispatch`.
+
+  The summary "core declined to add a filter" is true but misleading, and the comment thread is
+  the most useful thing found so far:
+
+  - **comment 3 (adamsilverstein)** — states the goal outright: *"the goal here is to modify the
+    CORS headers in responses from WP REST API Endpoints. It doesn't look like this is possible
+    using the `rest_post_dispatch` filter."*
+  - **comments 5 and 7 (TimothyBlynJacobs)** — raises our exact objection, twice: *"doesn't
+    `rest_send_cors_headers()` use a regular header function call, it doesn't go through
+    `WP_REST_Server`?"* and *"The headers sent by `rest_send_cors_headers` won't be filterable
+    [by] that proposed filter."*
+  - **comment 6 (sudar)** — confirms the only workaround is to `remove_filter()`
+    `rest_send_cors_headers` from `rest_pre_serve_request` and reimplement it.
+  - **comment 8 (aaemnnosttv)** — gives the generic `rest_post_dispatch` answer, which is
+    correct for ordinary response headers and does not address the CORS ones at all.
+  - **comment 9** — closes as `invalid`, citing comment 8.
+
+  So the recorded resolution answers a different question than the one the ticket was about,
+  and **the CORS-specific objection was raised by a core committer and never rebutted.** Nobody
+  argued that CORS headers *should not* be overridable; the thread simply lost the thread.
+  **This is not a rejected approach we have to work around — it is an unfinished one, with a
+  committer already on record agreeing with us.**
+
+- **[#43428](https://core.trac.wordpress.org/ticket/43428)** — "Improve CORS headers sent to
+  REST Api requests" (andrei.igna, 2018). **Still open**, milestone Awaiting Review. Asks to
+  consolidate CORS header emission into `rest_send_cors_headers` *"making it easier to control
+  the CORS headers from only one place, with one hook"*, drop `OPTIONS` from
+  `Access-Control-Allow-Methods`, send the preflight headers only on `OPTIONS`, and add
+  `Access-Control-Max-Age`. Author reports it tested across ~500 sites. Substantive discussion
+  stopped in 2018; everything since is field churn. **An open, on-point, unowned ticket is a
+  better venue for the gap-1 fix than a fresh one** — see [#16](https://github.com/moonmeister/wp-http-query/issues/16).
+
 - **[#38546](https://core.trac.wordpress.org/ticket/38546)** — "REST API: Add PATCH to CORS
-  allowed methods" — **fixed** by appending PATCH to the hardcoded string. Precedent that a
-  method core supports gets added to the list.
+  allowed methods" (jnylen0, 2016). **Fixed in 4.7**, changeset
+  [[39042](https://core.trac.wordpress.org/changeset/39042)], committed by pento, props jnylen0.
+  Commit message: *"Editable resources in the REST API accept the PATCH method, but the CORS
+  headers don't mention it."* That is exactly our argument with the verb swapped. No objection
+  was raised to the CORS change itself and it landed in days. **Clean precedent, cleanly
+  applicable.**
+
+- **[#57752](https://core.trac.wordpress.org/ticket/57752)** — "Improve
+  `rest_(allowed|exposed)_cors_headers` filters" (bor0). **Fixed in 6.3**, changeset
+  [[56096](https://core.trac.wordpress.org/changeset/56096)], owner kadamwhite. Passed `$request`
+  into both sibling CORS filters — and **again left `Access-Control-Allow-Methods` untouched.**
+  A second, recent instance of the same omission, which is the strongest available evidence that
+  it is oversight rather than policy.
+
+**Nobody has reported the clobber.** Searches for `rest_send_cors_headers`,
+`Access-Control-Allow-Methods`, `rest_pre_serve_request` header replacement, and
+`rest_allowed_cors_headers` return the tickets above and nothing describing the ordering
+problem. The mechanism in [#16](https://github.com/moonmeister/wp-http-query/issues/16) is a
+genuinely new finding. What is *not* new is "`rest_post_dispatch` does not reach the CORS
+headers" — TimothyBlynJacobs said that in 2019, and citing him is stronger than asserting it
+ourselves.
 
 But the `rest_post_dispatch` advice **does not work**, which is verified against
 `7.2-alpha-63166`: `send_header()` calls `header()` with no `$replace` argument
 (`class-wp-rest-server.php:1930`), so PHP defaults to replacing. `rest_post_dispatch` fires at
 `:464` and its headers go out at `:473-474`; `rest_send_cors_headers()` then runs on
 `rest_pre_serve_request` at `:516` and overwrites them. Two lines below the hardcoded header,
-`rest-api.php:816` sends `Vary: Origin` with an explicit `$replace = false` — deliberate in one
-place and absent in the others, which reads as oversight.
+`rest-api.php:816` sends `Vary: Origin` with an explicit `$replace = false`.
+
+Do not over-read that asymmetry. It was introduced by
+[#38060](https://core.trac.wordpress.org/ticket/38060) (4.7, changeset
+[[38806](https://core.trac.wordpress.org/changeset/38806)], jorbin), a ticket about sites behind
+Varnish — and `Vary` is a list header that *must* be appended rather than replaced, so
+`$replace = false` there is a local correctness requirement, not a considered stance on
+overridability. The honest reading is that nobody has ever thought about replacement semantics
+in this function, which is still the point.
 
 The honest limit of that claim: a plugin *can* still win by hooking `rest_pre_serve_request` at
 priority 11+. So the defensible statement is that **#46992's recorded resolution is wrong and
@@ -115,9 +173,10 @@ Also relevant: 5.5.0 made the two sibling CORS list headers filterable —
 (`:434`) — and missed this one because it lives in a different function.
 `rest_send_cors_headers()` has **no test coverage at all.**
 
-> ⚠️ Both ticket summaries are **second-hand from a search index.** Trac returns 403 to every
-> tool on this project; direct fetching was attempted and failed. Confirm in a browser before
-> citing publicly. The code analysis is verified; the ticket history is not.
+> ✅ All ticket contents above were read directly in a browser on 2026-08-16, including full
+> comment threads. Trac still 403s automated fetches — it serves a proof-of-work challenge, and
+> once solved interactively the `_hcc` cookie makes the rest of the session ordinary browsing.
+> Re-verification therefore needs a human-driven browser, not a fetch tool.
 
 ### The existing tunnel
 
@@ -420,29 +479,57 @@ out of scope.
 **With Q2 answered, nothing empirical blocks the project.** What remains is design — the four
 ADRs — and the patch itself.
 
-**Q3 — What is the actual prior art in WordPress?**
-**Partially answered.** Two upstream tickets exist and are tracked in the
-[README](../README.md#tracked-tickets):
+**Q3 — What is the actual prior art in WordPress? ✅ ANSWERED.** Read in a browser 2026-08-16.
 
-- [Trac#65616](https://core.trac.wordpress.org/ticket/65616) — ⚠️ **UNVERIFIED.** Trac serves a
-  bot challenge (HTTP 403) to automated fetches, so this ticket's title, status, component, and
-  contents have **not** been confirmed by anyone on this project. The ticket number came from
-  the user; everything else previously written here was reconstruction and has been removed.
-  **Open it in a browser and record what it actually says before citing it anywhere.**
-  Presumed to be the core-side ask, which is why sequencing step 1 is to read it.
-- [Requests#1074](https://github.com/WordPress/Requests/issues/1074) — "Support fror QUERY HTTP
-  method" _[sic]_, opened 2026-08-10, milestone 2.1.0, links to Trac#65616.
-- [Requests#1075](https://github.com/WordPress/Requests/pull/1075) — open PR implementing
-  #1074 (constant + helper method), triaged into milestone 2.1.0.
+**[Trac#65616](https://core.trac.wordpress.org/ticket/65616) — verified.**
+"Support the HTTP `QUERY` method for read/search REST endpoints (RFC 10008)". Reported by
+**khokansardar**, opened **2026-07-13**. Type enhancement, priority normal, severity normal,
+status **new**, no owner, milestone **Awaiting Review**, component **REST API**, focuses
+`rest-api` + `performance`, keywords **`early`** and **`2nd-opinion`**.
 
-Both were opened after the research pass that produced this document, which is why the earlier
-draft recorded prior art as absent. **The general caution still stands: absence of evidence was
-not evidence of absence, and it took the user surfacing these to correct it.**
+**It has zero comments.** No core-committer response, no patch, no rejected approach, nothing
+to work around. The two keywords are an open invitation: `early` asks for a change landed early
+in a cycle, `2nd-opinion` asks for more eyes. **This project is the second opinion.**
 
-Still outstanding: the original rationale for the current `ALLMETHODS` constant set, and any
-earlier custom-verb attempts (`SEARCH`, `GET`-with-body). If methods were deliberately
-restricted, engage that argument rather than rediscover it — this is what
-[ADR 0002](decisions/0002-allmethods-vs-queryable.md) is blocked on.
+Its content is a problem statement (URL-length ceiling vs. `POST` semantics), a findings list,
+and a three-phase proposal:
+
+1. Make core `QUERY`-safe — handle `QUERY` in `get_parameter_order()` for both JSON and
+   form-encoded bodies, add a `QUERY`/`QUERYABLE` constant, add an **optional `QUERY → GET`
+   fallback mirroring `HEAD → GET`**, unit tests, document outbound support.
+2. Opt-in advertising plus one pilot endpoint — advertise `QUERY` in
+   `Access-Control-Allow-Methods` **only when a route registers it**; pilot `/wp/v2/search`.
+3. Client feature detection — teach `@wordpress/api-fetch` to use `QUERY` for oversized reads
+   with automatic `GET` fallback (Gutenberg repo).
+
+Three things worth carrying out of it:
+
+- **Its gap analysis and ours agree, independently and exactly** — same three sites, same
+  reasoning, including that outbound already works and needs only a docblock. Its line numbers
+  are lower than ours (`rest-api.php:801` vs. our `:814`; `class-wp-rest-server.php:1185-1187`
+  vs. our `:1190-1196`), so it was written against an earlier trunk. Convergent findings from a
+  separate author are worth saying out loud on the ticket.
+- **The `QUERY → GET` fallback is a real option we had not considered**, and it is not in
+  [ADR 0002](decisions/0002-allmethods-vs-queryable.md). Now added there as option E.
+- **Its phase 2 proposes deriving the CORS method list from registered routes**, which is a
+  different and better fix than the #38546 precedent of appending to the hardcoded string. It
+  also happens to be what [#43428](https://core.trac.wordpress.org/ticket/43428) has been asking
+  for since 2018. Gap 1 has more support than we thought.
+
+**Also verified:** [Requests#1074](https://github.com/WordPress/Requests/issues/1074) (opened
+2026-08-10, milestone 2.1.0, links to Trac#65616) and
+[Requests#1075](https://github.com/WordPress/Requests/pull/1075) (open PR: constant + helper).
+Both post-date the research pass that produced this document, which is why an earlier draft
+recorded prior art as absent. **Absence of evidence was not evidence of absence, and it took the
+user surfacing these to correct it.**
+
+**One sub-question remains open, and it is now believed unanswerable from Trac.** The original
+rationale for the current `ALLMETHODS` constant set is **not** in #65616, and searches surface
+no ticket discussing it or any earlier custom-verb attempt (`SEARCH`, `GET`-with-body). The
+constants date to the WP-API plugin era, so if the reasoning was recorded anywhere it is the
+`WP-API/WP-API` GitHub history rather than Trac. **ADR 0002 is unblocked** — it should proceed
+on the merits and stop waiting for a rationale that probably was never written down. Treat
+"deliberately restricted" as unsupported unless someone produces the citation.
 
 **Q4 — Should `QUERY` join `ALLMETHODS`, or be opt-in only?**
 Adding it changes behavior for every existing `ALLMETHODS` route in core and in plugins — those
@@ -472,10 +559,11 @@ states the ordering principle; it deliberately does not duplicate the task list.
 The critical path is short, and **no part of it is empirical any more**. Q2 — whether `QUERY`
 and its body reach PHP — was the gating unknown and is answered. What remains:
 
-1. **Read [Trac#65616](https://core.trac.wordpress.org/ticket/65616) and finish Q3.** The
-   core-side ticket already exists, so this is engagement with an open thread, not a fresh
-   proposal. Nothing else can start without it, and no tool on this project can read it.
-2. **Settle [ADRs 0001–0004](decisions/).** The only remaining blockers are decisions.
+1. ~~**Read [Trac#65616](https://core.trac.wordpress.org/ticket/65616) and finish Q3.**~~
+   **Done 2026-08-16.** The ticket is real, uncontested, comment-free and tagged `2nd-opinion`.
+   Engagement with an open thread, not a fresh proposal.
+2. **Settle [ADRs 0001–0004](decisions/).** The only remaining blockers are decisions, and
+   **none of them is blocked on anything external any more.**
 3. **Write the patch, and prove it with the feature plugin** on stock core.
 4. **Bring patch, plugin and matrix results to the existing ticket.**
 

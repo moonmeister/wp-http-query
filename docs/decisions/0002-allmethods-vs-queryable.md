@@ -1,9 +1,9 @@
 # ADR 0002 — Should QUERY join ALLMETHODS, or be opt-in only?
 
-**Status:** Proposed — undecided
+**Status:** Proposed — undecided, but **no longer blocked**
 **Date:** 2026-08-16
 **Blocks:** core patch (gap 2)
-**Related:** [scope.md](../scope.md) Q3 — the original rationale for the current constant set is unknown
+**Related:** [scope.md](../scope.md) Q3 — answered 2026-08-16; see "Open" below
 
 ---
 
@@ -89,6 +89,33 @@ Treat `QUERY` as a read method alongside `GET`, since both are safe and idempote
 - **−** A `READABLE` handler reads `$request['param']` from the query string; it will not see a
   body. Silent empty results across a huge surface.
 
+### E. `QUERYABLE` plus an optional `QUERY → GET` route fallback
+
+From [Trac#65616](https://core.trac.wordpress.org/ticket/65616) itself, which we had not
+considered. Core already has a precedent for one method falling back to another: an unmatched
+`HEAD` falls back to the `GET` handler (`class-wp-rest-server.php:1190-1196`). The ticket
+proposes mirroring that — an unmatched `QUERY` may fall back to a registered `GET` handler.
+
+- **+** Answers "what does this buy anyone when no endpoint implements `QUERY`?" without
+  migrating a single route. Every existing read endpoint becomes reachable by `QUERY`.
+- **+** Follows a pattern core already ships and reviewers already accept.
+- **+** Orthogonal to the constants question — it composes with B or C rather than replacing
+  them.
+- **−** **It is not the same as `HEAD → GET`, and the difference is the whole problem.** `HEAD`
+  is `GET` minus the body, so the fallback is lossless. `QUERY` is `GET` *plus* a request body,
+  and the `GET` handler will not read it. Falling back silently discards the query.
+- **−** That failure is silent and returns a plausible-looking unfiltered result set — arguably
+  worse than the `404` we have today, and on read endpoints an unfiltered result set can be a
+  disclosure rather than merely a wrong answer.
+- **−** Only defensible if gap 3 is fixed first so body params populate, and even then the
+  handler's `get_collection_params()` never declared them.
+
+**Assessment:** the ergonomics are attractive and the safety argument is bad. If it is pursued
+at all it must be **opt-in per route** and it must not be conflated with the constants
+decision — which is why it is recorded here as a separate axis rather than a fifth alternative.
+Expect the ticket reporter to advocate for it; engage on the silent-discard point specifically,
+because the `HEAD → GET` analogy is superficially very persuasive.
+
 ## Recommendation (not yet decided)
 
 Lean **C**: ship `QUERYABLE`, leave `ALLMETHODS` and `READABLE` untouched, and record the
@@ -120,9 +147,15 @@ to be argued rather than counted.
 
 ## Open
 
-- **Blocked on scope.md Q3.** If there was a deliberate historical decision to restrict the
-  constant set, that reasoning should drive this ADR rather than being rediscovered.
-  Trac#65616 may or may not contain it — the ticket is unverified, see Q3.
+- ~~**Blocked on scope.md Q3.**~~ **Unblocked 2026-08-16.** Trac#65616 was read in full: it does
+  **not** contain the `ALLMETHODS` rationale, and no Trac ticket discussing the original constant
+  set or an earlier custom-verb attempt could be found. The constants pre-date core, so any
+  recorded reasoning would live in `WP-API/WP-API` history, not Trac. **Proceed on the merits.**
+  Do not assert the restriction was deliberate — that claim is unsupported, and a reviewer who
+  knows the history will say so.
+- **The ticket itself proposes `QUERY`/`QUERYABLE`** (its phase 1), which is options B/C. Our
+  lean and the reporter's proposal already agree, so the ADR's job is now to *defend* that choice
+  against option A rather than to pick between them.
 - What actually happens today when an `ALLMETHODS` route receives a `QUERY` with a JSON body?
   Given that JSON parsing is method-independent, params may populate fine — which would weaken
   the BC objection to A considerably. **Testable now; worth doing before deciding.**
