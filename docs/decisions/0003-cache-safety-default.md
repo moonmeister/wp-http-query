@@ -30,6 +30,14 @@ tolerable for URI-keyed `GET`. It is not tolerable for body-keyed `QUERY`.
 As of 2026-08-16, no CDN appears to implement body-inclusive cache keys, so essentially every
 cache in front of a WordPress site today is body-blind.
 
+**We will not be measuring this.** Matrix Axis B (CDNs, WAFs, managed hosts) was descoped on
+2026-08-16 — see [scope.md](../scope.md) §6. That is the right call for the project's boundary,
+and it settles this ADR's threat model rather than leaving it open: **core must assume every
+downstream cache is body-blind, because it will never have evidence otherwise.** Option C was
+already close to disqualified; with no Axis B data it is indefensible. The remaining question is
+only *how* conservative the default is and how an operator opts out — A vs B, and whether D
+rides along.
+
 ## Decision drivers
 
 - Shipping a cache-poisoning vector to anyone behind a body-blind cache is unacceptable, and

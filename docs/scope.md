@@ -59,14 +59,14 @@ and **will drift** — re-verify before filing.
 WordPress's REST routing layer is method-agnostic to a degree that surprised us. No core patch
 is required to register or dispatch a `QUERY` route:
 
-| Component | File:line | Behavior |
-|---|---|---|
-| Route registration | `class-wp-rest-server.php:1007` | `explode( ',', $handler['methods'] )` — any comma-separated method string. No allowlist. |
-| Method setting | `class-wp-rest-request.php:149-151` | `set_method()` is `strtoupper()` and nothing else. No validation. |
-| Route matching | `class-wp-rest-server.php:1190-1196` | Plain `empty( $handler['methods'][ $checked_method ] )` array-key lookup. Only special case is the HEAD→GET fallback. |
-| Raw body read | `class-wp-rest-server.php:1966-1977` | `get_raw_data()` calls `file_get_contents( 'php://input' )` unconditionally, no method check. |
-| JSON body parsing | `class-wp-rest-request.php:364-368` | `parse_json_params()` runs unconditionally; `JSON` is prepended to the parameter order whenever `is_json_content_type()` is true — **independent of method**. |
-| `Allow` header | `rest-api.php:883-913` | `rest_send_allow_header()` derives entirely from registered route methods. Generic, needs no change. |
+| Component          | File:line                            | Behavior                                                                                                                                                      |
+| ------------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Route registration | `class-wp-rest-server.php:1007`      | `explode( ',', $handler['methods'] )` — any comma-separated method string. No allowlist.                                                                      |
+| Method setting     | `class-wp-rest-request.php:149-151`  | `set_method()` is `strtoupper()` and nothing else. No validation.                                                                                             |
+| Route matching     | `class-wp-rest-server.php:1190-1196` | Plain `empty( $handler['methods'][ $checked_method ] )` array-key lookup. Only special case is the HEAD→GET fallback.                                         |
+| Raw body read      | `class-wp-rest-server.php:1966-1977` | `get_raw_data()` calls `file_get_contents( 'php://input' )` unconditionally, no method check.                                                                 |
+| JSON body parsing  | `class-wp-rest-request.php:364-368`  | `parse_json_params()` runs unconditionally; `JSON` is prepended to the parameter order whenever `is_json_content_type()` is true — **independent of method**. |
+| `Allow` header     | `rest-api.php:883-913`               | `rest_send_allow_header()` derives entirely from registered route methods. Generic, needs no change.                                                          |
 
 **Consequence:** a `QUERY` route with a JSON body already parses parameters correctly on stock
 trunk. This makes the feature-plugin path viable — we can demonstrate the feature end-to-end
@@ -74,11 +74,11 @@ before asking anyone to change core, which materially lowers the bar for accepta
 
 ### The three gaps
 
-| # | File:line | Current | Problem |
-|---|---|---|---|
-| 1 | `rest-api.php:814` | `header( 'Access-Control-Allow-Methods: OPTIONS, GET, POST, PUT, PATCH, DELETE' );` | Hardcoded, no filter at that point. Every cross-origin `QUERY` preflight fails. |
-| 2 | `class-wp-rest-server.php:24-56` | `READABLE='GET'`, `CREATABLE='POST'`, `EDITABLE='POST, PUT, PATCH'`, `DELETABLE='DELETE'`, `ALLMETHODS='GET, POST, PUT, PATCH, DELETE'` | No constant includes `QUERY`. `ALLMETHODS` routes will not answer it. See [ADR 0002](decisions/0002-allmethods-vs-queryable.md). |
-| 3 | `class-wp-rest-request.php:377-380` | `$accepts_body_data = array( 'POST', 'PUT', 'PATCH', 'DELETE' );` | `QUERY` excluded, so a form-encoded `QUERY` body is parsed into `$this->params['POST']` by `parse_body_params()` but never added to the lookup order. Silent data loss. |
+| #   | File:line                           | Current                                                                                                                                 | Problem                                                                                                                                                                 |
+| --- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `rest-api.php:814`                  | `header( 'Access-Control-Allow-Methods: OPTIONS, GET, POST, PUT, PATCH, DELETE' );`                                                     | Hardcoded, no filter at that point. Every cross-origin `QUERY` preflight fails.                                                                                         |
+| 2   | `class-wp-rest-server.php:24-56`    | `READABLE='GET'`, `CREATABLE='POST'`, `EDITABLE='POST, PUT, PATCH'`, `DELETABLE='DELETE'`, `ALLMETHODS='GET, POST, PUT, PATCH, DELETE'` | No constant includes `QUERY`. `ALLMETHODS` routes will not answer it. See [ADR 0002](decisions/0002-allmethods-vs-queryable.md).                                        |
+| 3   | `class-wp-rest-request.php:377-380` | `$accepts_body_data = array( 'POST', 'PUT', 'PATCH', 'DELETE' );`                                                                       | `QUERY` excluded, so a form-encoded `QUERY` body is parsed into `$this->params['POST']` by `parse_body_params()` but never added to the lookup order. Silent data loss. |
 
 Gap 3 only affects non-JSON bodies. The fix is one line; the design decision behind it
 ([ADR 0001](decisions/0001-query-body-media-type.md)) is not.
@@ -134,15 +134,15 @@ response is 4xx, no-cache headers are forced. `QUERY` work must not regress that
 This distinction gets misread as "you still could not send a `QUERY` request," so state it
 precisely. With this work done:
 
-| | Result |
-|---|---|
-| A route registered with `'methods' => 'QUERY'` (yours or a plugin's) | **Works.** Already works on stock core today — see §2. |
-| An existing core endpoint, e.g. `QUERY /wp-json/wp/v2/posts` | **404 `rest_no_route`** — "No route was found matching the URL and request method." Not a 405. Unchanged by this project. |
-| A route registered with `ALLMETHODS` | **Decided by [ADR 0002](decisions/0002-allmethods-vs-queryable.md).** |
+|                                                                      | Result                                                                                                                    |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| A route registered with `'methods' => 'QUERY'` (yours or a plugin's) | **Works.** Already works on stock core today — see §2.                                                                    |
+| An existing core endpoint, e.g. `QUERY /wp-json/wp/v2/posts`         | **404 `rest_no_route`** — "No route was found matching the URL and request method." Not a 405. Unchanged by this project. |
+| A route registered with `ALLMETHODS`                                 | **Decided by [ADR 0002](decisions/0002-allmethods-vs-queryable.md).**                                                     |
 
 That third row is why this scope line and ADR 0002 are the same decision viewed from two
 angles. Folding `QUERY` into `ALLMETHODS` would make every route using that constant — across
-core *and every plugin* — silently begin answering `QUERY`, with handlers never written for it
+core _and every plugin_ — silently begin answering `QUERY`, with handlers never written for it
 and a body they will not have parsed. That is migration, performed implicitly across the
 ecosystem. Declining to migrate anything is what makes opt-in the leaning.
 
@@ -172,7 +172,7 @@ Two real costs, neither of them BC:
   `rest-posts-controller.php:256,266`, `rest-attachments-controller.php:374,383`, and
   `rest-server.php:397,437,476,536`. A fixture update, not an API break — but see the note in
   ADR 0002, where this doubles as a free blast-radius measurement.
-- **Caching stakes rise sharply.** A *core* endpoint answering `QUERY` behind a body-blind
+- **Caching stakes rise sharply.** A _core_ endpoint answering `QUERY` behind a body-blind
   cache is [ADR 0003](decisions/0003-cache-safety-default.md)'s poisoning scenario on exactly
   the kind of route a CDN is configured to cache. **This, not versioning, is the reason to
   defer first-adopter work to its own ticket.**
@@ -221,7 +221,7 @@ See [ADR 0003](decisions/0003-cache-safety-default.md).
 RFC 10008 defines **two** distinct mechanisms that are easy to conflate:
 
 - **§2.3 `Content-Location`** — a snapshot of the results just produced. May be temporary.
-- **§2.4 `Location`** — an *equivalent resource* (§2.2): a repeatable, GET-able query.
+- **§2.4 `Location`** — an _equivalent resource_ (§2.2): a repeatable, GET-able query.
 
 `Location` is the escape hatch. RFC co-author Julian Reschke, on
 [mozilla/standards-positions#1430](https://github.com/mozilla/standards-positions/issues/1430):
@@ -274,7 +274,7 @@ The gaps are contract and ergonomics, not capability:
    DELETE, OPTIONS, TRACE, PATCH. No QUERY.
 2. **`WP_Http`'s documented contract excludes it.** `class-wp-http.php:115-118` lists only
    GET/POST/HEAD/PUT/DELETE/TRACE/OPTIONS/PATCH and warns "Some transports technically allow
-   others, but should not be assumed." So `QUERY` works but is *unsupported*.
+   others, but should not be assumed." So `QUERY` works but is _unsupported_.
 3. **Redirect handling.** `class-wp-http.php:1083-1085` downgrades only `POST` to `GET` on
    redirect. A `QUERY` hitting a 30x is replayed as `QUERY` with its body. Arguably correct
    for an idempotent method, but untested and undocumented.
@@ -306,26 +306,43 @@ Established browser constraints are in [ecosystem.md](ecosystem.md).
 
 ## 6. The test matrix
 
-The gating deliverable. **The single most load-bearing unknown in the project is whether a
+The gating deliverable. **The single most load-bearing unknown in the project was whether a
 request body on a non-POST verb reaches PHP at all.** No documentation source answered it
-during research; it needs empirical testing.
+during research, so it was tested empirically.
 
 `get_raw_data()` reads `php://input` with no method check, so the WordPress layer is fine. The
-risk is entirely below us: the SAPI, PHP's `enable_post_data_reading` machinery, and whether
+risk was entirely below us: the SAPI, PHP's `enable_post_data_reading` machinery, and whether
 `Content-Length` is honored for an unrecognized verb.
 
 Harness and per-axis detail: [../matrix/README.md](../matrix/README.md).
 
-- **Axis A — SAPI passthrough.** Does the verb arrive; is `php://input` complete; does
-  `Content-Length` match; does `$_POST` interfere. Testable with a bare PHP probe, no
-  WordPress.
-- **Axis B — intermediaries.** Cloudflare, Fastly, Varnish, ModSecurity/OWASP CRS, managed
-  hosts.
+- **Axis A — SAPI passthrough. ✅ Run 2026-08-16, and it passes.** The verb arrives intact,
+  `php://input` is complete and byte-identical to 64 KiB, `Content-Length` is honored, and
+  `$_POST` does not interfere (it is simply never populated). nginx, Apache on both SAPIs, and
+  Caddy. See Q2.
+- **Axis B — intermediaries. ❌ Out of scope**, descoped 2026-08-16.
 - **Axis C — clients.** curl, `WP_Http` (both transports), browser `fetch()`, `api-fetch`,
-  axios, undici, Guzzle.
+  axios, undici, Guzzle. Partly outstanding; `WP_Http` cases belong with the feature plugin.
 
 **Record failures as prominently as passes.** A negative result is the most useful thing this
 project can publish.
+
+### Why Axis B is out of scope
+
+The project's claim is bounded: *WordPress and the stack it runs on are not the blocker.*
+Axis A establishes exactly that. CDNs, WAFs and managed-host verb filtering sit outside the
+WordPress boundary — they are per-deployment configuration on a vendor's release schedule, and
+no core patch can influence them. Measuring them would produce a snapshot that rots fast and
+concede a burden of proof the project does not carry.
+
+This does not weaken §4. The cache-safety default assumes **no** intermediary implements
+RFC 10008 §2.7 body-inclusive cache keys, which is the conservative direction. Having no Axis B
+data makes that assumption the only defensible one rather than an open question — see
+[ADR 0003](decisions/0003-cache-safety-default.md).
+
+What a site owner will actually hit first is a `GET POST`-only hardening allowlist, which
+403s `QUERY` on both nginx and Apache. That is measured, it is site configuration rather than a
+defect, and it belongs in user documentation.
 
 ---
 
@@ -340,7 +357,7 @@ precede any patch** — gap 3 cannot be fixed correctly without answering it.
 
 **Q2 — Does the body reach PHP? ✅ ANSWERED — yes.** First matrix run, 2026-08-16.
 
-On nginx, Apache (`mod_php` *and* `mod_proxy_fcgi`) and Caddy, a `QUERY` request arrives at PHP
+On nginx, Apache (`mod_php` _and_ `mod_proxy_fcgi`) and Caddy, a `QUERY` request arrives at PHP
 with `REQUEST_METHOD` exactly as sent and the body byte-identical, SHA-256 verified, **up to
 64 KiB with no truncation**. `Content-Length` is honored for the unrecognized verb. Stock
 configuration; no patches to any server. Results:
@@ -360,8 +377,12 @@ Three qualifications, none fatal:
   fix the change that stops `QUERY` being a special case.
 
 Still open under Axis A: HTTP/2 and HTTP/3 — everything so far ran over HTTP/1.1 — plus TLS and
-OpenLiteSpeed. Axes B (intermediaries) and C (clients) are untouched, and **Axis B is now the
-riskiest unknown in the project**, since a CDN or WAF sits in front of most real sites.
+OpenLiteSpeed. None of these is likely to change the answer: the verb and body are opaque to
+the framing layer, and the two SAPIs already agree. Axis C (clients) is outstanding; Axis B is
+out of scope.
+
+**With Q2 answered, nothing empirical blocks the project.** What remains is design — the four
+ADRs — and the patch itself.
 
 **Q3 — What is the actual prior art in WordPress?**
 **Partially answered.** Two upstream tickets exist and are tracked in the
@@ -374,7 +395,7 @@ riskiest unknown in the project**, since a CDN or WAF sits in front of most real
   **Open it in a browser and record what it actually says before citing it anywhere.**
   Presumed to be the core-side ask, which is why sequencing step 1 is to read it.
 - [Requests#1074](https://github.com/WordPress/Requests/issues/1074) — "Support fror QUERY HTTP
-  method" *[sic]*, opened 2026-08-10, milestone 2.1.0, links to Trac#65616.
+  method" _[sic]_, opened 2026-08-10, milestone 2.1.0, links to Trac#65616.
 - [Requests#1075](https://github.com/WordPress/Requests/pull/1075) — open PR implementing
   #1074 (constant + helper method), triaged into milestone 2.1.0.
 
@@ -413,7 +434,7 @@ from its current behavior of leaving it alone?
 2. **Support [Requests#1075](https://github.com/WordPress/Requests/pull/1075)** (§5.1) — review
    it, verify what it covers, and help unblock
    [test-server#13](https://github.com/RequestsPHP/test-server/pull/13), which is gating its CI.
-   *No longer our authorship and no longer the critical path.*
+   _No longer our authorship and no longer the critical path._
 3. **Run the test matrix** (§6). Publish results regardless of outcome.
 4. **Build the feature plugin.** Native `QUERY` route + `X-HTTP-Method-Override` fallback,
    proving the end-to-end path on stock core. Possible today (§2), and the strongest artifact

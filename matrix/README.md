@@ -148,26 +148,36 @@ Three findings worth carrying into the ticket:
    whose premise it confirms.
 
 Not yet covered: HTTP/2 and HTTP/3 (all cases ran over HTTP/1.1), TLS, OpenLiteSpeed, and
-everything in Axes B and C.
+Axis C. Axis B is deliberately out of scope — see below.
 
 ---
 
-## Axis B — intermediaries *(manual)*
+## Axis B — intermediaries *(out of scope)*
 
-**Cannot be containerized.** Needs real deployments.
+**Descoped 2026-08-16.** Axis A answered the question this project actually needed answered:
+the layers WordPress runs on — PHP, the FPM/mod_php SAPIs, and the four major web servers —
+do not block `QUERY`. That is sufficient for a readiness claim.
 
-| Layer | Question | Status |
-|---|---|---|
-| Cloudflare | Pass through, 405, or strip body? Cached? | Not started |
-| Fastly | Same | Not started |
-| Varnish (builtin VCL) | Same | Not started |
-| ModSecurity / OWASP CRS | Does the default ruleset reject an unknown verb? | Not started |
-| WP Engine | Platform-level verb filtering? | Not started |
-| Kinsta | Same | Not started |
-| Pantheon | Same | Not started |
+CDNs, WAFs and managed-host verb filtering sit *outside* the WordPress boundary. They are
+per-deployment configuration that a site owner controls or buys, they change on the vendor's
+schedule, and no core patch can affect them. Testing them would produce a snapshot that rots
+quickly and answers a question nobody in a Trac review is entitled to ask us.
 
-Varnish is the one testable locally — worth adding to `compose.yaml` as a front-end tier once
-Axis A is green.
+| Layer | Why not tested |
+|---|---|
+| Cloudflare, Fastly | Needs real deployments; vendor-schedule, not ours |
+| Varnish, ModSecurity / OWASP CRS | Containerizable, but same reasoning — deployment config |
+| WP Engine, Kinsta, Pantheon | Platform policy, outside the project boundary |
+
+**What we already know indirectly still stands:** no intermediary appears to implement RFC 10008
+§2.7 body-inclusive cache keys, so in practice nothing caches `QUERY` today. That is the
+*assumption* the cache-safety default is built on, and descoping Axis B does not weaken it —
+it makes the conservative default the only defensible option, since we will have no evidence
+that any given cache is body-aware. See
+[ADR 0003](../docs/decisions/0003-cache-safety-default.md).
+
+If someone later wants this data, `run.sh` takes a port and a path; adding a Varnish tier to
+`compose.yaml` is a small job. It is just not on the critical path.
 
 ## Axis C — clients *(partly manual)*
 

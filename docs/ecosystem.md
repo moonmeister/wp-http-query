@@ -83,7 +83,8 @@ is nameable in Apache config and `<Limit QUERY>` parses fine.
 > matrix hit this and produced a false pass for a full run. Any claim that an Apache hardening
 > config permits `QUERY` should be checked against a **known** verb like DELETE first.
 
-ModSecurity / OWASP CRS defaults remain **unverified** — see CDNs and intermediaries below.
+ModSecurity / OWASP CRS defaults are **not tested and will not be** — see CDNs and
+intermediaries below.
 
 ### LiteSpeed, Caddy
 
@@ -141,16 +142,22 @@ mostly affects third-party consumers rather than the block editor.
 
 ---
 
-## CDNs and intermediaries
+## CDNs and intermediaries — out of scope
 
-**Entirely unverified.** No verified evidence surfaced for Cloudflare, Fastly, Varnish,
-ModSecurity/OWASP CRS defaults, WP Engine, Kinsta, or Pantheon.
+**Descoped 2026-08-16** ([scope.md](scope.md) §6). Unverified, and deliberately staying that
+way: these sit outside the WordPress boundary, are per-deployment vendor configuration, and no
+core patch can influence them. Axis A established what the project actually needed — PHP, the
+SAPIs and the major web servers do not block `QUERY`.
 
-What is known indirectly: **no CDN appears to implement RFC 10008 §2.7 body-inclusive cache
-keys**, so in practice nothing caches `QUERY` today. This is the central argument for the
-`Location` indirection — see [ADR 0004](decisions/0004-location-indirection.md).
+What is known indirectly still stands: **no CDN appears to implement RFC 10008 §2.7
+body-inclusive cache keys**, so in practice nothing caches `QUERY` today. Core therefore
+assumes every downstream cache is body-blind — the conservative direction, and now the only
+defensible one, since there will be no measurement to the contrary. See
+[ADR 0003](decisions/0003-cache-safety-default.md) and
+[ADR 0004](decisions/0004-location-indirection.md).
 
-Covered by matrix Axis B, which requires real deployments rather than local containers.
+Unlike the rest of this file, **this section does not need re-verification** — nothing here is
+a claim we rely on.
 
 ---
 
