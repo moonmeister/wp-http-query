@@ -128,7 +128,7 @@ Re-verified against the GitHub API **2026-08-16**.
 | WHATWG Fetch | [#1938](https://github.com/whatwg/fetch/issues/1938) — **open**, labels `needs implementer interest`, `topic: http`. Last activity 2026-07-01 |
 | WHATWG HTML (forms) | [#12594](https://github.com/whatwg/html/issues/12594) — **open**, labels `addition/proposal`, `needs implementer interest`, `topic: forms`. Last activity 2026-07-13 |
 | Mozilla | [#1430](https://github.com/mozilla/standards-positions/issues/1430) — **open, no position label assigned.** See below |
-| WebKit | [#692](https://github.com/WebKit/standards-positions/issues/692) — **closed on a technicality; no position exists.** See below |
+| WebKit | [#709](https://github.com/WebKit/standards-positions/issues/709) — **open, no position label yet.** Re-filed 2026-08-16 by this project, superseding [#692](https://github.com/WebKit/standards-positions/issues/692) (closed on a technicality). See below |
 
 **Mozilla — no formal position, informally waiting.** The issue is open with **no label**, so
 Mozilla has not taken a position. `mozfreddyb` commented 2026-07-07:
@@ -156,13 +156,23 @@ reason and explicitly invites a re-file. No `support` / `neutral` / `oppose` lab
 applied, and WebKit's README states that only a label represents its position. A search of the
 repo confirms **no follow-up issue was ever opened**.
 
-So: **WebKit has neither implemented nor rejected `QUERY`. It has not been asked, in a form its
+So: **WebKit had neither implemented nor rejected `QUERY`. It had not been asked, in a form its
 tooling accepts.** Never cite #692 as a WebKit rejection — that would be wrong, and it is the
 kind of claim a reviewer will check.
 
-> **Actionable.** Re-filing this with the correct template is a genuine, near-zero-cost
-> ecosystem contribution, and it is one of the few levers this project has on browser support.
-> It is not a WordPress task and nothing here gates on it.
+**Re-filed 2026-08-16 as [#709](https://github.com/WebKit/standards-positions/issues/709)** by
+this project, using the `request-for-position.yml` issue form. Open, **no position label yet** —
+which still means no WebKit position exists, only that the question is now properly asked. The
+re-file credits `jeswr` and links #692.
+
+Sets expectations for what comes back: the likeliest response mirrors Mozilla's on #1430 — that
+the semantics need to settle in Fetch and HTML first. A pointer back to
+[whatwg/fetch#1938](https://github.com/whatwg/fetch/issues/1938) would be a normal outcome, not
+a setback.
+
+> Nothing in this project gates on the answer. It was worth doing because it was one of the few
+> levers available on browser support, and because "WebKit has no position" is only a useful
+> fact once someone has actually asked.
 
 ---
 
@@ -222,9 +232,9 @@ Re-run before any public claim, and at minimum monthly:
    `src/http/ngx_http_request.h` for a `NGX_HTTP_QUERY` identifier.
 2. **Fetch** — check [whatwg/fetch#1938](https://github.com/whatwg/fetch/issues/1938) state and
    labels; check whether `QUERY` entered the normalize-a-method list in `fetch.bs`.
-3. **Standards positions** — check for a *label* on Mozilla #1430, not just comments. For
-   WebKit, check whether #692 was ever re-filed:
-   `gh api -X GET search/issues -f q='repo:WebKit/standards-positions 10008'`.
+3. **Standards positions** — check for a *label* on Mozilla #1430 and WebKit #709, not just
+   comments. A label is the position; a comment is not:
+   `gh issue view 709 -R WebKit/standards-positions --json labels,comments`.
 4. **Browsers** — re-test caching empirically. The current datapoint is weak.
 5. **Frameworks** — resolve the five collected-but-unverified links above.
 6. **Update the date at the top of this file**, even if nothing changed. A stale date is more
