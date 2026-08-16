@@ -428,9 +428,10 @@ from its current behavior of leaving it alone?
 
 ## 8. Sequencing
 
-**Task breakdown by venue: [tasks.md](tasks.md).** That file tracks who does what and where —
-the work lands in six places, only one of which we control. This section states the ordering
-principle; it deliberately does not duplicate the task list.
+**Task breakdown: [GitHub issues](https://github.com/moonmeister/wp-http-query/issues)**, mapped
+in the README under [Where the work lands](../README.md#where-the-work-lands). They track who
+does what and where — the work lands in six places, only one of which we control. This section
+states the ordering principle; it deliberately does not duplicate the task list.
 
 The critical path is short, and **no part of it is empirical any more**. Q2 — whether `QUERY`
 and its body reach PHP — was the gating unknown and is answered. What remains:

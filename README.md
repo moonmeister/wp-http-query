@@ -18,7 +18,8 @@ Concretely: a site owner whose stack supports `QUERY` should be able to use it w
 without patching core, and a site owner whose stack does not should be unaffected.
 
 Start with **[docs/scope.md](docs/scope.md)**. To pick up work, see
-**[docs/tasks.md](docs/tasks.md)** — the contributions this needs land in six different repos.
+**[the issues](https://github.com/moonmeister/wp-http-query/issues)** — the contributions this
+needs land in six different repos, and [Where the work lands](#where-the-work-lands) maps them.
 
 ## Why `QUERY`
 
@@ -52,6 +53,49 @@ Expected local layout — the matrix harness and scripts assume siblings:
 
 Deliberately **not** submodules: the two forks track upstream on upstream's schedule and get
 rebased independently.
+
+---
+
+## Where the work lands
+
+Tracked entirely in **[issues](https://github.com/moonmeister/wp-http-query/issues)**. They are
+organized by **capability delivered**, not by venue — venue is a label, because a single
+capability usually needs research here, code in a fork, and a writeup on someone else's tracker.
+Each parent carries research → code → report sub-issues: on this project *reporting is a
+deliverable*, since the pitch is "arrive with verified evidence" and a patch nobody writes up is
+worth about as much as no patch.
+
+| Capability | Venue | Milestone |
+|---|---|---|
+| [#1 Method constants & route matching](../../issues/1) — gap 2, the most contested call | core | Core patch v1 |
+| [#2 Request body parsing](../../issues/2) — gap 3, one line | core | Core patch v1 |
+| [#3 CORS preflight](../../issues/3) — gap 1, independently landable | core | Core patch v1 |
+| [#4 Cache safety & `Accept-Query`](../../issues/4) — security-relevant | core | Core patch v1 |
+| [#5 Feature plugin demo](../../issues/5) — the strongest artifact for Trac | this repo | Core patch v1 |
+| [#6 PHP client — `WP_Http` / Requests](../../issues/6) — review, not authorship | WpOrg/Requests | Ecosystem |
+| [#7 JS clients](../../issues/7) — `api-fetch` and browser `fetch()` | this repo | Ecosystem |
+
+Plus four standalone: [#31](../../issues/31) re-file the WebKit standards position,
+[#32](../../issues/32) document the hardening-allowlist 403, [#33](../../issues/33) matrix Axis A
+leftovers, [#34](../../issues/34) `/wp/v2/search` as first adopter.
+
+**Milestones.** *Core patch v1* must be done before posting anything to Trac#65616. *Ecosystem*
+runs in parallel and gates nothing. *Deferred* is named so it is not rediscovered as a gap.
+
+[#8](../../issues/8) — reading Trac#65616 in a browser — is the project's only hard blocker and
+needs a human; see the verification note below.
+
+### Explicitly not doing
+
+Full reasoning in [scope.md](docs/scope.md) §3 and §6.
+
+| | Why |
+|---|---|
+| Matrix Axis B — CDNs, WAFs, managed hosts | Outside the WordPress boundary; Axis A suffices for a readiness claim |
+| Designing a query language | ADR 0001 option C, deferred |
+| Migrating existing core endpoints | Capability, not adoption |
+| Lobbying nginx, CDNs, or hosts | Tracked, not gated on |
+| Authoring the Requests PR | [#1075](https://github.com/WordPress/Requests/pull/1075) already exists and is being triaged |
 
 ---
 
@@ -109,7 +153,6 @@ Tracked because they move the readiness date, not because the project waits on t
 ```
 docs/
   scope.md            Project scope, current state of trunk, open questions
-  tasks.md            What needs contributing, and to which repo
   ecosystem.md        Ecosystem support status — time-sensitive, dated, re-verified
   decisions/          ADRs for contested design calls
 matrix/
