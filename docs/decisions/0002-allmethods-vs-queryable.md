@@ -101,20 +101,31 @@ proposes mirroring that — an unmatched `QUERY` may fall back to a registered `
 - **+** Follows a pattern core already ships and reviewers already accept.
 - **+** Orthogonal to the constants question — it composes with B or C rather than replacing
   them.
-- **−** **It is not the same as `HEAD → GET`, and the difference is the whole problem.** `HEAD`
-  is `GET` minus the body, so the fallback is lossless. `QUERY` is `GET` *plus* a request body,
-  and the `GET` handler will not read it. Falling back silently discards the query.
-- **−** That failure is silent and returns a plausible-looking unfiltered result set — arguably
-  worse than the `404` we have today, and on read endpoints an unfiltered result set can be a
-  disclosure rather than merely a wrong answer.
-- **−** Only defensible if gap 3 is fixed first so body params populate, and even then the
-  handler's `get_collection_params()` never declared them.
+- **−** **It is not the same as `HEAD → GET`.** `HEAD` is `GET` minus the body, so the fallback is
+  lossless. `QUERY` is `GET` *plus* a request body, and whether the fallback is lossless depends
+  entirely on whether that body reaches the handler.
+- **−** With a **form-encoded** body it does not, and the result is a silent, plausible-looking
+  *unfiltered* result set — arguably worse than today's `404`, and on a read endpoint an
+  unfiltered collection can be a disclosure rather than merely a wrong answer.
+- **−** Only defensible if gap 3 is fixed first.
 
-**Assessment:** the ergonomics are attractive and the safety argument is bad. If it is pursued
-at all it must be **opt-in per route** and it must not be conflated with the constants
-decision — which is why it is recorded here as a separate axis rather than a fifth alternative.
-Expect the ticket reporter to advocate for it; engage on the silent-discard point specifically,
-because the `HEAD → GET` analogy is superficially very persuasive.
+> ⚠️ **Corrected 2026-08-16 — this ADR previously overstated the case against option E.**
+> It asserted flatly that "the `GET` handler will not read [the body]. Falling back silently
+> discards the query." **That is false for JSON bodies**, which is what REST clients actually
+> send. Measured, not reasoned — see "What a `QUERY` body actually does today" below. Do not
+> take this argument into the ticket in its old form; the reporter can refute it in one test.
+
+**Assessment (revised).** The safety objection survives, but it is *narrower and differently
+located* than stated above: the danger is not the fallback, it is **gap 3**. With gap 3 fixed,
+a `QUERY` falling back to a `GET` handler filters correctly and validates correctly, for both
+body encodings — the fallback really would be close to lossless. With gap 3 unfixed, a
+form-encoded `QUERY` silently returns everything.
+
+That reordering matters for sequencing: **gap 3 is a prerequisite for option E, not a caveat on
+it.** If it is pursued at all it should still be **opt-in per route**, and it must not be
+conflated with the constants decision — which is why it is recorded here as a separate axis
+rather than a fifth alternative. Expect the ticket reporter to advocate for it, and engage on
+the gap-3 ordering rather than on silent discard in general.
 
 ## Recommendation (not yet decided)
 
@@ -231,6 +242,53 @@ Minor finding for core, noted in passing: `rest-attachments-controller.php:374` 
 reversed, so PHPUnit reports actual as expected. Harmless, but it makes those two diffs read
 backwards.
 
+## What a `QUERY` body actually does today
+
+✅ **Measured 2026-08-16, unmodified trunk, no core patch of any kind.** This was the ADR's
+decisive open question and it now has an answer.
+
+`get_parameter_order()` (`class-wp-rest-request.php:361-398`) adds the `JSON` param source with
+**no method check at all** — `if ( $this->is_json_content_type() )`. The `$accepts_body_data`
+allowlist at `:377` gates only the `POST` source, i.e. the *form-encoded* body. Observed orders:
+
+| Request | Parameter order |
+|---|---|
+| `POST` + `application/json` | `JSON > POST > GET > URL > defaults` |
+| **`QUERY` + `application/json`** | **`JSON > GET > URL > defaults`** |
+| `PUT` + `application/x-www-form-urlencoded` | `POST > GET > URL > defaults` |
+| **`QUERY` + `application/x-www-form-urlencoded`** | **`GET > URL > defaults`** ← no body source |
+| `GET` + `application/json` | `JSON > GET > URL > defaults` |
+
+So **a `QUERY` request with a JSON body already populates params correctly on trunk.** Gap 3
+costs exactly one thing: form-encoded `QUERY` bodies.
+
+Confirmed end to end against the real posts controller. Registering
+`WP_REST_Posts_Controller::get_items()` under `'methods' => 'QUERY'` with its own
+`get_collection_params()` — which is precisely what option D or an option E fallback would
+dispatch to — gives:
+
+| Case | Result |
+|---|---|
+| `QUERY` + `{"search":"needle"}` | ✅ **200, collection correctly filtered to the one match** |
+| `QUERY` + `{"per_page":9999}` | ✅ **400 — body params are schema-validated** |
+| `QUERY` + `search=needle` (form) | ❌ **200 with the full unfiltered collection** |
+
+Two consequences, and they point in opposite directions:
+
+1. **The BC objection to option A is weaker than this ADR assumed.** A plugin route registered
+   with `ALLMETHODS` that begins receiving `QUERY` does not run with empty parameters — with a
+   JSON body it runs with fully populated, fully validated ones. The feared failure mode
+   ("handlers receive a method they were not written for, with a body they will not parse")
+   is not what happens. Say so; it is a point against our own preferred option and stating it
+   first is worth more than hoping nobody checks.
+2. **The remaining risk is concentrated in gap 3, and it is the disclosure-shaped one.** A
+   form-encoded `QUERY` returns an unfiltered collection with a `200`. That is the silent-wrong-
+   answer case, and it applies to option A, option D and option E alike. **Gap 3 should be
+   sequenced first in the patch, not last.**
+
+Reproductions: `experiments/blast-radius/rest-query-body-probe.php` and
+`rest-query-fallback-probe.php`.
+
 ## Open
 
 - ~~**Blocked on scope.md Q3.**~~ **Unblocked 2026-08-16.** Trac#65616 was read in full: it does
@@ -242,12 +300,15 @@ backwards.
 - **The ticket itself proposes `QUERY`/`QUERYABLE`** (its phase 1), which is options B/C. Our
   lean and the reporter's proposal already agree, so the ADR's job is now to *defend* that choice
   against option A rather than to pick between them.
-- What actually happens today when an `ALLMETHODS` route receives a `QUERY` with a JSON body?
-  Given that JSON parsing is method-independent, params may populate fine — which would weaken
-  the BC objection to A considerably. **Still open, and now the decisive question**, since the
-  measurement did not discriminate between A, B and C. Note core's own single `ALLMETHODS` route
-  cannot answer it: it rejects non-matching methods in its `permission_callback`. This needs a
-  synthetic route registered in a test, not a core endpoint.
+- ~~What actually happens today when an `ALLMETHODS` route receives a `QUERY` with a JSON
+  body?~~ **Answered 2026-08-16** — params populate and validate normally; see "What a `QUERY`
+  body actually does today." The BC objection to A is weaker than this ADR assumed.
+- **Does that change the recommendation?** It weakens the strongest argument for B/C over A while
+  strengthening nothing for A on the ecosystem side, where the risk was always about plugin
+  authors' expectations rather than about parameter plumbing. The lean toward C stands, but it
+  now rests on "route authors should opt into a method they must consciously support" rather than
+  on "their handlers would break." That is a weaker and more honest claim. **Decide explicitly
+  whether it is still enough.**
 - Does `EDITABLE`/`CREATABLE` need any statement, or is silence correct?
 - Report the array-form normalization bug to core? It is real, confirmed on trunk, and has a
   failing test — but it was found while measuring `QUERY`, and filing it needs the same

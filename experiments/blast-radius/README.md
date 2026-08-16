@@ -45,10 +45,40 @@ list against baseline.
 `results/*.tests` here are those lists, committed so the decomposition in ADR 0002 can be checked
 without re-running.
 
-## `rest-array-methods-probe.php`
+## Probes
 
-A standalone finding, not part of the variant sweep. Drop it in
-`tests/phpunit/tests/rest-api/` and run `--filter Tests_REST_Array_Methods_Probe`.
+Three standalone tests, not part of the variant sweep. Drop any of them in
+`tests/phpunit/tests/rest-api/` and run with `--filter <ClassName>`. **None of them requires a
+core patch** — they all run against unmodified trunk, which is the point.
+
+Each is written to fail where the finding is, so the PHPUnit diff *is* the result. Two also
+assert `array()` against a collected table purely to make that table print.
+
+### `rest-query-body-probe.php` — does a `QUERY` body populate params?
+
+Answer: **with JSON, yes, already.** `get_parameter_order()` adds the `JSON` source with no
+method check, so `QUERY` + `application/json` resolves as `JSON > GET > URL > defaults`. The
+`$accepts_body_data` allowlist (`class-wp-rest-request.php:377`) gates only the form-encoded
+source, so `QUERY` + `application/x-www-form-urlencoded` resolves as `GET > URL > defaults` and
+loses the body. Gap 3 costs exactly that one case.
+
+Note the `PUT` control: `POST` is deliberately not used, because `get_parameter_order()` skips
+`parse_body_params()` for `POST` and relies on the SAPI having filled `$_POST`, which a synthetic
+request object never has.
+
+### `rest-query-fallback-probe.php` — would a `QUERY → GET` fallback work?
+
+Registers the real `WP_REST_Posts_Controller::get_items()` under `'methods' => 'QUERY'` with its
+own `get_collection_params()`, which is what ADR 0002 option D or an option E fallback would
+dispatch to. A JSON body **filters the collection correctly and is schema-validated** (`400` on
+`per_page=9999`); a form-encoded body returns the **full unfiltered collection with a `200`**.
+
+This corrected ADR 0002, which had asserted the fallback would silently discard the query in
+general. It does so only for form-encoded bodies — i.e. the objection is really gap 3.
+
+### `rest-array-methods-probe.php` — the array-form normalization bug
+
+A finding that has nothing to do with `QUERY`, discovered while measuring option D.
 
 `register_rest_route()` splits comma-separated method strings only when `methods` is a string;
 the array branch (`class-wp-rest-server.php:1008-1020`) does not. So

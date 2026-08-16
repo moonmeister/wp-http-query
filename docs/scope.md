@@ -83,6 +83,19 @@ before asking anyone to change core, which materially lowers the bar for accepta
 Gap 3 only affects non-JSON bodies. The fix is one line; the design decision behind it
 ([ADR 0001](decisions/0001-query-body-media-type.md)) is not.
 
+> ✅ **Both halves of that sentence measured 2026-08-16** against unmodified trunk, no patch.
+> `get_parameter_order()` adds the `JSON` source with **no method check**, so a `QUERY` with
+> `Content-Type: application/json` already resolves params in the order
+> `JSON > GET > URL > defaults` and works correctly end to end — dispatched at the real posts
+> controller, a `{"search":"…"}` body filters the collection and a `{"per_page":9999}` body is
+> rejected with a `400`. The `$accepts_body_data` allowlist gates only the form-encoded `POST`
+> source, so a form-encoded `QUERY` resolves as `GET > URL > defaults` and **returns the full
+> unfiltered collection with a `200`.**
+>
+> That makes gap 3 the only one of the three whose failure mode is a silent wrong answer rather
+> than a refusal, which argues for sequencing it **first** in the patch.
+> Reproductions: [`experiments/blast-radius/`](../experiments/blast-radius/).
+
 **Gap 1 has prior art, and reading it in full turned it from unfavorable to favorable.** All
 tickets below were read in a browser on 2026-08-16 and are verified.
 
