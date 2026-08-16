@@ -52,6 +52,17 @@ STACKS=(
 	"php-builtin:8085"
 )
 
+# Request the front controller directly rather than the bare root.
+#
+# This matters: on nginx, `QUERY /` is answered by the index module, which 405s
+# non-GET/HEAD/POST *before* try_files can fall through to index.php. That is a
+# real nginx behavior, but it is not the WordPress path — /wp-json/* never
+# resolves to a directory index. Hitting /index.php reproduces what every stack
+# does internally for a REST request, and removes the directory-index variable
+# from the comparison. The bare-root behavior is kept as its own case below.
+FC_PATH="/index.php"
+ROOT_PATH="/"
+
 JSON_BODY='{"filter":{"post_type":"post","status":"publish"},"per_page":10}'
 FORM_BODY='filter[post_type]=post&per_page=10'
 # 64 KiB, to catch truncation that a small body would hide.
@@ -74,10 +85,17 @@ if [[ $DO_UP -eq 1 ]]; then
 	done
 fi
 
-# run_case <stack> <port> <case> <method> <content-type|-> <body|->
+# run_case <stack> <port> <case> <method> <content-type|-> <body|-> <path> [expect]
+#
+# expect: "ok" (default) — a 200 with an intact body is a pass.
+#         "deny"         — a non-2xx is a pass. Used for sentinels that prove a
+#                          hardening config is actually in force. Without these,
+#                          a misconfigured hardened stack reports all-pass and
+#                          looks like evidence that hardening permits QUERY.
 run_case() {
-	local stack="$1" port="$2" case_name="$3" method="$4" ctype="$5" body="$6"
-	local url="http://localhost:$port/"
+	local stack="$1" port="$2" case_name="$3" method="$4" ctype="$5" body="$6" path="$7"
+	local expect="${8:-ok}"
+	local url="http://localhost:$port$path"
 	local resp="$TMP/resp.json"
 	local -a args=(-s -o "$resp" -w '%{http_code}' --max-time 20 -X "$method")
 
@@ -92,7 +110,16 @@ run_case() {
 	code="$(curl "${args[@]}" "$url" 2>/dev/null || echo "000")"
 
 	local probe='null' verdict reason
-	if [[ "$code" == "200" ]] && jq -e . "$resp" >/dev/null 2>&1; then
+	if [[ "$expect" == "deny" ]]; then
+		if [[ "$code" == "000" ]]; then
+			verdict="error"; reason="no response (stack down or connection refused)"
+		elif [[ "$code" == 2* ]]; then
+			verdict="fail"
+			reason="HTTP $code — hardening NOT in force, this stack's results are not trustworthy"
+		else
+			verdict="pass"; reason="denied with HTTP $code, as required"
+		fi
+	elif [[ "$code" == "200" ]] && jq -e . "$resp" >/dev/null 2>&1; then
 		probe="$(cat "$resp")"
 		local got_method intact readable
 		got_method="$(jq -r '.request_method // ""' "$resp")"
@@ -118,9 +145,11 @@ run_case() {
 
 	jq -n \
 		--arg stack "$stack" --arg case "$case_name" --arg method "$method" \
+		--arg path "$path" --arg expect "$expect" \
 		--arg code "$code" --arg verdict "$verdict" --arg reason "$reason" \
 		--argjson probe "$probe" \
-		'{stack:$stack, case:$case, method:$method, http_status:($code|tonumber? // 0),
+		'{stack:$stack, case:$case, method:$method, path:$path, expect:$expect,
+		  http_status:($code|tonumber? // 0),
 		  verdict:$verdict, reason:$reason, probe:$probe}' >> "$TMP/rows.jsonl"
 }
 
@@ -131,12 +160,25 @@ printf '%.0s-' {1..78}; echo
 : > "$TMP/rows.jsonl"
 for entry in "${STACKS[@]}"; do
 	stack="${entry%%:*}"; port="${entry##*:}"
-	run_case "$stack" "$port" "get-control"   GET   -                                   -
-	run_case "$stack" "$port" "post-control"  POST  "application/json"                  "$JSON_BODY"
-	run_case "$stack" "$port" "query-json"    QUERY "application/json"                  "$JSON_BODY"
-	run_case "$stack" "$port" "query-form"    QUERY "application/x-www-form-urlencoded" "$FORM_BODY"
-	run_case "$stack" "$port" "query-empty"   QUERY -                                   -
-	run_case "$stack" "$port" "query-large"   QUERY "application/octet-stream"          "$LARGE_BODY"
+	run_case "$stack" "$port" "get-control"   GET   -                                   -             "$FC_PATH"
+	run_case "$stack" "$port" "post-control"  POST  "application/json"                  "$JSON_BODY"  "$FC_PATH"
+	run_case "$stack" "$port" "query-json"    QUERY "application/json"                  "$JSON_BODY"  "$FC_PATH"
+	run_case "$stack" "$port" "query-form"    QUERY "application/x-www-form-urlencoded" "$FORM_BODY"  "$FC_PATH"
+	run_case "$stack" "$port" "query-empty"   QUERY -                                   -             "$FC_PATH"
+	run_case "$stack" "$port" "query-large"   QUERY "application/octet-stream"          "$LARGE_BODY" "$FC_PATH"
+	# Bare root — exercises the directory-index handler instead of the front
+	# controller. Not the WordPress REST path; recorded to document the
+	# difference rather than to gate on it.
+	run_case "$stack" "$port" "query-root"    QUERY "application/json"                  "$JSON_BODY"  "$ROOT_PATH"
+
+	# Sentinel: on a hardened stack, a method outside the allowlist must be
+	# denied. DELETE is a *known* verb, so a 200 here means the hardening block
+	# is not applying at all — not that it tolerates unknown methods.
+	case "$stack" in
+		*-hardened)
+			run_case "$stack" "$port" "harden-sentinel" DELETE - - "$FC_PATH" deny
+			;;
+	esac
 done
 
 jq -s \
@@ -154,6 +196,11 @@ jq -s \
 	echo "Run: $(jq -r '.run.date' "$RESULTS_JSON")"
 	echo
 	echo "Legend: ✅ pass · ❌ fail · ⚠️ error (stack unreachable)"
+	echo
+	echo "All cases hit \`/index.php\` (the front controller — what \`/wp-json/*\` resolves to)"
+	echo "except \`query-root\`, which hits \`/\` to exercise the directory-index handler."
+	echo "A \`query-root\` failure alongside passing \`query-*\` cases is **not** a QUERY"
+	echo "passthrough problem; see matrix/README.md."
 	echo
 	jq -r '
 		([.results[].case]  | unique) as $cases  |

@@ -67,9 +67,36 @@ PHP, since the SAPI is what is under test.
 | `query-form` | QUERY | form-encoded | Does PHP's `$_POST` machinery interfere? |
 | `query-empty` | QUERY | — | Is the verb alone accepted? |
 | `query-large` | QUERY | 64 KiB | Truncation a small body would hide. |
+| `query-root` | QUERY | JSON | Directory-index handler instead of front controller. |
+| `harden-sentinel` | DELETE | — | *Hardened stacks only.* Proves the config is in force. |
 
 `post-control` matters: if it fails too, the stack is misconfigured rather than
 `QUERY`-hostile. Never report a `query-*` failure without checking its control.
+
+### Two traps this harness fell into, both now guarded
+
+Recording these because both produced *confident, wrong* results, and both are the kind of
+error that would be embarrassing to carry into a Trac discussion.
+
+**1. Requesting the bare root.** The first run had every case hit `/`, and nginx returned 405
+for `QUERY`. Read naively that is "nginx rejects QUERY" — the exact claim
+[../docs/ecosystem.md](../docs/ecosystem.md) warns against. In fact nginx's index module
+answers `/` and 405s non-GET/HEAD/POST *before* `try_files` can reach the front controller.
+`QUERY /index.php` and `QUERY /wp-json/wp/v2/search` both return 200 with an intact body on
+the same server. Cases now target `/index.php`; `query-root` keeps the root behavior visible
+instead of discarding it.
+
+**2. A hardening block that wasn't in force.** `apache-modphp-hardened` initially passed every
+`QUERY` case, which looked like a real finding — Apache tolerating an unknown verb where nginx
+did not. It was a config bug: a `Require all granted` sat in the same context as the
+`<LimitExcept GET POST>` `Require all denied`, and Apache OR's `Require` directives via an
+implicit `<RequireAny>`, so access was granted. Both directives are now method-scoped, and
+`harden-sentinel` sends a **known** verb (DELETE) that must be denied. A 200 there fails the
+stack loudly rather than inflating the pass count.
+
+The general lesson: **a negative control is worth as much as the test.** A hardened stack that
+denies nothing, and a permissive stack whose 405 comes from an unrelated handler, both report
+cleanly and both are wrong.
 
 ### Verdicts
 
@@ -77,6 +104,51 @@ PHP, since the SAPI is what is under test.
 readable; and the body's SHA-256 matches what the client asserted via `X-Probe-Expect-Sha256`.
 
 Anything else is `fail` (reached the stack, wrong answer) or `error` (never reached it).
+
+Sentinel cases invert this: `expect: "deny"` in `results.json` means a non-2xx is the pass.
+
+---
+
+## Axis A results — first run, 2026-08-16
+
+Canonical data in [`results/results.json`](results/results.json); generated view in
+[`results/MATRIX.md`](results/MATRIX.md).
+
+**The make-or-break question is answered: yes.** On every stack that does not deliberately
+block the verb, `QUERY` reaches PHP with `REQUEST_METHOD` exactly as sent and the body byte-
+identical, verified by SHA-256 — **including a 64 KiB body, with no truncation**, across both
+`fpm-fcgi` and `apache2handler`.
+
+| Stack | `QUERY` reaches PHP | Body intact | Note |
+|---|---|---|---|
+| `nginx-fpm` | ✅ | ✅ | Passes on the front-controller path. `QUERY /` 405s — index module, not FastCGI. |
+| `apache-modphp` | ✅ | ✅ | `apache2handler`. Root path works too. |
+| `apache-fcgi` | ✅ | ✅ | `mod_proxy_fcgi` |
+| `caddy-fpm` | ✅ | ✅ | |
+| `nginx-hardened` | ❌ 403 | — | `limit_except GET POST`. Sentinel confirms in force. |
+| `apache-modphp-hardened` | ❌ 403 | — | `<LimitExcept GET POST>`. Sentinel confirms in force. |
+| `php-builtin` | ❌ 501 | — | `php -S` rejects unknown methods outright. |
+
+Three findings worth carrying into the ticket:
+
+1. **The SAPI layer is not the blocker.** nginx, Apache (both SAPIs) and Caddy all pass `QUERY`
+   and its body through untouched, on stock configuration. This removes the most common
+   objection to the whole premise — that `QUERY` cannot reach WordPress in the first place.
+
+2. **Hardening allowlists block `QUERY`, on Apache as well as nginx.** The common
+   `GET POST`-only block denies it with a 403 on both servers. This is a **site-configuration**
+   issue, not a WordPress or web-server defect, and it is what a site owner will actually hit
+   first. Worth documenting for users; nothing WordPress can fix.
+
+3. **PHP never populates `$_POST` for `QUERY`** — not even with
+   `Content-Type: application/x-www-form-urlencoded`. Controlled: the identical body sent as
+   `POST` populates `$_POST` with `filter` and `per_page`; sent as `QUERY` it yields an empty
+   `$_POST` and a fully intact `php://input`. This is PHP behavior, not a server difference —
+   it held on every passing stack. See [ADR 0001](../docs/decisions/0001-query-body-media-type.md),
+   whose premise it confirms.
+
+Not yet covered: HTTP/2 and HTTP/3 (all cases ran over HTTP/1.1), TLS, OpenLiteSpeed, and
+everything in Axes B and C.
 
 ---
 

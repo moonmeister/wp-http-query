@@ -25,6 +25,31 @@ The form-encoded path does *not* work: `$accepts_body_data = array( 'POST', 'PUT
 parsed by `parse_body_params()` into `$this->params['POST']` and then never added to the lookup
 order. Silent data loss.
 
+### Measured: PHP will not do this for us (matrix, 2026-08-16)
+
+The matrix settles a question this ADR previously assumed. **PHP never populates `$_POST` for
+a `QUERY` request, even with `Content-Type: application/x-www-form-urlencoded.`** Controlled on
+`nginx-fpm`: an identical `filter[post_type]=post&per_page=10` body sent as `POST` populates
+`$_POST` with `filter` and `per_page`; sent as `QUERY` it yields an empty `$_POST` and a
+byte-intact `php://input`. This held on every passing stack and across both SAPIs, so it is PHP
+behavior rather than a server difference.
+
+That is exactly the situation `parse_body_params()` was written for — its docblock reads
+*"Parses out URL-encoded bodies for request methods that aren't supported natively by PHP"*
+(`class-wp-rest-request.php:746-747`) — and it uses `parse_str( $this->get_body(), $params )`
+on the raw body rather than reading `$_POST`.
+
+**Two consequences, both favoring option B:**
+
+- Adding `'QUERY'` to `$accepts_body_data` really is a one-line change. Core already does its
+  own parsing and does not depend on `$_POST`, so nothing else has to move.
+- `QUERY` is precisely the class of method that method was added to serve. Option B is not
+  special-casing `QUERY`; it is stopping `QUERY` from being the special case.
+
+It also raises the cost of option A. Under A, a form-encoded `QUERY` body is not rejected — it
+is parsed, stored, and then silently dropped from the lookup order, and the caller gets an
+empty result set with a 200.
+
 **This decision gates the gap-3 fix.** Adding `'QUERY'` to `$accepts_body_data` is a one-line
 change, but it is only the right change if form-encoded is a format we intend to support.
 

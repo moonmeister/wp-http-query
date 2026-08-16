@@ -1,0 +1,1798 @@
+{
+  "run": {
+    "date": "2026-08-16T18:42:46Z",
+    "curl": "curl 8.12.1 (aarch64-apple-darwin25.3.0) libcurl/8.12.1 BoringSSL zlib/1.2.12 brotli/1.2.0 zstd/1.5.7 libidn2/2.3.8 libssh2/1.11.1 nghttp2/1.69.0 quiche/0.26.1 librtmp/2.3 OpenLDAP/2.6.13"
+  },
+  "results": [
+    {
+      "stack": "nginx-fpm",
+      "case": "get-control",
+      "method": "GET",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "GET",
+        "method_verbatim": true,
+        "content_type": "",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 0,
+          "content_length_header": null,
+          "length_matches": null,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "expected_sha256": null,
+          "intact": null,
+          "preview": ""
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "nginx/1.27.5",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "accept": "*/*",
+          "user-agent": "curl/8.12.1",
+          "host": "localhost:8081"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "nginx-fpm",
+      "case": "post-control",
+      "method": "POST",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "POST",
+        "method_verbatim": true,
+        "content_type": "application/json",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 64,
+          "content_length_header": 64,
+          "length_matches": true,
+          "sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "expected_sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "intact": true,
+          "preview": "{\"filter\":{\"post_type\":\"post\",\"status\":\"publish\"},\"per_page\":10}"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "nginx/1.27.5",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "content-length": "64",
+          "content-type": "application/json",
+          "x-probe-expect-sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "accept": "*/*",
+          "user-agent": "curl/8.12.1",
+          "host": "localhost:8081"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "nginx-fpm",
+      "case": "query-json",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": "application/json",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 64,
+          "content_length_header": 64,
+          "length_matches": true,
+          "sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "expected_sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "intact": true,
+          "preview": "{\"filter\":{\"post_type\":\"post\",\"status\":\"publish\"},\"per_page\":10}"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "nginx/1.27.5",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "content-length": "64",
+          "content-type": "application/json",
+          "x-probe-expect-sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "accept": "*/*",
+          "user-agent": "curl/8.12.1",
+          "host": "localhost:8081"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "nginx-fpm",
+      "case": "query-form",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": "application/x-www-form-urlencoded",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 34,
+          "content_length_header": 34,
+          "length_matches": true,
+          "sha256": "c96eec8a640add0bcdf121755c01abb1d137d45052b47013fe012971b4f5f542",
+          "expected_sha256": "c96eec8a640add0bcdf121755c01abb1d137d45052b47013fe012971b4f5f542",
+          "intact": true,
+          "preview": "filter[post_type]=post&per_page=10"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "nginx/1.27.5",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "content-length": "34",
+          "content-type": "application/x-www-form-urlencoded",
+          "x-probe-expect-sha256": "c96eec8a640add0bcdf121755c01abb1d137d45052b47013fe012971b4f5f542",
+          "accept": "*/*",
+          "user-agent": "curl/8.12.1",
+          "host": "localhost:8081"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "nginx-fpm",
+      "case": "query-empty",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": "",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 0,
+          "content_length_header": null,
+          "length_matches": null,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "expected_sha256": null,
+          "intact": null,
+          "preview": ""
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "nginx/1.27.5",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "accept": "*/*",
+          "user-agent": "curl/8.12.1",
+          "host": "localhost:8081"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "nginx-fpm",
+      "case": "query-large",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": "application/octet-stream",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 65536,
+          "content_length_header": 65536,
+          "length_matches": true,
+          "sha256": "1f8745f0d2d1387ec1af2211a3cf417b2e9e885e853472649c1d979d0e9370e3",
+          "expected_sha256": "1f8745f0d2d1387ec1af2211a3cf417b2e9e885e853472649c1d979d0e9370e3",
+          "intact": true,
+          "preview": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "nginx/1.27.5",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "content-length": "65536",
+          "content-type": "application/octet-stream",
+          "x-probe-expect-sha256": "1f8745f0d2d1387ec1af2211a3cf417b2e9e885e853472649c1d979d0e9370e3",
+          "accept": "*/*",
+          "user-agent": "curl/8.12.1",
+          "host": "localhost:8081"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "nginx-fpm",
+      "case": "query-root",
+      "method": "QUERY",
+      "path": "/",
+      "expect": "ok",
+      "http_status": 405,
+      "verdict": "fail",
+      "reason": "HTTP 405",
+      "probe": null
+    },
+    {
+      "stack": "nginx-hardened",
+      "case": "get-control",
+      "method": "GET",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "GET",
+        "method_verbatim": true,
+        "content_type": "",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 0,
+          "content_length_header": null,
+          "length_matches": null,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "expected_sha256": null,
+          "intact": null,
+          "preview": ""
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "nginx/1.27.5",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "accept": "*/*",
+          "user-agent": "curl/8.12.1",
+          "host": "localhost:8181"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "nginx-hardened",
+      "case": "post-control",
+      "method": "POST",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "POST",
+        "method_verbatim": true,
+        "content_type": "application/json",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 64,
+          "content_length_header": 64,
+          "length_matches": true,
+          "sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "expected_sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "intact": true,
+          "preview": "{\"filter\":{\"post_type\":\"post\",\"status\":\"publish\"},\"per_page\":10}"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "nginx/1.27.5",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "content-length": "64",
+          "content-type": "application/json",
+          "x-probe-expect-sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "accept": "*/*",
+          "user-agent": "curl/8.12.1",
+          "host": "localhost:8181"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "nginx-hardened",
+      "case": "query-json",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 403,
+      "verdict": "fail",
+      "reason": "HTTP 403",
+      "probe": null
+    },
+    {
+      "stack": "nginx-hardened",
+      "case": "query-form",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 403,
+      "verdict": "fail",
+      "reason": "HTTP 403",
+      "probe": null
+    },
+    {
+      "stack": "nginx-hardened",
+      "case": "query-empty",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 403,
+      "verdict": "fail",
+      "reason": "HTTP 403",
+      "probe": null
+    },
+    {
+      "stack": "nginx-hardened",
+      "case": "query-large",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 403,
+      "verdict": "fail",
+      "reason": "HTTP 403",
+      "probe": null
+    },
+    {
+      "stack": "nginx-hardened",
+      "case": "query-root",
+      "method": "QUERY",
+      "path": "/",
+      "expect": "ok",
+      "http_status": 403,
+      "verdict": "fail",
+      "reason": "HTTP 403",
+      "probe": null
+    },
+    {
+      "stack": "nginx-hardened",
+      "case": "harden-sentinel",
+      "method": "DELETE",
+      "path": "/index.php",
+      "expect": "deny",
+      "http_status": 403,
+      "verdict": "pass",
+      "reason": "denied with HTTP 403, as required",
+      "probe": null
+    },
+    {
+      "stack": "apache-modphp",
+      "case": "get-control",
+      "method": "GET",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "GET",
+        "method_verbatim": true,
+        "content_type": null,
+        "body": {
+          "input_readable": true,
+          "bytes_read": 0,
+          "content_length_header": null,
+          "length_matches": null,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "expected_sha256": null,
+          "intact": null,
+          "preview": ""
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "apache2handler",
+          "php_version": "8.3.33",
+          "server_software": "Apache/2.4.68 (Debian)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "host": "localhost:8082",
+          "user-agent": "curl/8.12.1",
+          "accept": "*/*"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "apache-modphp",
+      "case": "post-control",
+      "method": "POST",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "POST",
+        "method_verbatim": true,
+        "content_type": "application/json",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 64,
+          "content_length_header": 64,
+          "length_matches": true,
+          "sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "expected_sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "intact": true,
+          "preview": "{\"filter\":{\"post_type\":\"post\",\"status\":\"publish\"},\"per_page\":10}"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "apache2handler",
+          "php_version": "8.3.33",
+          "server_software": "Apache/2.4.68 (Debian)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "host": "localhost:8082",
+          "user-agent": "curl/8.12.1",
+          "accept": "*/*",
+          "x-probe-expect-sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "apache-modphp",
+      "case": "query-json",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": "application/json",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 64,
+          "content_length_header": 64,
+          "length_matches": true,
+          "sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "expected_sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "intact": true,
+          "preview": "{\"filter\":{\"post_type\":\"post\",\"status\":\"publish\"},\"per_page\":10}"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "apache2handler",
+          "php_version": "8.3.33",
+          "server_software": "Apache/2.4.68 (Debian)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "host": "localhost:8082",
+          "user-agent": "curl/8.12.1",
+          "accept": "*/*",
+          "x-probe-expect-sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "apache-modphp",
+      "case": "query-form",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": "application/x-www-form-urlencoded",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 34,
+          "content_length_header": 34,
+          "length_matches": true,
+          "sha256": "c96eec8a640add0bcdf121755c01abb1d137d45052b47013fe012971b4f5f542",
+          "expected_sha256": "c96eec8a640add0bcdf121755c01abb1d137d45052b47013fe012971b4f5f542",
+          "intact": true,
+          "preview": "filter[post_type]=post&per_page=10"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "apache2handler",
+          "php_version": "8.3.33",
+          "server_software": "Apache/2.4.68 (Debian)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "host": "localhost:8082",
+          "user-agent": "curl/8.12.1",
+          "accept": "*/*",
+          "x-probe-expect-sha256": "c96eec8a640add0bcdf121755c01abb1d137d45052b47013fe012971b4f5f542"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "apache-modphp",
+      "case": "query-empty",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": null,
+        "body": {
+          "input_readable": true,
+          "bytes_read": 0,
+          "content_length_header": null,
+          "length_matches": null,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "expected_sha256": null,
+          "intact": null,
+          "preview": ""
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "apache2handler",
+          "php_version": "8.3.33",
+          "server_software": "Apache/2.4.68 (Debian)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "host": "localhost:8082",
+          "user-agent": "curl/8.12.1",
+          "accept": "*/*"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "apache-modphp",
+      "case": "query-large",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": "application/octet-stream",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 65536,
+          "content_length_header": 65536,
+          "length_matches": true,
+          "sha256": "1f8745f0d2d1387ec1af2211a3cf417b2e9e885e853472649c1d979d0e9370e3",
+          "expected_sha256": "1f8745f0d2d1387ec1af2211a3cf417b2e9e885e853472649c1d979d0e9370e3",
+          "intact": true,
+          "preview": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "apache2handler",
+          "php_version": "8.3.33",
+          "server_software": "Apache/2.4.68 (Debian)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "host": "localhost:8082",
+          "user-agent": "curl/8.12.1",
+          "accept": "*/*",
+          "x-probe-expect-sha256": "1f8745f0d2d1387ec1af2211a3cf417b2e9e885e853472649c1d979d0e9370e3"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "apache-modphp",
+      "case": "query-root",
+      "method": "QUERY",
+      "path": "/",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": "application/json",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 64,
+          "content_length_header": 64,
+          "length_matches": true,
+          "sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "expected_sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "intact": true,
+          "preview": "{\"filter\":{\"post_type\":\"post\",\"status\":\"publish\"},\"per_page\":10}"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "apache2handler",
+          "php_version": "8.3.33",
+          "server_software": "Apache/2.4.68 (Debian)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "host": "localhost:8082",
+          "user-agent": "curl/8.12.1",
+          "accept": "*/*",
+          "x-probe-expect-sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "apache-modphp-hardened",
+      "case": "get-control",
+      "method": "GET",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "GET",
+        "method_verbatim": true,
+        "content_type": null,
+        "body": {
+          "input_readable": true,
+          "bytes_read": 0,
+          "content_length_header": null,
+          "length_matches": null,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "expected_sha256": null,
+          "intact": null,
+          "preview": ""
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "apache2handler",
+          "php_version": "8.3.33",
+          "server_software": "Apache/2.4.68 (Debian)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "host": "localhost:8182",
+          "user-agent": "curl/8.12.1",
+          "accept": "*/*"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "apache-modphp-hardened",
+      "case": "post-control",
+      "method": "POST",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "POST",
+        "method_verbatim": true,
+        "content_type": "application/json",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 64,
+          "content_length_header": 64,
+          "length_matches": true,
+          "sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "expected_sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "intact": true,
+          "preview": "{\"filter\":{\"post_type\":\"post\",\"status\":\"publish\"},\"per_page\":10}"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "apache2handler",
+          "php_version": "8.3.33",
+          "server_software": "Apache/2.4.68 (Debian)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "host": "localhost:8182",
+          "user-agent": "curl/8.12.1",
+          "accept": "*/*",
+          "x-probe-expect-sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "apache-modphp-hardened",
+      "case": "query-json",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 403,
+      "verdict": "fail",
+      "reason": "HTTP 403",
+      "probe": null
+    },
+    {
+      "stack": "apache-modphp-hardened",
+      "case": "query-form",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 403,
+      "verdict": "fail",
+      "reason": "HTTP 403",
+      "probe": null
+    },
+    {
+      "stack": "apache-modphp-hardened",
+      "case": "query-empty",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 403,
+      "verdict": "fail",
+      "reason": "HTTP 403",
+      "probe": null
+    },
+    {
+      "stack": "apache-modphp-hardened",
+      "case": "query-large",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 403,
+      "verdict": "fail",
+      "reason": "HTTP 403",
+      "probe": null
+    },
+    {
+      "stack": "apache-modphp-hardened",
+      "case": "query-root",
+      "method": "QUERY",
+      "path": "/",
+      "expect": "ok",
+      "http_status": 403,
+      "verdict": "fail",
+      "reason": "HTTP 403",
+      "probe": null
+    },
+    {
+      "stack": "apache-modphp-hardened",
+      "case": "harden-sentinel",
+      "method": "DELETE",
+      "path": "/index.php",
+      "expect": "deny",
+      "http_status": 403,
+      "verdict": "pass",
+      "reason": "denied with HTTP 403, as required",
+      "probe": null
+    },
+    {
+      "stack": "apache-fcgi",
+      "case": "get-control",
+      "method": "GET",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "GET",
+        "method_verbatim": true,
+        "content_type": null,
+        "body": {
+          "input_readable": true,
+          "bytes_read": 0,
+          "content_length_header": null,
+          "length_matches": null,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "expected_sha256": null,
+          "intact": null,
+          "preview": ""
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "Apache/2.4.68 (Unix)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "accept": "*/*",
+          "user-agent": "curl/8.12.1",
+          "host": "localhost:8083"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "apache-fcgi",
+      "case": "post-control",
+      "method": "POST",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "POST",
+        "method_verbatim": true,
+        "content_type": "application/json",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 64,
+          "content_length_header": 64,
+          "length_matches": true,
+          "sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "expected_sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "intact": true,
+          "preview": "{\"filter\":{\"post_type\":\"post\",\"status\":\"publish\"},\"per_page\":10}"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "Apache/2.4.68 (Unix)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "x-probe-expect-sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "accept": "*/*",
+          "user-agent": "curl/8.12.1",
+          "host": "localhost:8083"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "apache-fcgi",
+      "case": "query-json",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": "application/json",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 64,
+          "content_length_header": 64,
+          "length_matches": true,
+          "sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "expected_sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "intact": true,
+          "preview": "{\"filter\":{\"post_type\":\"post\",\"status\":\"publish\"},\"per_page\":10}"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "Apache/2.4.68 (Unix)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "x-probe-expect-sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "accept": "*/*",
+          "user-agent": "curl/8.12.1",
+          "host": "localhost:8083"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "apache-fcgi",
+      "case": "query-form",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": "application/x-www-form-urlencoded",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 34,
+          "content_length_header": 34,
+          "length_matches": true,
+          "sha256": "c96eec8a640add0bcdf121755c01abb1d137d45052b47013fe012971b4f5f542",
+          "expected_sha256": "c96eec8a640add0bcdf121755c01abb1d137d45052b47013fe012971b4f5f542",
+          "intact": true,
+          "preview": "filter[post_type]=post&per_page=10"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "Apache/2.4.68 (Unix)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "x-probe-expect-sha256": "c96eec8a640add0bcdf121755c01abb1d137d45052b47013fe012971b4f5f542",
+          "accept": "*/*",
+          "user-agent": "curl/8.12.1",
+          "host": "localhost:8083"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "apache-fcgi",
+      "case": "query-empty",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": null,
+        "body": {
+          "input_readable": true,
+          "bytes_read": 0,
+          "content_length_header": null,
+          "length_matches": null,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "expected_sha256": null,
+          "intact": null,
+          "preview": ""
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "Apache/2.4.68 (Unix)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "accept": "*/*",
+          "user-agent": "curl/8.12.1",
+          "host": "localhost:8083"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "apache-fcgi",
+      "case": "query-large",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": "application/octet-stream",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 65536,
+          "content_length_header": 65536,
+          "length_matches": true,
+          "sha256": "1f8745f0d2d1387ec1af2211a3cf417b2e9e885e853472649c1d979d0e9370e3",
+          "expected_sha256": "1f8745f0d2d1387ec1af2211a3cf417b2e9e885e853472649c1d979d0e9370e3",
+          "intact": true,
+          "preview": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "Apache/2.4.68 (Unix)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "x-probe-expect-sha256": "1f8745f0d2d1387ec1af2211a3cf417b2e9e885e853472649c1d979d0e9370e3",
+          "accept": "*/*",
+          "user-agent": "curl/8.12.1",
+          "host": "localhost:8083"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "apache-fcgi",
+      "case": "query-root",
+      "method": "QUERY",
+      "path": "/",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": "application/json",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 64,
+          "content_length_header": 64,
+          "length_matches": true,
+          "sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "expected_sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "intact": true,
+          "preview": "{\"filter\":{\"post_type\":\"post\",\"status\":\"publish\"},\"per_page\":10}"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "Apache/2.4.68 (Unix)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "x-probe-expect-sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "accept": "*/*",
+          "user-agent": "curl/8.12.1",
+          "host": "localhost:8083"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "caddy-fpm",
+      "case": "get-control",
+      "method": "GET",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "GET",
+        "method_verbatim": true,
+        "content_type": "",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 0,
+          "content_length_header": 0,
+          "length_matches": true,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "expected_sha256": null,
+          "intact": null,
+          "preview": ""
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "Caddy/v2.11.4",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "host": "localhost:8084",
+          "user-agent": "curl/8.12.1",
+          "via": "1.1 Caddy",
+          "x-forwarded-host": "localhost:8084",
+          "content-length": "0",
+          "x-forwarded-proto": "http",
+          "accept": "*/*",
+          "x-forwarded-for": "192.168.65.1"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "caddy-fpm",
+      "case": "post-control",
+      "method": "POST",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "POST",
+        "method_verbatim": true,
+        "content_type": "application/json",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 64,
+          "content_length_header": 64,
+          "length_matches": true,
+          "sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "expected_sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "intact": true,
+          "preview": "{\"filter\":{\"post_type\":\"post\",\"status\":\"publish\"},\"per_page\":10}"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "Caddy/v2.11.4",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "user-agent": "curl/8.12.1",
+          "via": "1.1 Caddy",
+          "content-type": "application/json",
+          "x-forwarded-for": "192.168.65.1",
+          "x-forwarded-host": "localhost:8084",
+          "host": "localhost:8084",
+          "content-length": "64",
+          "x-probe-expect-sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "accept": "*/*",
+          "x-forwarded-proto": "http"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "caddy-fpm",
+      "case": "query-json",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": "application/json",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 64,
+          "content_length_header": 64,
+          "length_matches": true,
+          "sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "expected_sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "intact": true,
+          "preview": "{\"filter\":{\"post_type\":\"post\",\"status\":\"publish\"},\"per_page\":10}"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "Caddy/v2.11.4",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "x-forwarded-host": "localhost:8084",
+          "host": "localhost:8084",
+          "x-forwarded-proto": "http",
+          "content-length": "64",
+          "x-forwarded-for": "192.168.65.1",
+          "content-type": "application/json",
+          "via": "1.1 Caddy",
+          "accept": "*/*",
+          "user-agent": "curl/8.12.1",
+          "x-probe-expect-sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "caddy-fpm",
+      "case": "query-form",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": "application/x-www-form-urlencoded",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 34,
+          "content_length_header": 34,
+          "length_matches": true,
+          "sha256": "c96eec8a640add0bcdf121755c01abb1d137d45052b47013fe012971b4f5f542",
+          "expected_sha256": "c96eec8a640add0bcdf121755c01abb1d137d45052b47013fe012971b4f5f542",
+          "intact": true,
+          "preview": "filter[post_type]=post&per_page=10"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "Caddy/v2.11.4",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "host": "localhost:8084",
+          "x-probe-expect-sha256": "c96eec8a640add0bcdf121755c01abb1d137d45052b47013fe012971b4f5f542",
+          "x-forwarded-host": "localhost:8084",
+          "x-forwarded-proto": "http",
+          "x-forwarded-for": "192.168.65.1",
+          "content-length": "34",
+          "via": "1.1 Caddy",
+          "user-agent": "curl/8.12.1",
+          "content-type": "application/x-www-form-urlencoded",
+          "accept": "*/*"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "caddy-fpm",
+      "case": "query-empty",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": "application/x-www-form-urlencoded",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 0,
+          "content_length_header": 0,
+          "length_matches": true,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "expected_sha256": null,
+          "intact": null,
+          "preview": ""
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "Caddy/v2.11.4",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "user-agent": "curl/8.12.1",
+          "host": "localhost:8084",
+          "accept": "*/*",
+          "via": "1.1 Caddy",
+          "x-forwarded-host": "localhost:8084",
+          "x-forwarded-proto": "http",
+          "x-forwarded-for": "192.168.65.1",
+          "content-length": "0"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "caddy-fpm",
+      "case": "query-large",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": "application/octet-stream",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 65536,
+          "content_length_header": 65536,
+          "length_matches": true,
+          "sha256": "1f8745f0d2d1387ec1af2211a3cf417b2e9e885e853472649c1d979d0e9370e3",
+          "expected_sha256": "1f8745f0d2d1387ec1af2211a3cf417b2e9e885e853472649c1d979d0e9370e3",
+          "intact": true,
+          "preview": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "Caddy/v2.11.4",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "x-forwarded-proto": "http",
+          "x-forwarded-for": "192.168.65.1",
+          "via": "1.1 Caddy",
+          "accept": "*/*",
+          "x-probe-expect-sha256": "1f8745f0d2d1387ec1af2211a3cf417b2e9e885e853472649c1d979d0e9370e3",
+          "host": "localhost:8084",
+          "content-type": "application/octet-stream",
+          "x-forwarded-host": "localhost:8084",
+          "content-length": "65536",
+          "user-agent": "curl/8.12.1"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "caddy-fpm",
+      "case": "query-root",
+      "method": "QUERY",
+      "path": "/",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "QUERY",
+        "method_verbatim": true,
+        "content_type": "application/json",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 64,
+          "content_length_header": 64,
+          "length_matches": true,
+          "sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "expected_sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "intact": true,
+          "preview": "{\"filter\":{\"post_type\":\"post\",\"status\":\"publish\"},\"per_page\":10}"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "fpm-fcgi",
+          "php_version": "8.3.33",
+          "server_software": "Caddy/v2.11.4",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "content-length": "64",
+          "via": "1.1 Caddy",
+          "x-forwarded-proto": "http",
+          "x-forwarded-for": "192.168.65.1",
+          "user-agent": "curl/8.12.1",
+          "x-forwarded-host": "localhost:8084",
+          "content-type": "application/json",
+          "x-probe-expect-sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "host": "localhost:8084",
+          "accept": "*/*"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "php-builtin",
+      "case": "get-control",
+      "method": "GET",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "GET",
+        "method_verbatim": true,
+        "content_type": null,
+        "body": {
+          "input_readable": true,
+          "bytes_read": 0,
+          "content_length_header": null,
+          "length_matches": null,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "expected_sha256": null,
+          "intact": null,
+          "preview": ""
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "cli-server",
+          "php_version": "8.3.33",
+          "server_software": "PHP/8.3.33 (Development Server)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "host": "localhost:8085",
+          "user-agent": "curl/8.12.1",
+          "accept": "*/*"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "php-builtin",
+      "case": "post-control",
+      "method": "POST",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 200,
+      "verdict": "pass",
+      "reason": "",
+      "probe": {
+        "probe_version": 1,
+        "request_method": "POST",
+        "method_verbatim": true,
+        "content_type": "application/json",
+        "body": {
+          "input_readable": true,
+          "bytes_read": 64,
+          "content_length_header": 64,
+          "length_matches": true,
+          "sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "expected_sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "intact": true,
+          "preview": "{\"filter\":{\"post_type\":\"post\",\"status\":\"publish\"},\"per_page\":10}"
+        },
+        "php_parsing": {
+          "post_populated": false,
+          "post_keys": [],
+          "get_populated": false,
+          "get_keys": [],
+          "enable_post_data_reading": true,
+          "post_max_size": "8M"
+        },
+        "environment": {
+          "sapi": "cli-server",
+          "php_version": "8.3.33",
+          "server_software": "PHP/8.3.33 (Development Server)",
+          "protocol": "HTTP/1.1"
+        },
+        "headers_received": {
+          "host": "localhost:8085",
+          "user-agent": "curl/8.12.1",
+          "accept": "*/*",
+          "x-probe-expect-sha256": "bb1183391302a39b02c06ad403f40b0ad90fc9f8638d0d34295e4c4e48411a7e",
+          "content-type": "application/json",
+          "content-length": "64"
+        },
+        "notes": []
+      }
+    },
+    {
+      "stack": "php-builtin",
+      "case": "query-json",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 501,
+      "verdict": "fail",
+      "reason": "HTTP 501",
+      "probe": null
+    },
+    {
+      "stack": "php-builtin",
+      "case": "query-form",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 501,
+      "verdict": "fail",
+      "reason": "HTTP 501",
+      "probe": null
+    },
+    {
+      "stack": "php-builtin",
+      "case": "query-empty",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 501,
+      "verdict": "fail",
+      "reason": "HTTP 501",
+      "probe": null
+    },
+    {
+      "stack": "php-builtin",
+      "case": "query-large",
+      "method": "QUERY",
+      "path": "/index.php",
+      "expect": "ok",
+      "http_status": 501,
+      "verdict": "fail",
+      "reason": "HTTP 501",
+      "probe": null
+    },
+    {
+      "stack": "php-builtin",
+      "case": "query-root",
+      "method": "QUERY",
+      "path": "/",
+      "expect": "ok",
+      "http_status": 501,
+      "verdict": "fail",
+      "reason": "HTTP 501",
+      "probe": null
+    }
+  ]
+}

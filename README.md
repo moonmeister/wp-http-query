@@ -127,7 +127,8 @@ plugin/               Feature plugin — proves the path end-to-end on stock cor
 | Scope defined | Done — [docs/scope.md](docs/scope.md) |
 | Trunk gap analysis | Done — three sites identified, verified against `7.2-alpha-63166` |
 | Prior-art search (Trac) | **Partially answered** — [Trac#65616](https://core.trac.wordpress.org/ticket/65616) exists and is the core-side ask. Still need the `ALLMETHODS` rationale, see scope Q3 |
-| Test matrix | Scaffolded, not yet run |
+| Test matrix — Axis A (SAPI) | **Run 2026-08-16. `QUERY` + body reach PHP intact on nginx, Apache (both SAPIs) and Caddy**, up to 64 KiB. `php -S` 501s; `GET POST` hardening allowlists 403. [Results](matrix/results/MATRIX.md) |
+| Test matrix — Axes B/C | Not started. **Axis B (CDN/WAF) is now the riskiest open unknown** |
 | Requests upstream PR | **In flight upstream, not ours** — [#1075](https://github.com/WordPress/Requests/pull/1075) open, milestone 2.1.0, CI-blocked on [test-server#13](https://github.com/RequestsPHP/test-server/pull/13) |
 | Feature plugin | Scaffolded |
 | Core patch | Blocked on ADRs 0001, 0002 |

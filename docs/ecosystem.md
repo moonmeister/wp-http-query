@@ -28,6 +28,14 @@ everything below is not.
 
 ## Web servers
 
+> **Measured 2026-08-16.** The claims below are no longer inference — the matrix ran against
+> real containers. nginx, Apache (`mod_php` and `mod_proxy_fcgi`) and Caddy all pass `QUERY`
+> and a byte-intact body through to PHP on stock config, up to 64 KiB. See
+> [../matrix/README.md](../matrix/README.md#axis-a-results--first-run-2026-08-16).
+>
+> This is the durable half of the section. What remains unverified is HTTP/2/3, TLS,
+> OpenLiteSpeed, and everything with an intermediary in front of it.
+
 ### nginx — no native method identifier
 
 No `NGX_HTTP_QUERY` identifier in master as of 2026-08-10. Support exists only as unmerged
@@ -51,11 +59,44 @@ Practical consequences:
 > distinction matters for the project's premise. The hardening-block 403 is covered by a
 > dedicated matrix stack.
 
-### Apache, LiteSpeed, Caddy
+**Confirmed by measurement.** `QUERY /index.php` and `QUERY /wp-json/wp/v2/search` both return
+200 with a byte-intact body through `fastcgi_pass`. The hardened stack 403s, as predicted.
 
-**Unverified.** Nothing survived research verification about Apache (`mod_php` vs
-`mod_proxy_fcgi`, `<Limit>`/`<LimitExcept>` semantics for unknown verbs, ModSecurity default
-rulesets), LiteSpeed/OpenLiteSpeed, or Caddy. Covered by the matrix.
+One measured wrinkle: **`QUERY /` — the bare root — returns 405.** nginx's index module answers
+the directory request and rejects non-GET/HEAD/POST before `try_files` reaches the front
+controller. Irrelevant to `/wp-json/*`, which never resolves to a directory index, but it is a
+trap for anyone benchmarking nginx by curling `/` and concluding the server rejects the verb.
+That is exactly the misreading this section warns about, and the harness itself made it once —
+see [../matrix/README.md](../matrix/README.md).
+
+### Apache — passes on both SAPIs
+
+**Verified 2026-08-16.** `mod_php` (`apache2handler`) and `mod_proxy_fcgi` (`fpm-fcgi`) both
+deliver `QUERY` with an intact body, including at the root path.
+
+`<LimitExcept GET POST>` **does** deny `QUERY` (403), same as nginx's `limit_except` — with the
+caveat that Apache's containers operate on method *names* as strings, so unlike nginx, `QUERY`
+is nameable in Apache config and `<Limit QUERY>` parses fine.
+
+> Careful with `<LimitExcept>`: an unscoped `Require all granted` in the same context silently
+> defeats it, because Apache OR's `Require` directives via an implicit `<RequireAny>`. The
+> matrix hit this and produced a false pass for a full run. Any claim that an Apache hardening
+> config permits `QUERY` should be checked against a **known** verb like DELETE first.
+
+ModSecurity / OWASP CRS defaults remain **unverified** — see CDNs and intermediaries below.
+
+### LiteSpeed, Caddy
+
+**Caddy verified 2026-08-16** — passes `QUERY` with an intact body via `php_fastcgi`.
+
+**LiteSpeed/OpenLiteSpeed still unverified**; not yet in the matrix (config is not usefully
+mountable as a single file). Do not read its absence as either a pass or a fail.
+
+### PHP built-in server — rejects it
+
+`php -S` returns **501** for `QUERY` at every path. Production-irrelevant, but it affects local
+development and CI, and it is the one stack in the matrix where PHP itself is the rejecting
+component rather than the web server.
 
 ---
 

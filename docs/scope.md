@@ -338,7 +338,30 @@ JSON body path only works if we settle on an `application/json`-shaped filter pa
 precede any patch** — gap 3 cannot be fixed correctly without answering it.
 → [ADR 0001](decisions/0001-query-body-media-type.md)
 
-**Q2 — Does the body reach PHP?** §6, Axis A. Make-or-break, unanswered, empirical.
+**Q2 — Does the body reach PHP? ✅ ANSWERED — yes.** First matrix run, 2026-08-16.
+
+On nginx, Apache (`mod_php` *and* `mod_proxy_fcgi`) and Caddy, a `QUERY` request arrives at PHP
+with `REQUEST_METHOD` exactly as sent and the body byte-identical, SHA-256 verified, **up to
+64 KiB with no truncation**. `Content-Length` is honored for the unrecognized verb. Stock
+configuration; no patches to any server. Results:
+[../matrix/results/results.json](../matrix/results/results.json).
+
+**The SAPI layer is not the blocker, and the project's central premise holds.**
+
+Three qualifications, none fatal:
+
+- **`php -S` returns 501** for `QUERY`. Dev and CI only, but it will bite contributors and
+  anything built on the built-in server.
+- **`GET POST`-only hardening allowlists 403 it** — on Apache as well as nginx. Site
+  configuration, not a WordPress defect, but it is the first wall a real site owner hits.
+- **PHP never populates `$_POST` for `QUERY`**, even with a form-encoded `Content-Type`
+  (controlled against an identical `POST` body, which does populate it). This confirms
+  [ADR 0001](decisions/0001-query-body-media-type.md)'s premise and makes option B's one-line
+  fix the change that stops `QUERY` being a special case.
+
+Still open under Axis A: HTTP/2 and HTTP/3 — everything so far ran over HTTP/1.1 — plus TLS and
+OpenLiteSpeed. Axes B (intermediaries) and C (clients) are untouched, and **Axis B is now the
+riskiest unknown in the project**, since a CDN or WAF sits in front of most real sites.
 
 **Q3 — What is the actual prior art in WordPress?**
 **Partially answered.** Two upstream tickets exist and are tracked in the
