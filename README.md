@@ -17,7 +17,8 @@ when they finish — not to wait for them, and not to claim they are ready.
 Concretely: a site owner whose stack supports `QUERY` should be able to use it with WordPress
 without patching core, and a site owner whose stack does not should be unaffected.
 
-Start with **[docs/scope.md](docs/scope.md)**.
+Start with **[docs/scope.md](docs/scope.md)**. To pick up work, see
+**[docs/tasks.md](docs/tasks.md)** — the contributions this needs land in six different repos.
 
 ## Why `QUERY`
 
@@ -108,6 +109,7 @@ Tracked because they move the readiness date, not because the project waits on t
 ```
 docs/
   scope.md            Project scope, current state of trunk, open questions
+  tasks.md            What needs contributing, and to which repo
   ecosystem.md        Ecosystem support status — time-sensitive, dated, re-verified
   decisions/          ADRs for contested design calls
 matrix/

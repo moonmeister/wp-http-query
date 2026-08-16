@@ -428,23 +428,23 @@ from its current behavior of leaving it alone?
 
 ## 8. Sequencing
 
+**Task breakdown by venue: [tasks.md](tasks.md).** That file tracks who does what and where —
+the work lands in six places, only one of which we control. This section states the ordering
+principle; it deliberately does not duplicate the task list.
+
+The critical path is short, and **no part of it is empirical any more**. Q2 — whether `QUERY`
+and its body reach PHP — was the gating unknown and is answered. What remains:
+
 1. **Read [Trac#65616](https://core.trac.wordpress.org/ticket/65616) and finish Q3.** The
    core-side ticket already exists, so this is engagement with an open thread, not a fresh
-   proposal. Still need the `ALLMETHODS` rationale for [ADR 0002](decisions/0002-allmethods-vs-queryable.md).
-2. **Support [Requests#1075](https://github.com/WordPress/Requests/pull/1075)** (§5.1) — review
-   it, verify what it covers, and help unblock
-   [test-server#13](https://github.com/RequestsPHP/test-server/pull/13), which is gating its CI.
-   _No longer our authorship and no longer the critical path._
-3. **Run the test matrix** (§6). Publish results regardless of outcome.
-4. **Build the feature plugin.** Native `QUERY` route + `X-HTTP-Method-Override` fallback,
-   proving the end-to-end path on stock core. Possible today (§2), and the strongest artifact
-   to bring to Trac.
-5. **Settle ADRs 0001–0004** in public discussion, with matrix data in hand.
-6. **File the Trac ticket** against component REST API, with the diff, the plugin, and the
-   matrix.
+   proposal. Nothing else can start without it, and no tool on this project can read it.
+2. **Settle [ADRs 0001–0004](decisions/).** The only remaining blockers are decisions.
+3. **Write the patch, and prove it with the feature plugin** on stock core.
+4. **Bring patch, plugin and matrix results to the existing ticket.**
 
 Deliberate ordering: arrive with evidence and a working demonstration rather than a patch and
-an argument.
+an argument. Note that the Requests track (§5.1) runs independently and ahead — core will not
+accept patches to vendored dependencies, so anything in `Requests/` must land upstream first.
 
 ---
 
