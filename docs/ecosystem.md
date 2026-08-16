@@ -121,11 +121,48 @@ mostly affects third-party consumers rather than the block editor.
 
 ### Standards positions
 
+Re-verified against the GitHub API **2026-08-16**.
+
 | Body | Position |
 |---|---|
-| WHATWG Fetch | [Issue #1938](https://github.com/whatwg/fetch/issues/1938) — **open**, labeled "needs implementer interest" |
-| Mozilla | [#1430](https://github.com/mozilla/standards-positions/issues/1430) — **deferred** pending fetch/HTML-forms resolution |
-| WebKit | Issue closed |
+| WHATWG Fetch | [#1938](https://github.com/whatwg/fetch/issues/1938) — **open**, labels `needs implementer interest`, `topic: http`. Last activity 2026-07-01 |
+| WHATWG HTML (forms) | [#12594](https://github.com/whatwg/html/issues/12594) — **open**, labels `addition/proposal`, `needs implementer interest`, `topic: forms`. Last activity 2026-07-13 |
+| Mozilla | [#1430](https://github.com/mozilla/standards-positions/issues/1430) — **open, no position label assigned.** See below |
+| WebKit | [#692](https://github.com/WebKit/standards-positions/issues/692) — **closed on a technicality; no position exists.** See below |
+
+**Mozilla — no formal position, informally waiting.** The issue is open with **no label**, so
+Mozilla has not taken a position. `mozfreddyb` commented 2026-07-07:
+
+> While this looks generally OK, the final semantics have yet to emerge from the discussions
+> around fetch and HTML forms. Let's do that first.
+
+"Generally OK, but sequenced behind Fetch and HTML" is the accurate reading. Do not write
+"Mozilla deferred" as though a `defer` position were recorded — it was not. Note also that RFC
+10008 co-author Julian Reschke posted on this thread (2026-07-16) pointing at
+[§2.4 `Location`](https://greenbytes.de/tech/specs/rfc10008.html#location) as the thing that
+"would make caching completely trivial" — the same argument behind
+[ADR 0004](decisions/0004-location-indirection.md).
+
+**WebKit — asked once, closed for using the wrong issue template, never re-filed.** Filed
+2026-06-30 by `jeswr`, closed 2026-07-07 as `not_planned` with the `invalid` label. The sole
+comment, from `annevk`, is entirely procedural:
+
+> Could you please file this again using the template. Our tooling cannot handle custom
+> formatting.
+
+The label is misleading. WebKit documents `invalid` as *"the issue is not about a specification
+that would be implemented in a browser engine"* — but the closing comment gives a **formatting**
+reason and explicitly invites a re-file. No `support` / `neutral` / `oppose` label was ever
+applied, and WebKit's README states that only a label represents its position. A search of the
+repo confirms **no follow-up issue was ever opened**.
+
+So: **WebKit has neither implemented nor rejected `QUERY`. It has not been asked, in a form its
+tooling accepts.** Never cite #692 as a WebKit rejection — that would be wrong, and it is the
+kind of claim a reviewer will check.
+
+> **Actionable.** Re-filing this with the correct template is a genuine, near-zero-cost
+> ecosystem contribution, and it is one of the few levers this project has on browser support.
+> It is not a WordPress task and nothing here gates on it.
 
 ---
 
@@ -185,7 +222,9 @@ Re-run before any public claim, and at minimum monthly:
    `src/http/ngx_http_request.h` for a `NGX_HTTP_QUERY` identifier.
 2. **Fetch** — check [whatwg/fetch#1938](https://github.com/whatwg/fetch/issues/1938) state and
    labels; check whether `QUERY` entered the normalize-a-method list in `fetch.bs`.
-3. **Standards positions** — Mozilla #1430, WebKit.
+3. **Standards positions** — check for a *label* on Mozilla #1430, not just comments. For
+   WebKit, check whether #692 was ever re-filed:
+   `gh api -X GET search/issues -f q='repo:WebKit/standards-positions 10008'`.
 4. **Browsers** — re-test caching empirically. The current datapoint is weak.
 5. **Frameworks** — resolve the five collected-but-unverified links above.
 6. **Update the date at the top of this file**, even if nothing changed. A stale date is more

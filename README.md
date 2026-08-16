@@ -96,8 +96,9 @@ Tracked because they move the readiness date, not because the project waits on t
 |---|---|---|
 | [nginx#1488](https://github.com/nginx/nginx/pull/1488) | `NGX_HTTP_QUERY` method identifier | Open |
 | [whatwg/fetch#1938](https://github.com/whatwg/fetch/issues/1938) | Fetch integration: normalization, CORS, caching | Open — "needs implementer interest" |
-| [mozilla/standards-positions#1430](https://github.com/mozilla/standards-positions/issues/1430) | Mozilla position | Deferred |
-| [whatwg/html#12594](https://github.com/whatwg/html/issues/12594) | `<form method="query">` | Unresolved |
+| [mozilla/standards-positions#1430](https://github.com/mozilla/standards-positions/issues/1430) | Mozilla position | Open, **no position label**; informally sequenced behind Fetch/HTML |
+| [WebKit/standards-positions#692](https://github.com/WebKit/standards-positions/issues/692) | WebKit position | Closed `invalid` — **wrong issue template, never re-filed. No position exists** |
+| [whatwg/html#12594](https://github.com/whatwg/html/issues/12594) | `<form method="query">` | Open — `needs implementer interest` |
 | [undici#5459](https://github.com/nodejs/undici/pull/5459) | Body-aware cache key | Shipped |
 
 ---
