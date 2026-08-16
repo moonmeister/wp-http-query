@@ -65,19 +65,28 @@ Each parent carries research → code → report sub-issues: on this project *re
 deliverable*, since the pitch is "arrive with verified evidence" and a patch nobody writes up is
 worth about as much as no patch.
 
+**[#37](../../issues/37) is the tracking issue** — the single entry point, carrying the suggested
+working order and the reason for it. The table below is the same tree without the ordering.
+
 | Capability | Venue | Milestone |
 |---|---|---|
+| [#2 Request body parsing](../../issues/2) — gap 3, one line. **Do this first**: it is the only gap that fails *open* — a form-encoded `QUERY` returns an unfiltered collection with a `200` | core | Core patch v1 |
 | [#1 Method constants & route matching](../../issues/1) — gap 2, the most contested call | core | Core patch v1 |
-| [#2 Request body parsing](../../issues/2) — gap 3, one line | core | Core patch v1 |
 | [#3 CORS preflight](../../issues/3) — gap 1, independently landable; prior art is **more favorable than it looked** — see [Trac#46992](https://core.trac.wordpress.org/ticket/46992) and [#43428](https://core.trac.wordpress.org/ticket/43428) | core | Core patch v1 |
 | [#4 Cache safety & `Accept-Query`](../../issues/4) — security-relevant | core | Core patch v1 |
 | [#5 Feature plugin demo](../../issues/5) — the strongest artifact for Trac | this repo | Core patch v1 |
 | [#6 PHP client — `WP_Http` / Requests](../../issues/6) — review, not authorship | WpOrg/Requests | Ecosystem |
 | [#7 JS clients](../../issues/7) — `api-fetch` and browser `fetch()` | this repo | Ecosystem |
 
-Plus four standalone: [#31](../../issues/31) re-file the WebKit standards position,
+Plus five standalone: [#31](../../issues/31) re-file the WebKit standards position,
 [#32](../../issues/32) document the hardening-allowlist 403, [#33](../../issues/33) matrix Axis A
-leftovers, [#34](../../issues/34) `/wp/v2/search` as first adopter.
+leftovers, [#34](../../issues/34) `/wp/v2/search` as first adopter, [#36](../../issues/36) file the
+array-form `methods` normalization bug.
+
+**Two of these land regardless of `QUERY`** — [#16](../../issues/16) (the CORS header clobber) and
+[#36](../../issues/36) (array-form `methods` never comma-split). Both are real core defects with
+failing tests, both are framed without reference to `QUERY`, and both survive the main proposal
+stalling in review.
 
 **Milestones.** *Core patch v1* must be done before posting anything to Trac#65616. *Ecosystem*
 runs in parallel and gates nothing. *Deferred* is named so it is not rediscovered as a gap.
