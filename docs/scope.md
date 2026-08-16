@@ -297,10 +297,12 @@ precede any patch** — gap 3 cannot be fixed correctly without answering it.
 **Partially answered.** Two upstream tickets exist and are tracked in the
 [README](../README.md#tracked-tickets):
 
-- [Trac#65616](https://core.trac.wordpress.org/ticket/65616) — "Support the HTTP `QUERY` method
-  for read/search REST endpoints (RFC 10008)", component REST API. **This is the core-side
-  ask.** Read it before drafting anything; the project engages this thread rather than opening
-  a new one.
+- [Trac#65616](https://core.trac.wordpress.org/ticket/65616) — ⚠️ **UNVERIFIED.** Trac serves a
+  bot challenge (HTTP 403) to automated fetches, so this ticket's title, status, component, and
+  contents have **not** been confirmed by anyone on this project. The ticket number came from
+  the user; everything else previously written here was reconstruction and has been removed.
+  **Open it in a browser and record what it actually says before citing it anywhere.**
+  Presumed to be the core-side ask, which is why sequencing step 1 is to read it.
 - [Requests#1074](https://github.com/WordPress/Requests/issues/1074) — "Support fror QUERY HTTP
   method" *[sic]*, opened 2026-08-10, milestone 2.1.0, links to Trac#65616.
 - [Requests#1075](https://github.com/WordPress/Requests/pull/1075) — open PR implementing

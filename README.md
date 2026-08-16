@@ -59,9 +59,14 @@ rebased independently.
 Upstream tickets this project drives or is blocked on. **Re-check state before citing** —
 see [docs/ecosystem.md](docs/ecosystem.md) for the re-verification protocol.
 
+> **Verification note.** GitHub rows below were fetched and confirmed directly. **WordPress
+> Trac cannot be fetched by any tool on this project** — it returns HTTP 403 with a
+> "Checking your browser…" challenge to curl and to automated fetchers alike. Any Trac detail
+> here must be entered by a human from a real browser, and is marked unverified until then.
+
 | Ticket | Where | Title | State | Notes |
 |---|---|---|---|---|
-| [Trac#65616](https://core.trac.wordpress.org/ticket/65616) | Core, component: REST API | "Support the HTTP `QUERY` method for read/search REST endpoints (RFC 10008)" | Open | **This is the core-side prior art** — see [scope.md](docs/scope.md) Q3. Read before drafting any proposal. |
+| [Trac#65616](https://core.trac.wordpress.org/ticket/65616) | Core — *presumed* REST API | ⚠️ **unverified** | ⚠️ **unverified** | **Trac 403s automated fetches** (bot challenge), so nothing about this ticket has been confirmed. Only the number is known. **Open it in a browser and fill this row in.** See [scope.md](docs/scope.md) Q3. |
 | [Requests#1074](https://github.com/WordPress/Requests/issues/1074) | WpOrg/Requests | "Support fror QUERY HTTP method" *[sic]* | **Open** — opened 2026-08-10 | Milestone **2.1.0**. Component: Core, Type: enhancement. Links to Trac#65616. |
 | [Requests#1075](https://github.com/WordPress/Requests/pull/1075) | WpOrg/Requests | "Add QUERY HTTP method to the list of allowed methods" | **Open PR** — opened 2026-08-10 | Implements #1074: adds the constant + a helper method. Author **dingo-d**, branch `feature/add-query-http-method`. Triaged by **jrfnl** (Status: triage, milestone 2.1.0), who asked for canonical RFC links — addressed in `9483ea8`. |
 | [test-server#13](https://github.com/RequestsPHP/test-server/pull/13) | RequestsPHP/test-server | Companion to #1075 | Open | Blocks CI verification of #1075; author reports local testing issues pending this. |
