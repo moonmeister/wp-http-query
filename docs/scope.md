@@ -83,6 +83,42 @@ before asking anyone to change core, which materially lowers the bar for accepta
 Gap 3 only affects non-JSON bodies. The fix is one line; the design decision behind it
 ([ADR 0001](decisions/0001-query-body-media-type.md)) is not.
 
+**Gap 1 has prior art, and it is unfavorable to the obvious fix.** A Trac search on 2026-08-16
+turned up two tickets that must be read before anything is proposed:
+
+- **[#46992](https://core.trac.wordpress.org/ticket/46992)** — "Add a filter which allows the
+  HTTP headers for REST API Endpoints to be changed" — **closed as `invalid`.** Nearly the same
+  complaint, and core's recorded answer was *"use `rest_post_dispatch`."* So "add a filter" has
+  been asked and declined.
+- **[#38546](https://core.trac.wordpress.org/ticket/38546)** — "REST API: Add PATCH to CORS
+  allowed methods" — **fixed** by appending PATCH to the hardcoded string. Precedent that a
+  method core supports gets added to the list.
+
+But the `rest_post_dispatch` advice **does not work**, which is verified against
+`7.2-alpha-63166`: `send_header()` calls `header()` with no `$replace` argument
+(`class-wp-rest-server.php:1930`), so PHP defaults to replacing. `rest_post_dispatch` fires at
+`:464` and its headers go out at `:473-474`; `rest_send_cors_headers()` then runs on
+`rest_pre_serve_request` at `:516` and overwrites them. Two lines below the hardcoded header,
+`rest-api.php:816` sends `Vary: Origin` with an explicit `$replace = false` — deliberate in one
+place and absent in the others, which reads as oversight.
+
+The honest limit of that claim: a plugin *can* still win by hooking `rest_pre_serve_request` at
+priority 11+. So the defensible statement is that **#46992's recorded resolution is wrong and
+the mechanism that works is undocumented and order-dependent** — not that overriding is
+impossible. Tracked as [#16](https://github.com/moonmeister/wp-http-query/issues/16) (fix the
+clobber, independent of `QUERY`) and
+[#35](https://github.com/moonmeister/wp-http-query/issues/35) (add `QUERY` to the list, per the
+#38546 precedent).
+
+Also relevant: 5.5.0 made the two sibling CORS list headers filterable —
+`rest_exposed_cors_headers` (`class-wp-rest-server.php:408`) and `rest_allowed_cors_headers`
+(`:434`) — and missed this one because it lives in a different function.
+`rest_send_cors_headers()` has **no test coverage at all.**
+
+> ⚠️ Both ticket summaries are **second-hand from a search index.** Trac returns 403 to every
+> tool on this project; direct fetching was attempted and failed. Confirm in a browser before
+> citing publicly. The code analysis is verified; the ticket history is not.
+
 ### The existing tunnel
 
 `serve_request()` already honors `$_GET['_method']`, falling back to

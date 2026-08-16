@@ -69,7 +69,7 @@ worth about as much as no patch.
 |---|---|---|
 | [#1 Method constants & route matching](../../issues/1) — gap 2, the most contested call | core | Core patch v1 |
 | [#2 Request body parsing](../../issues/2) — gap 3, one line | core | Core patch v1 |
-| [#3 CORS preflight](../../issues/3) — gap 1, independently landable | core | Core patch v1 |
+| [#3 CORS preflight](../../issues/3) — gap 1, independently landable; **[Trac#46992](https://core.trac.wordpress.org/ticket/46992) already declined the obvious fix** | core | Core patch v1 |
 | [#4 Cache safety & `Accept-Query`](../../issues/4) — security-relevant | core | Core patch v1 |
 | [#5 Feature plugin demo](../../issues/5) — the strongest artifact for Trac | this repo | Core patch v1 |
 | [#6 PHP client — `WP_Http` / Requests](../../issues/6) — review, not authorship | WpOrg/Requests | Ecosystem |
