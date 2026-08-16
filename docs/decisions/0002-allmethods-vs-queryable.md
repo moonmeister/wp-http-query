@@ -122,28 +122,114 @@ Lean **C**: ship `QUERYABLE`, leave `ALLMETHODS` and `READABLE` untouched, and r
 intent to revisit. This is the version most likely to survive review, and the project's whole
 posture is additive-only ([README](../../README.md) principle 4).
 
-**Option D should be explicitly ruled out in the ticket** — someone will propose it because
-the semantics look right, and its blast radius is the worst of any option.
+**Option D should be explicitly ruled out in the ticket** — someone will propose it because the
+semantics look right. Rule it out on the silent-body-discard argument across all 77 `READABLE`
+routes, **not** on its measured failure count; the count is 20 but decomposes into one unrelated
+core bug and six fixture updates, and anyone who checks will say so.
 
-## A cheap experiment that turns this argument into a number
+## Measured blast radius
 
-Core's test suite hard-codes the current method sets in exact-match assertions:
+✅ **Run 2026-08-16.** Each option was patched into `WP_REST_Server` one at a time and the REST
+suite run against it. Isolation: a detached `git worktree` at baseline `e7739d5414`, its own
+MySQL schema (`wordpress_develop_tests_exp`), `phpunit --group restapi`, 3550 tests. Runner and
+raw output are kept outside this repo in the scratch worktree (`run-blast-radius.sh`,
+`blast-radius/`).
 
-- `rest-posts-controller.php:256` — `assertSame( $headers['Allow'], 'GET' )`
-- `rest-posts-controller.php:266` — `assertSame( $headers['Allow'], 'GET, POST, PUT, PATCH, DELETE' )`
-- `rest-attachments-controller.php:374, 383` — same pattern
-- `rest-server.php:397, 437, 476, 536`
+| Variant | Patch | Result | New failures vs baseline |
+|---|---|---|---|
+| baseline | none | Errors 1, Warnings 4, Skipped 6 | — |
+| **A** | `ALLMETHODS` += `QUERY` | identical to baseline | **0** |
+| **B** | new `QUERYABLE = 'QUERY'` | identical to baseline | **0** |
+| **D** | `READABLE` = `'GET, QUERY'` | Failures 20 | **20** |
 
-These are a **tripwire**. Adding `QUERY` to one endpoint breaks none of them; option A breaks
-the `ALLMETHODS` assertion immediately; option D breaks every `'GET'` assertion across all
-three files.
+### The experiment's premise was wrong, and that is the most useful thing it produced
 
-So: implement each option on a scratch branch and run the suite. The failure count is a direct,
-citable measure of blast radius, and it converts "this might break things" into evidence —
-which is the posture the whole project is built on. **Do this before the ADR is decided.**
+This ADR previously predicted that "option A breaks the `ALLMETHODS` assertion immediately."
+**It does not — option A breaks nothing at all.** Two reasons:
 
-Worth noting the tripwire only catches core. Plugin breakage is unmeasurable this way and has
-to be argued rather than counted.
+1. **Core uses `ALLMETHODS` exactly once.** Constant usage across `src/`: `READABLE` 77,
+   `CREATABLE` 35, `EDITABLE` 28, `DELETABLE` 13, **`ALLMETHODS` 1** — the Abilities API run
+   controller (`class-wp-rest-abilities-v1-run-controller.php:64`), which registers `ALLMETHODS`
+   only because routes are registered before plugins register abilities.
+2. **That one route self-defends.** Its `permission_callback` calls `validate_request_method()`
+   (`:153`), which computes the expected method from the ability's annotations and rejects
+   anything else with `rest_ability_invalid_method`. A `QUERY` request reaches it and is turned
+   away before the callback runs. (This also retires an earlier worry of ours that option A would
+   expose `destructive` abilities over `QUERY`. It would not.)
+3. The `'GET, POST, PUT, PATCH, DELETE'` assertions the tripwire was built on do not come from
+   `ALLMETHODS` at all. They come from `READABLE` + `EDITABLE` + `DELETABLE` **composing** on
+   `/wp/v2/posts/{id}`.
+
+**Therefore: the core suite cannot measure option A.** A "0 failures" result for A is not
+evidence that A is safe — it is evidence that core barely uses the constant whose ecosystem-wide
+use is the entire objection. Reporting `A: 0` without this paragraph would manufacture false
+confidence, and a reviewer who checks will find it in one grep. **Do not cite the A and B numbers
+as a safety argument.** The honest statement is: *core does not exercise `ALLMETHODS`; the BC risk
+for A lives entirely in plugins and is unmeasured.*
+
+### Option D's 20 failures are also not what they look like
+
+Decomposed:
+
+- **14** — `REST_Block_Renderer_Controller_Test`, all `404 is identical to 200`. Not fixture
+  churn; the route stopped existing. Cause is a **latent core bug**, below.
+- **6** — assertion text only, and all six are core *correctly* advertising the new method:
+  `Allow: GET, QUERY` on two OPTIONS tests, `QUERY` added to `targetHints`, to the block-directory
+  schema, and to the site-health route's method map. Every one is a fixture that needs updating,
+  not a behavior that broke.
+
+So option D's real score is **one core bug plus six fixture updates — zero genuine behavioral
+breakage.** That is much weaker evidence against D than `20` suggests, and the case against D has
+to rest on semantics rather than the count (see below).
+
+### The latent core bug this uncovered
+
+`register_rest_route()` normalizes `methods` at `class-wp-rest-server.php:1008-1020`:
+
+```php
+if ( is_string( $handler['methods'] ) ) {
+    $methods = explode( ',', $handler['methods'] );   // split
+} elseif ( is_array( $handler['methods'] ) ) {
+    $methods = $handler['methods'];                    // NOT split
+}
+foreach ( $methods as $method ) {
+    $handler['methods'][ strtoupper( trim( $method ) ) ] = true;
+}
+```
+
+The array branch never splits on commas, so any array element containing a comma becomes one
+bogus method key that can never match. `array( READABLE, EDITABLE )` registers the literal key
+`'POST, PUT, PATCH'`, and `POST` to that route 404s.
+
+**Confirmed on unmodified trunk** with a three-case probe (single-method constants in an array:
+passes; string form with `EDITABLE`: passes; array form with `EDITABLE`: `404`, and the
+registered keys are exactly `['GET', 'POST, PUT, PATCH']`). This is independent of `QUERY`.
+
+Core is not broken today: it has exactly one array-form registration with constants — the block
+renderer's `array( READABLE, CREATABLE )` — and both are single-method. It is a landmine, not a
+live fire. Option D steps on it by making `READABLE` multi-method, which is the whole of those 14
+failures.
+
+This is separately reportable, has a failing test, and does not depend on any `QUERY` decision —
+the same shape of independently-landable artifact as the CORS clobber (#16).
+
+### What the experiment does and does not settle
+
+- It **does not discriminate between A, B and C.** All three are 0 in core. The decision must be
+  argued on ecosystem BC and on what the constants are supposed to *mean*, not on failure counts.
+- It **does not vindicate option D either.** The strongest objection to D was never the count: it
+  is that D makes all 77 `READABLE` routes advertise and accept `QUERY`, dispatching to handlers
+  that read `$request['param']` from the query string and will never look at the body. That is
+  the option E silent-discard failure, applied to the entire read surface by default. **No test in
+  core sends a `QUERY` with a body, so the suite cannot see this.** The recommendation to rule out
+  D stands, on those grounds.
+- Plugin breakage remains unmeasurable this way and has to be argued rather than counted. Say this
+  before someone else says it.
+
+Minor finding for core, noted in passing: `rest-attachments-controller.php:374` and
+`rest-posts-controller.php:256` write `assertSame( $headers['Allow'], 'GET' )` — arguments
+reversed, so PHPUnit reports actual as expected. Harmless, but it makes those two diffs read
+backwards.
 
 ## Open
 
@@ -158,5 +244,11 @@ to be argued rather than counted.
   against option A rather than to pick between them.
 - What actually happens today when an `ALLMETHODS` route receives a `QUERY` with a JSON body?
   Given that JSON parsing is method-independent, params may populate fine — which would weaken
-  the BC objection to A considerably. **Testable now; worth doing before deciding.**
+  the BC objection to A considerably. **Still open, and now the decisive question**, since the
+  measurement did not discriminate between A, B and C. Note core's own single `ALLMETHODS` route
+  cannot answer it: it rejects non-matching methods in its `permission_callback`. This needs a
+  synthetic route registered in a test, not a core endpoint.
 - Does `EDITABLE`/`CREATABLE` need any statement, or is silence correct?
+- Report the array-form normalization bug to core? It is real, confirmed on trunk, and has a
+  failing test — but it was found while measuring `QUERY`, and filing it needs the same
+  "framed without reference to `QUERY`" treatment as #16.

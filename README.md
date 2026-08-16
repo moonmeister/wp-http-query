@@ -196,6 +196,8 @@ plugin/               Feature plugin — proves the path end-to-end on stock cor
 | Test matrix — Axis A (SAPI) | **Run 2026-08-16. `QUERY` + body reach PHP intact on nginx, Apache (both SAPIs) and Caddy**, up to 64 KiB. `php -S` 501s; `GET POST` hardening allowlists 403. [Results](matrix/results/MATRIX.md) |
 | Test matrix — Axis B (CDN/WAF) | **Out of scope** — outside the WordPress boundary, and Axis A is sufficient for a readiness claim. See [scope.md](docs/scope.md) §6 |
 | Test matrix — Axis C (clients) | Partly outstanding; `WP_Http` cases belong with the feature plugin |
+| ADR 0002 blast radius | **Run 2026-08-16** against core's REST suite: options A and B change nothing, option D fails 20. **All three numbers are misleading and the ADR says why** — core uses `ALLMETHODS` once, so the suite cannot measure option A, and 14 of D's 20 are a pre-existing core bug. [Experiment](experiments/blast-radius/) · [ADR 0002](docs/decisions/0002-allmethods-vs-queryable.md) |
+| Core bug found (unrelated to `QUERY`) | `register_rest_route()` does not comma-split `methods` given in array form, so `array( READABLE, EDITABLE )` registers the bogus key `'POST, PUT, PATCH'` and `POST` 404s. Confirmed on unmodified trunk, [failing test written](experiments/blast-radius/rest-array-methods-probe.php). Latent — core's one array-form route uses single-method constants. Not yet reported |
 | Requests upstream PR | **In flight upstream, not ours** — [#1075](https://github.com/WordPress/Requests/pull/1075) open, milestone 2.1.0, CI-blocked on [test-server#13](https://github.com/RequestsPHP/test-server/pull/13) |
 | Feature plugin | Scaffolded |
 | Core patch | Blocked on ADRs 0001, 0002 — both now decidable; ADR 0002's external blocker cleared 2026-08-16 |
