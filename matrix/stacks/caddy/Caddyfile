@@ -1,0 +1,7 @@
+# Caddy + PHP-FPM. Included because Caddy is increasingly common in modern
+# WordPress hosting and has an independent HTTP parser worth testing.
+:80 {
+	root * /var/www/html
+	php_fastcgi php-fpm:9000
+	file_server
+}

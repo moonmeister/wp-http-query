@@ -1,0 +1,7 @@
+.DS_Store
+*.log
+
+# Matrix scratch. results/results.json and results/MATRIX.md ARE committed —
+# tracking them over time is how we notice the ecosystem moving.
+matrix/results/*.tmp
+matrix/.env
