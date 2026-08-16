@@ -122,13 +122,60 @@ response is 4xx, no-cache headers are forced. `QUERY` work must not regress that
 
 ### Out of scope
 
-- Converting any existing core endpoint to `QUERY`. Every current route keeps its current
-  methods. This project adds capability; it migrates nothing.
+- Converting any existing core endpoint to `QUERY` — see "Capability, not adoption" below.
 - Implementing a query language. Not building `application/jsonpath` or `application/sql`
   support — see [ADR 0001](decisions/0001-query-body-media-type.md).
 - Building a body-aware HTTP cache. That is the intermediary's job (§4).
 - Lobbying nginx, Cloudflare, or hosts. We track their status; we do not gate on it.
 - Browser or Fetch-standard changes.
+
+### Capability, not adoption
+
+This distinction gets misread as "you still could not send a `QUERY` request," so state it
+precisely. With this work done:
+
+| | Result |
+|---|---|
+| A route registered with `'methods' => 'QUERY'` (yours or a plugin's) | **Works.** Already works on stock core today — see §2. |
+| An existing core endpoint, e.g. `QUERY /wp-json/wp/v2/posts` | **404 `rest_no_route`** — "No route was found matching the URL and request method." Not a 405. Unchanged by this project. |
+| A route registered with `ALLMETHODS` | **Decided by [ADR 0002](decisions/0002-allmethods-vs-queryable.md).** |
+
+That third row is why this scope line and ADR 0002 are the same decision viewed from two
+angles. Folding `QUERY` into `ALLMETHODS` would make every route using that constant — across
+core *and every plugin* — silently begin answering `QUERY`, with handlers never written for it
+and a body they will not have parsed. That is migration, performed implicitly across the
+ecosystem. Declining to migrate anything is what makes opt-in the leaning.
+
+### First adopter — deferred, not rejected
+
+Shipping `QUERY` support that no core endpoint answers invites a fair review question: what
+does this buy anyone? Two answers. Plugins get it immediately, which is how most WordPress
+capability arrives. And a first-adopter core endpoint is real follow-up work, tracked here as
+deferred rather than out of scope forever.
+
+`/wp/v2/search` is the obvious candidate — literally a search endpoint constrained by URL
+length, which is the problem `QUERY` exists to solve.
+
+**It would not need a `v3`, and it is not a breaking change.** `register_rest_route()` takes a
+list of handlers; the search controller currently registers one
+(`class-wp-rest-search-controller.php:91-105`). Adding a second handler with
+`'methods' => 'QUERY'`, the same `callback`, `permission_callback` and
+`get_collection_params()` is purely additive — `get_items()` reads via `get_param()`, which
+pulls from the merged parameter order and does not care whether values arrived as query string
+or JSON body. The controller needs no changes. `wp/v2` versioning covers the resource
+representation contract, not the method set; a previously-404 request beginning to succeed
+does not break a client.
+
+Two real costs, neither of them BC:
+
+- **Core's test suite hard-codes method sets.** Exact-match assertions exist in
+  `rest-posts-controller.php:256,266`, `rest-attachments-controller.php:374,383`, and
+  `rest-server.php:397,437,476,536`. A fixture update, not an API break — but see the note in
+  ADR 0002, where this doubles as a free blast-radius measurement.
+- **Caching stakes rise sharply.** A *core* endpoint answering `QUERY` behind a body-blind
+  cache is [ADR 0003](decisions/0003-cache-safety-default.md)'s poisoning scenario on exactly
+  the kind of route a CDN is configured to cache. **This, not versioning, is the reason to
+  defer first-adopter work to its own ticket.**
 
 ### Anticipated objection
 

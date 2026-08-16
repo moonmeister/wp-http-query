@@ -98,10 +98,31 @@ posture is additive-only ([README](../../README.md) principle 4).
 **Option D should be explicitly ruled out in the ticket** — someone will propose it because
 the semantics look right, and its blast radius is the worst of any option.
 
+## A cheap experiment that turns this argument into a number
+
+Core's test suite hard-codes the current method sets in exact-match assertions:
+
+- `rest-posts-controller.php:256` — `assertSame( $headers['Allow'], 'GET' )`
+- `rest-posts-controller.php:266` — `assertSame( $headers['Allow'], 'GET, POST, PUT, PATCH, DELETE' )`
+- `rest-attachments-controller.php:374, 383` — same pattern
+- `rest-server.php:397, 437, 476, 536`
+
+These are a **tripwire**. Adding `QUERY` to one endpoint breaks none of them; option A breaks
+the `ALLMETHODS` assertion immediately; option D breaks every `'GET'` assertion across all
+three files.
+
+So: implement each option on a scratch branch and run the suite. The failure count is a direct,
+citable measure of blast radius, and it converts "this might break things" into evidence —
+which is the posture the whole project is built on. **Do this before the ADR is decided.**
+
+Worth noting the tripwire only catches core. Plugin breakage is unmeasurable this way and has
+to be argued rather than counted.
+
 ## Open
 
 - **Blocked on scope.md Q3.** If there was a deliberate historical decision to restrict the
   constant set, that reasoning should drive this ADR rather than being rediscovered.
+  Trac#65616 may or may not contain it — the ticket is unverified, see Q3.
 - What actually happens today when an `ALLMETHODS` route receives a `QUERY` with a JSON body?
   Given that JSON parsing is method-independent, params may populate fine — which would weaken
   the BC objection to A considerably. **Testable now; worth doing before deciding.**
