@@ -72,7 +72,7 @@ working order and the reason for it. The table below is the same tree without th
 |---|---|---|
 | [#2 Request body parsing](../../issues/2) — gap 3, one line. **Do this first**: it is the only gap that fails *open* — a form-encoded `QUERY` returns an unfiltered collection with a `200` | core | Core patch v1 |
 | [#1 Method constants & route matching](../../issues/1) — gap 2, the most contested call | core | Core patch v1 |
-| [#3 CORS preflight](../../issues/3) — gap 1, independently landable; prior art is **more favorable than it looked** — see [Trac#46992](https://core.trac.wordpress.org/ticket/46992) and [#43428](https://core.trac.wordpress.org/ticket/43428) | core | Core patch v1 |
+| [#3 CORS preflight](../../issues/3) — gap 1, independently landable; prior art is **more favorable than it looked** — [Trac#46992](https://core.trac.wordpress.org/ticket/46992) **reopened 2026-08-17** with the clobber fix ([#16](../../issues/16)), awaiting committer direction on the fix shape | core | Core patch v1 |
 | [#4 Cache safety & `Accept-Query`](../../issues/4) — security-relevant | core | Core patch v1 |
 | [#5 Feature plugin demo](../../issues/5) — the strongest artifact for Trac | this repo | Core patch v1 |
 | [#6 PHP client — `WP_Http` / Requests](../../issues/6) — review, not authorship | WpOrg/Requests | Ecosystem |
@@ -150,7 +150,7 @@ Gap 1's supporting record, all read in full on 2026-08-16. Reasoning in
 
 | Ticket | State | Why it matters |
 |---|---|---|
-| [Trac#43428](https://core.trac.wordpress.org/ticket/43428) | **Open**, Awaiting Review, unowned, stalled since 2018 | Asks to control CORS headers "from only one place, with one hook" — our gap-1 ask, already filed. **Best venue for [#16](../../issues/16); reviving beats opening a new ticket.** |
+| [Trac#43428](https://core.trac.wordpress.org/ticket/43428) | **Open**, Awaiting Review, unowned, stalled since 2018 | CORS spec-correctness and preflight performance: preflight headers only on `OPTIONS`, drop `OPTIONS` from the method list, add `Access-Control-Max-Age`. **Not our ask** — it does not concern overriding the value. Read in full 2026-08-17; an earlier reading of its "one place, with one hook" phrase as our gap-1 ask was wrong. **Not the venue for [#16](../../issues/16)** — that went to the reopened #46992. Compatible, not competing |
 | [Trac#46992](https://core.trac.wordpress.org/ticket/46992) | Closed `invalid`, 2019 | Closed citing `rest_post_dispatch` — but **TimothyBlynJacobs raised our exact objection in comments 5 and 7 and it was never rebutted.** The close answers a different question than the ticket asked. Cite him, don't re-derive it. |
 | [Trac#38546](https://core.trac.wordpress.org/ticket/38546) | **Fixed**, 4.7, [39042] | PATCH added to the CORS list because "editable resources accept PATCH but the CORS headers don't mention it." Our argument, verb swapped. Landed in days, uncontested. |
 | [Trac#57752](https://core.trac.wordpress.org/ticket/57752) | **Fixed**, 6.3, [56096] | Improved the two *sibling* CORS filters in 2023 and left `Access-Control-Allow-Methods` out again. Best evidence the omission is oversight, not policy. |
@@ -210,8 +210,9 @@ plugin/               Feature plugin — proves the path end-to-end on stock cor
 | Core bug found (unrelated to `QUERY`) | `register_rest_route()` does not comma-split `methods` given in array form, so `array( READABLE, EDITABLE )` registers the bogus key `'POST, PUT, PATCH'` and `POST` 404s. Confirmed on unmodified trunk, [failing test written](experiments/blast-radius/rest-array-methods-probe.php). Latent — core's one array-form route uses single-method constants. Not yet reported |
 | Requests upstream PR | **In flight upstream, not ours** — [#1075](https://github.com/WordPress/Requests/pull/1075) open, milestone 2.1.0, CI-blocked on [test-server#13](https://github.com/RequestsPHP/test-server/pull/13) |
 | Feature plugin | Scaffolded |
-| Core patch | Blocked on ADRs 0001, 0002 — both now decidable; ADR 0002's external blocker cleared 2026-08-16 |
-| Trac ticket | Not filed |
+| CORS clobber ([#16](../../issues/16)) | **Tests done 2026-08-17** — 7 tests / 37 assertions, 3 fail on unmodified trunk, no regressions across the 3550-test REST suite. Needs `LOCAL_PHP_XDEBUG=true` or they skip silently. Branch `fix/rest-cors-allow-methods-clobber`, `QUERY`-free. **Fix shape deliberately open** — conditional, an array filter matching the 5.5.0 siblings, or both; asking for committer direction before opening a PR |
+| Core patch (`QUERY`) | Blocked on ADRs 0001, 0002 — both now decidable; ADR 0002's external blocker cleared 2026-08-16 |
+| Trac ticket | **[#46992 reopened 2026-08-17](https://core.trac.wordpress.org/ticket/46992#comment:10)** with the clobber defect — the first thing this project has filed. Trac#65616 (the `QUERY` proposal) still untouched, gated on the ADRs |
 
 ## Quick start
 

@@ -132,8 +132,23 @@ tickets below were read in a browser on 2026-08-16 and are verified.
   the CORS headers from only one place, with one hook"*, drop `OPTIONS` from
   `Access-Control-Allow-Methods`, send the preflight headers only on `OPTIONS`, and add
   `Access-Control-Max-Age`. Author reports it tested across ~500 sites. Substantive discussion
-  stopped in 2018; everything since is field churn. **An open, on-point, unowned ticket is a
-  better venue for the gap-1 fix than a fresh one** — see [#16](https://github.com/moonmeister/wp-http-query/issues/16).
+  stopped in 2018; everything since is field churn.
+
+  > ⚠️ **Corrected 2026-08-17, after reading the ticket in full.** An earlier draft called this
+  > "our gap-1 ask, already filed" and the best venue for
+  > [#16](https://github.com/moonmeister/wp-http-query/issues/16). **Both were wrong.** All five
+  > of its proposals are about CORS spec-correctness and preflight performance — *which* headers
+  > go out, *when*, and *from where*. None concerns overriding the value, which is our ask. The
+  > "one place, with one hook" phrase is the rationale for its first item only (consolidating
+  > where `Access-Control-Allow-Headers` is emitted from), not a request for overridability.
+  >
+  > Its five comments contain one substantive exchange — schlessera questioning whether `OPTIONS`
+  > belongs in the list, andrei.igna answering — then field churn. No patch in 8 years, no
+  > committer engagement on the substance.
+  >
+  > **Gap 1 went to the reopened [#46992](https://core.trac.wordpress.org/ticket/46992) instead.**
+  > The two are compatible: if #43428's third proposal lands, the clobber fix simply applies on
+  > the `OPTIONS` path.
 
 - **[#38546](https://core.trac.wordpress.org/ticket/38546)** — "REST API: Add PATCH to CORS
   allowed methods" (jnylen0, 2016). **Fixed in 4.7**, changeset
@@ -525,9 +540,12 @@ Three things worth carrying out of it:
 - **The `QUERY → GET` fallback is a real option we had not considered**, and it is not in
   [ADR 0002](decisions/0002-allmethods-vs-queryable.md). Now added there as option E.
 - **Its phase 2 proposes deriving the CORS method list from registered routes**, which is a
-  different and better fix than the #38546 precedent of appending to the hardcoded string. It
-  also happens to be what [#43428](https://core.trac.wordpress.org/ticket/43428) has been asking
-  for since 2018. Gap 1 has more support than we thought.
+  different and better fix than the #38546 precedent of appending to the hardcoded string.
+  #65616 is the *only* citation for that idea — an earlier draft also credited
+  [#43428](https://core.trac.wordpress.org/ticket/43428), which was a misreading, corrected
+  above. Derive-from-routes is also not currently on the table for gap 1: it changes default
+  output for anyone with a custom-method route, making it a behavior change rather than a no-op,
+  which is a hard sell on a bug ticket.
 
 **Also verified:** [Requests#1074](https://github.com/WordPress/Requests/issues/1074) (opened
 2026-08-10, milestone 2.1.0, links to Trac#65616) and
