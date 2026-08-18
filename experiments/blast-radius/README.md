@@ -89,3 +89,51 @@ The probe fails on **unmodified trunk** — this is independent of `QUERY`. Core
 array-form registration with constants (`class-wp-rest-block-renderer-controller.php:48`, both
 single-method), so nothing is broken today; it is a landmine. Option D makes `READABLE`
 multi-method and steps on it, which is the entire source of the 14 block-renderer failures.
+
+Filed 2026-08-18 as [Trac#65905](https://core.trac.wordpress.org/ticket/65905).
+
+## Plugin-directory search
+
+How far the array-form bug reaches in the wild, and — the reason it matters here — how much
+ecosystem breakage each ADR 0002 option would cause. Run 2026-08-18 against
+[veloria.dev](https://veloria.dev/), which regex-searches the whole plugin directory.
+
+The result CSVs are **not committed** — ~15 MB of matched lines, most of it noise. The regexes are,
+so the numbers can be re-derived. RE2 syntax (no lookaround, no backreferences); `[^...]` classes
+match newlines, so multi-line registrations are covered.
+
+| # | Regex | Lines | Plugins | Installs |
+|---|---|---|---|---|
+| 1 | `['"]methods['"]\s*=>\s*(array\(\|\[)[^)\]]*(EDITABLE\|ALLMETHODS)` | 4 | 3 | 2,000 |
+| 2 | `['"]methods['"]\s*=>\s*(array\(\|\[)[^)\]]*['"][A-Za-z]+\s*,` | 1 | 1 | 0 |
+| 3 | `['"]methods['"]\s*=>\s*(array\(\|\[)` | 7,024 | 921 | 53.3M |
+| 4 | `WP_REST_Server::EDITABLE` | 6,986 | 1,367 | 76.5M |
+| 5 | `register_rest_route\s*\(` | 69,835 | 8,748 | 178.9M |
+
+Search 1 is the bug. Search 2's single hit is a **false positive** — a settings schema keyed
+`'methods'`, not a route registration.
+
+Filtering search 3's CSV by constant gives the per-option ecosystem blast radius, since a
+registration only breaks if it names a constant that gains a second method:
+
+| Constant in array-form `methods` | Lines | Plugins | Installs |
+|---|---|---|---|
+| `READABLE` | 44 | 27 | 1.19M |
+| `CREATABLE` | 76 | 39 | 2.73M |
+| `DELETABLE` | 8 | 3 | 6,400 |
+| any `WP_REST_Server::` constant | 87 | 44 | 2.75M |
+
+**Lower bounds.** Matches are per-line, so the constant must appear on the same line as the
+`methods` key; indirection (`'methods' => $methods`) is invisible. A zero would be a floor, not a
+proof.
+
+Two findings:
+
+- The array form is common (921 plugins) but **only 87 of its 7,024 lines name a
+  `WP_REST_Server::` constant at all** — the rest pass plain strings like `array( 'POST' )`, which
+  are immune. That is why a bug dating to 4.4 has stayed quiet, and it is a better explanation than
+  "nobody uses arrays."
+- The hazard is **specific to option D**. `ALLMETHODS` is already multi-method and has zero
+  array-form uses, and a new single-method `QUERYABLE` cannot trip the bug. Option D would break
+  **27 plugins / 1.19M installs** — unless Trac#65905 lands first, which makes this a sequencing
+  constraint on D rather than a durable argument against it.
