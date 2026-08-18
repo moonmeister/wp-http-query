@@ -81,12 +81,17 @@ working order and the reason for it. The table below is the same tree without th
 Plus five standalone: [#31](../../issues/31) re-file the WebKit standards position,
 [#32](../../issues/32) document the hardening-allowlist 403, [#33](../../issues/33) matrix Axis A
 leftovers, [#34](../../issues/34) `/wp/v2/search` as first adopter, [#36](../../issues/36) file the
-array-form `methods` normalization bug.
+array-form `methods` normalization bug — **filed 2026-08-18 as
+[Trac#65905](https://core.trac.wordpress.org/ticket/65905)**.
 
 **Two of these land regardless of `QUERY`** — [#16](../../issues/16) (the CORS header clobber) and
 [#36](../../issues/36) (array-form `methods` never comma-split). Both are real core defects with
-failing tests, both are framed without reference to `QUERY`, and both survive the main proposal
-stalling in review.
+failing tests, and both survive the main proposal stalling in review.
+
+They differ on disclosure, deliberately. #16 is framed with no reference to `QUERY` at all.
+Trac#65905 **does** disclose it, because there the overlap is the strongest argument available: if
+`READABLE` gains a second method the bug produces 14 failures in core's own suite, so core is one
+multi-method constant away from breaking its own routes.
 
 **Milestones.** *Core patch v1* must be done before posting anything to Trac#65616. *Ecosystem*
 runs in parallel and gates nothing. *Deferred* is named so it is not rediscovered as a gap.
@@ -207,7 +212,7 @@ plugin/               Feature plugin — proves the path end-to-end on stock cor
 | Test matrix — Axis C (clients) | Partly outstanding; `WP_Http` cases belong with the feature plugin |
 | ADR 0002 blast radius | **Run 2026-08-16** against core's REST suite: options A and B change nothing, option D fails 20. **All three numbers are misleading and the ADR says why** — core uses `ALLMETHODS` once, so the suite cannot measure option A, and 14 of D's 20 are a pre-existing core bug. [Experiment](experiments/blast-radius/) · [ADR 0002](docs/decisions/0002-allmethods-vs-queryable.md) |
 | Gap 3 behavior measured | **Done 2026-08-16**, unmodified trunk. A `QUERY` with a **JSON** body already populates and schema-validates params correctly — dispatched at the real posts controller it filters the collection and `400`s a bad `per_page`. Only **form-encoded** bodies are lost, and they return the full unfiltered collection with a `200`. Gap 3 is the only gap whose failure is a silent wrong answer, so it should be patched first. [Probes](experiments/blast-radius/) |
-| Core bug found (unrelated to `QUERY`) | `register_rest_route()` does not comma-split `methods` given in array form, so `array( READABLE, EDITABLE )` registers the bogus key `'POST, PUT, PATCH'` and `POST` 404s. Confirmed on unmodified trunk, [failing test written](experiments/blast-radius/rest-array-methods-probe.php). Latent — core's one array-form route uses single-method constants. Not yet reported |
+| Core bug found (unrelated to `QUERY`) | `register_rest_route()` does not comma-split `methods` given in array form, so `array( READABLE, EDITABLE )` registers the bogus key `'POST, PUT, PATCH'` and `POST` 404s. Confirmed on unmodified trunk, [failing test written](experiments/blast-radius/rest-array-methods-probe.php). Latent in core — its one array-form route uses single-method constants. Measured in the plugin directory: 3 plugins / 2,000 installs hit it today, but 27 plugins / 1.19M installs would break if `READABLE` ever gained a second method. Filed as [Trac#65905](https://core.trac.wordpress.org/ticket/65905) |
 | Requests upstream PR | **In flight upstream, not ours** — [#1075](https://github.com/WordPress/Requests/pull/1075) open, milestone 2.1.0, CI-blocked on [test-server#13](https://github.com/RequestsPHP/test-server/pull/13) |
 | Feature plugin | Scaffolded |
 | CORS clobber ([#16](../../issues/16)) | **Tests done 2026-08-17** — 7 tests / 37 assertions, 3 fail on unmodified trunk, no regressions across the 3550-test REST suite. Needs `LOCAL_PHP_XDEBUG=true` or they skip silently. Branch `fix/rest-cors-allow-methods-clobber`, `QUERY`-free. **Fix shape deliberately open** — conditional, an array filter matching the 5.5.0 siblings, or both; asking for committer direction before opening a PR |
