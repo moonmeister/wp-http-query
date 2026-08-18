@@ -90,7 +90,9 @@ array-form registration with constants (`class-wp-rest-block-renderer-controller
 single-method), so nothing is broken today; it is a landmine. Option D makes `READABLE`
 multi-method and steps on it, which is the entire source of the 14 block-renderer failures.
 
-Filed 2026-08-18 as [Trac#65905](https://core.trac.wordpress.org/ticket/65905).
+Filed 2026-08-18 as [Trac#65905](https://core.trac.wordpress.org/ticket/65905); patched in
+[wordpress-develop#13136](https://github.com/WordPress/wordpress-develop/pull/13136), which carries
+four core-style tests that supersede this probe.
 
 ## Plugin-directory search
 
