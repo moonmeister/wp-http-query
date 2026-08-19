@@ -260,14 +260,27 @@ precisely. With this work done:
 |                                                                      | Result                                                                                                                    |
 | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | A route registered with `'methods' => 'QUERY'` (yours or a plugin's) | **Works.** Already works on stock core today — see §2.                                                                    |
-| An existing core endpoint, e.g. `QUERY /wp-json/wp/v2/posts`         | **404 `rest_no_route`** — "No route was found matching the URL and request method." Not a 405. Unchanged by this project. |
+| An existing core endpoint, e.g. `QUERY /wp-json/wp/v2/posts`         | **Decided by [ADR 0002](decisions/0002-allmethods-vs-queryable.md).** Today: **404 `rest_no_route`** — "No route was found matching the URL and request method." Not a 405. |
 | A route registered with `ALLMETHODS`                                 | **Decided by [ADR 0002](decisions/0002-allmethods-vs-queryable.md).**                                                     |
 
-That third row is why this scope line and ADR 0002 are the same decision viewed from two
-angles. Folding `QUERY` into `ALLMETHODS` would make every route using that constant — across
-core _and every plugin_ — silently begin answering `QUERY`, with handlers never written for it
-and a body they will not have parsed. That is migration, performed implicitly across the
-ecosystem. Declining to migrate anything is what makes opt-in the leaning.
+Those last two rows are why this scope line and ADR 0002 are the same decision viewed from two
+angles. Folding `QUERY` into `ALLMETHODS` — or into `READABLE` — would make every route using
+that constant, across core _and every plugin_, begin answering `QUERY` with handlers never
+written for it. That is migration, performed implicitly across the ecosystem.
+
+> ⚠️ **Revised 2026-08-19.** This paragraph used to end "…and a body they will not have parsed,"
+> and concluded that declining to migrate anything is what makes opt-in the leaning. **The
+> body clause was false.** `parse_body_params()` already runs for `QUERY` on unmodified trunk
+> (`class-wp-rest-request.php:373-375`); the parsed body sits in `$this->params['POST']` and is
+> only left out of the lookup order at `:377`. Once gap 3 is fixed, an existing handler reads a
+> `QUERY` body correctly without changes, because handlers read `$request['x']` rather than
+> `$_GET`.
+>
+> With that gone, the case against migrating is about **route authors' expectations**, not
+> broken handlers — and ADR 0002's lean has reversed to **option D**, which migrates every
+> `READABLE` route deliberately. The second row above is no longer "unchanged by this project."
+> The open question for the community is **on by default versus opt-in**, and that is the
+> question to put to them rather than to answer here.
 
 ### First adopter — deferred, not rejected
 
@@ -562,10 +575,15 @@ constants date to the WP-API plugin era, so if the reasoning was recorded anywhe
 on the merits and stop waiting for a rationale that probably was never written down. Treat
 "deliberately restricted" as unsupported unless someone produces the citation.
 
-**Q4 — Should `QUERY` join `ALLMETHODS`, or be opt-in only?**
-Adding it changes behavior for every existing `ALLMETHODS` route in core and in plugins — those
-routes would begin answering `QUERY` with handlers never written for it.
-→ [ADR 0002](decisions/0002-allmethods-vs-queryable.md)
+**Q4 — Should `QUERY` be on by default, or opt-in only?**
+Restated 2026-08-19. It was previously "should `QUERY` join `ALLMETHODS`?", which framed the
+choice too narrowly — ADR 0002's lean is now **option D**, `READABLE` gaining `QUERY`, which is
+a broader default than `ALLMETHODS` and a safer one, since `ALLMETHODS` also covers writes.
+Either way the substance is the same: does core turn `QUERY` on for existing routes, or does
+each route author opt in? **This is the question to put to the community, not to answer
+unilaterally here.**
+→ [ADR 0002](decisions/0002-allmethods-vs-queryable.md), [#38](../../issues/38) for the
+missing number
 
 **Q5 — Does the cache-safety default belong in core or in the route?** §4.1.
 → [ADR 0003](decisions/0003-cache-safety-default.md)
