@@ -1,8 +1,11 @@
 # ADR 0001 — What query format does a WordPress QUERY endpoint accept?
 
-**Status:** Proposed — undecided
-**Date:** 2026-08-16
-**Blocks:** core patch (gap 3), `Accept-Query` advertisement, feature plugin design
+**Status:** **Accepted — option B** (`application/json` + form-encoded), 2026-08-19
+**Date:** 2026-08-16, decided 2026-08-19
+**Blocks:** ~~core patch (gap 3)~~ **unblocked** —
+[#14](https://github.com/moonmeister/wp-http-query/issues/14) can proceed. `Accept-Query`
+advertisement ([#20](https://github.com/moonmeister/wp-http-query/issues/20)) and feature plugin
+design still depend on the two open items below.
 
 ---
 
@@ -77,7 +80,7 @@ already works.
 - **−** Leaves gap 3 unfixed, so form-encoded `QUERY` remains silently broken rather than
   cleanly rejected.
 
-### B. `application/json` + form-encoded
+### B. `application/json` + form-encoded ← **accepted**
 
 Option A plus adding `'QUERY'` to `$accepts_body_data`.
 
@@ -96,7 +99,7 @@ Define e.g. `application/vnd.wp.query+json` with a documented filter grammar.
   scope per [scope.md](../scope.md) §3.
 - **−** Would almost certainly not land in a first patch.
 
-### D. Pluggable — core parses nothing, routes declare their own
+### D. Pluggable — core parses nothing, routes declare their own ← **declined, revisitable**
 
 Core threads the method through and lets each route declare its accepted media types and parse
 its own body.
@@ -105,16 +108,81 @@ its own body.
 - **+** Lets the ecosystem discover the right format before core blesses one.
 - **−** No interoperability. Every plugin invents its own thing.
 - **−** Still requires deciding what core's *own* endpoints would do, if any ever adopt `QUERY`.
+- **−** **Solves a problem nobody has yet, and the capability already exists** — a route can
+  parse its own body today via `get_body()` with no core support. See the decision below.
 
-## Recommendation (not yet decided)
+## Decision — option B, 2026-08-19
 
-Lean **B for the patch, D as the extension model**, with C explicitly deferred. B fixes a real
-bug and keeps the diff minimal; D matches WordPress's usual posture of providing plumbing
-rather than policy. Revisit C only if the feature plugin surfaces genuine demand.
+**Core accepts `application/json` and `application/x-www-form-urlencoded`. Nothing else.**
+Concretely: add `'QUERY'` to `$accepts_body_data` at `class-wp-rest-request.php:377`. That is
+the whole production change.
+
+C stays deferred — designing a query language is out of scope per [scope.md](../scope.md) §3.
+
+### D is dropped, not adopted as the extension model
+
+The earlier lean paired B with D ("core parses nothing, routes declare their own"). **D is now
+declined for the first patch.** The reasoning is that it is a good idea without a demonstrated
+need, and needs can be met later at no cost — but the specific reason it costs nothing to defer
+is worth writing down, because it is the thing that makes deferring safe rather than merely
+optimistic:
+
+**D requires no core plumbing at all.** A route that wants `application/jsonpath` can already
+read `$request->get_body()` in its own callback, or hook `rest_request_before_callbacks`, parse
+whatever it likes, and `set_param()` the result. Nothing in core prevents this today and nothing
+in option B changes that. So "pluggable" is not a feature core would have to build — it is the
+status quo. Adopting D as a stated extension model would have meant writing documentation and a
+filter for a capability that already exists, and then defending that surface in review.
+
+Deferring it is therefore free in the strict sense: **if demand appears, adding a declared-media-type
+API later is purely additive and breaks nothing shipped under B.** That is not true of C, and it
+is not true of the `Accept-Query` value, which is a compatibility surface from the moment it is
+emitted.
+
+### The consequence to carry forward
+
+B fixes the form-encoded silent-data-loss case. It does **not** fix the general one — see the
+first open item. Do not describe B as closing gap 3 completely, because a reviewer who reads
+`parse_body_params()` will see that it does not.
 
 ## Open
 
-- Does `Accept-Query` need a filter so routes can advertise their own types under D?
-- If core advertises `application/json`, are we implicitly blessing it as *the* WordPress query
-  format? Probably yes — treat that as the real decision.
-- Should a `QUERY` with an unrecognized `Content-Type` 415, or fall through silently as today?
+Two items, both now downstream of this decision rather than blocking it.
+
+### 1. Unrecognized `Content-Type` still fails silently — and B does not fix it
+
+`parse_body_params()` returns early on any content type that is not
+`application/x-www-form-urlencoded` (`class-wp-rest-request.php:762-766`), with no error. So
+after B lands, a `QUERY` carrying `Content-Type: application/jsonpath` and a perfectly good body
+is parsed by nobody, falls through to URL parameters, and returns **a 200 with an unfiltered
+collection** — the exact failure shape this project has been treating as the reason gap 3 comes
+first.
+
+Two things make this harder than it looks:
+
+- **It is pre-existing and method-general.** `PUT`, `PATCH` and `DELETE` behave identically
+  today. A `QUERY`-only 415 is inconsistent; a general one is a BC break in core.
+- **But `QUERY` has a stronger case than the others.** A `PUT` with an unparsed body may still
+  be a meaningful request via URL parameters. A `QUERY` whose body was discarded is a request
+  whose entire meaning was discarded — the body *is* the query.
+
+That asymmetry is probably the argument for a `QUERY`-specific 415, but it is a new opinion in
+core and it should be argued deliberately rather than slipped into the gap-3 patch. **Keep it
+out of [#14](https://github.com/moonmeister/wp-http-query/issues/14)** so that patch stays a
+one-line bug fix, and settle it before `Accept-Query` is emitted — advertising the two types we
+accept while silently accepting a third is incoherent.
+
+### 2. Does advertising `application/json` bless it as *the* WordPress query format?
+
+Probably yes, and that is the real weight of this decision. Worth separating two things that B
+runs together:
+
+| | |
+|---|---|
+| What core **parses** | JSON and form-encoded — both, because the alternative is silent loss |
+| What core **advertises** in `Accept-Query` | Open. Not necessarily both |
+
+Form-encoded is a poor query format and advertising it invites `filter[meta_query][0][key]=…`
+in a header we have to live with. Accepting it is a bug fix; advertising it is an endorsement.
+It is defensible to parse both and advertise only `application/json`. That call belongs to
+[#20](https://github.com/moonmeister/wp-http-query/issues/20).

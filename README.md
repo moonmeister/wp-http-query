@@ -111,7 +111,7 @@ Full reasoning in [scope.md](docs/scope.md) §3 and §6.
 | | Why |
 |---|---|
 | Matrix Axis B — CDNs, WAFs, managed hosts | Outside the WordPress boundary; Axis A suffices for a readiness claim |
-| Designing a query language | ADR 0001 option C, deferred |
+| Designing a query language | ADR 0001 option C, deferred. A pluggable per-route format API (option D) is declined too — routes can already parse their own bodies, so it is additive whenever it is wanted |
 | Migrating existing core endpoints | Capability, not adoption |
 | Lobbying nginx, CDNs, or hosts | Tracked, not gated on |
 | Authoring the Requests PR | [#1075](https://github.com/WordPress/Requests/pull/1075) already exists and is being triaged |
@@ -215,6 +215,7 @@ plugin/               Feature plugin — proves the path end-to-end on stock cor
 | Test matrix — Axis B (CDN/WAF) | **Out of scope** — outside the WordPress boundary, and Axis A is sufficient for a readiness claim. See [scope.md](docs/scope.md) §6 |
 | Test matrix — Axis C (clients) | Partly outstanding; `WP_Http` cases belong with the feature plugin |
 | ADR 0002 blast radius | **Run 2026-08-16** against core's REST suite: options A and B change nothing, option D fails 20. **All three numbers are misleading and the ADR says why** — core uses `ALLMETHODS` once, so the suite cannot measure option A, and 14 of D's 20 are a pre-existing core bug. [Experiment](experiments/blast-radius/) · [ADR 0002](docs/decisions/0002-allmethods-vs-queryable.md) |
+| ADR 0001 | **Decided 2026-08-19 — option B**, JSON + form-encoded. One line: `'QUERY'` into `$accepts_body_data`. Option D (pluggable per-route formats) declined as unneeded, and free to defer because routes can already parse their own bodies with no core support. **Gap 3 ([#14](../../issues/14)) is unblocked.** [ADR 0001](docs/decisions/0001-query-body-media-type.md) |
 | ADR 0002 lean | **Reversed C → D on 2026-08-19.** The argument against D — that all 77 `READABLE` routes would accept a body their handlers never read — is **false**: `parse_body_params()` already runs for `QUERY` (`class-wp-rest-request.php:373-375`) and the parsed body is only left out of the lookup order at `:377`. Fix gap 3 and every existing read handler serves `QUERY` correctly with no per-route work. Not yet Accepted — waiting on [#38](../../issues/38). [ADR 0002](docs/decisions/0002-allmethods-vs-queryable.md) · [#10](../../issues/10) |
 | Method-branching risk | **Unmeasured — the last assertion in the project that has no number.** Plugin code doing `'GET' === $request->get_method()` inside a REST callback silently stops matching under option D. No core test can see it. [#38](../../issues/38) |
 | Gap 3 behavior measured | **Done 2026-08-16**, unmodified trunk. A `QUERY` with a **JSON** body already populates and schema-validates params correctly — dispatched at the real posts controller it filters the collection and `400`s a bad `per_page`. Only **form-encoded** bodies are lost, and they return the full unfiltered collection with a `200`. Gap 3 is the only gap whose failure is a silent wrong answer, so it should be patched first. [Probes](experiments/blast-radius/) |

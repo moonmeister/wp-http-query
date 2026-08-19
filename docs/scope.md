@@ -484,12 +484,18 @@ defect, and it belongs in user documentation.
 
 ## 7. Open questions
 
-**Q1 — What query format does a WordPress `QUERY` endpoint accept?**
-RFC 10008 anticipates real query-format media types (`application/jsonpath`, `application/sql`)
-advertised via `Accept-Query`. WordPress has no parsing story for any of them, and its existing
-JSON body path only works if we settle on an `application/json`-shaped filter payload. **Must
-precede any patch** — gap 3 cannot be fixed correctly without answering it.
-→ [ADR 0001](decisions/0001-query-body-media-type.md)
+**Q1 — What query format does a WordPress `QUERY` endpoint accept? ✅ ANSWERED — JSON and
+form-encoded.** Decided 2026-08-19, [ADR 0001](decisions/0001-query-body-media-type.md)
+option **B**. Core parses `application/json` (already works on trunk) and
+`application/x-www-form-urlencoded` (the one-line `$accepts_body_data` fix). A query language
+(option C) stays out of scope, and the pluggable model (option D) is **declined for now** —
+a route can already parse its own body via `get_body()`, so core has nothing to build and
+adding a declared-media-type API later is purely additive.
+
+**Gap 3 is unblocked.** Two things this does *not* settle, both tracked in the ADR: an
+unrecognized `Content-Type` still falls through silently (pre-existing and method-general, not
+`QUERY`-specific), and whether `Accept-Query` should advertise form-encoded or only JSON —
+parsing a format and endorsing it are different commitments.
 
 **Q2 — Does the body reach PHP? ✅ ANSWERED — yes.** First matrix run, 2026-08-16.
 
