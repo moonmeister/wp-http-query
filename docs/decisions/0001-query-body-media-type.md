@@ -158,19 +158,60 @@ is parsed by nobody, falls through to URL parameters, and returns **a 200 with a
 collection** — the exact failure shape this project has been treating as the reason gap 3 comes
 first.
 
-Two things make this harder than it looks:
+Verified in source 2026-08-19, and it is worse than "pre-existing":
 
-- **It is pre-existing and method-general.** `PUT`, `PATCH` and `DELETE` behave identically
-  today. A `QUERY`-only 415 is inconsistent; a general one is a BC break in core.
-- **But `QUERY` has a stronger case than the others.** A `PUT` with an unparsed body may still
-  be a meaningful request via URL parameters. A `QUERY` whose body was discarded is a request
-  whose entire meaning was discarded — the body *is* the query.
+- **There is no `415` anywhere in the REST API.** The only body-related error core returns is
+  `rest_invalid_json` (400), and only when the Content-Type *is* JSON and the JSON is malformed
+  (`class-wp-rest-request.php:717-735`).
+- **`POST` has the same hole**, by a different route. `parse_body_params()` is skipped for
+  `POST` because PHP handles form bodies natively, and `set_body_params( wp_unslash( $_POST ) )`
+  (`class-wp-rest-server.php:379`) sets an empty bucket, because PHP leaves `$_POST` empty for a
+  non-form Content-Type. `POST` with `application/xml` and a valid body: parsed by nobody, no
+  error.
+- **Core sends no `Accept-Post` and no `Accept-Patch`** — zero occurrences. WordPress advertises
+  accepted body formats for no method at all.
 
-That asymmetry is probably the argument for a `QUERY`-specific 415, but it is a new opinion in
-core and it should be argued deliberately rather than slipped into the gap-3 patch. **Keep it
-out of [#14](https://github.com/moonmeister/wp-http-query/issues/14)** so that patch stays a
-one-line bug fix, and settle it before `Accept-Query` is emitted — advertising the two types we
-accept while silently accepting a third is incoherent.
+**Writes mostly fail closed by accident.** Write endpoints declare `required => true` args, so
+an empty param set trips `rest_missing_callback_param` → 400
+(`class-wp-rest-request.php:924-928`). A misleading error, but an error. Read endpoints have
+all-optional args with defaults, so they return **200 with an unfiltered collection**. That
+read/write asymmetry — not "the body *is* the query" — is the real reason this matters more for
+`QUERY`.
+
+### But a 415 requires option D, so it is the same decision
+
+A 415 needs core to know what "recognized" means. Core knows JSON and form-encoded. A route
+parsing `application/jsonpath` itself via `get_body()` would be rejected **before its callback
+runs** — so a 415 does not merely lack a declaration mechanism, it destroys the escape hatch
+that makes declining D safe in the first place.
+
+The same pressure arrives from advertising. `Accept-Query` is a **per-resource** header: it
+states what *this* resource accepts. A global list cannot be accurate for a route doing custom
+parsing, which core would advertise `application/json` for.
+
+So the 415, the `Accept-Query` value, and option D are three uses of one mechanism — *what
+formats does this route accept?* Three scopes, each additive on the last:
+
+| | Mechanism | Gets you |
+|---|---|---|
+| **v1 — B, as decided** | none | Parse JSON + form-encoded. No 415. Fixed `Accept-Query`, accurate for every core route, wrong for a custom-format route |
+| **v1.5** | one filter over the advertised list, receiving the request | Accurate advertising for custom routes. About the size of the `rest_allowed_cors_methods` filter added in [#13151](https://github.com/WordPress/wordpress-develop/pull/13151) |
+| **v2 — D** | `'accepts' => array( … )` in `register_rest_route()` | Per-resource `Accept-Query` as the RFC intends, plus a 415 that is safe because core knows which routes opted out |
+
+**This does not reopen the decision** — B remains the right minimal patch and every step above
+is purely additive. It sharpens *why* D is deferred: not "nobody needs it," but "nothing in v1
+needs it, and the first thing that will is `Accept-Query` accuracy."
+
+**Keep the 415 out of [#14](https://github.com/moonmeister/wp-http-query/issues/14)** so that
+patch stays a one-line bug fix.
+
+### 415 for all methods — a real argument, and not ours
+
+Fixing this method-generally is defensible and someone may raise it. It is a core-wide BC break:
+a `POST` with a mislabeled Content-Type that currently limps along on URL parameters would start
+failing. Realistically it would have to land behind a per-route opt-in — which is option D
+again. Worth naming in the Trac thread as a known gap this project is deliberately not widening;
+not worth filing separately.
 
 ### 2. Does advertising `application/json` bless it as *the* WordPress query format?
 
