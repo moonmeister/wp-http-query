@@ -234,13 +234,17 @@ response is 4xx, no-cache headers are forced. `QUERY` work must not regress that
 ### In scope
 
 - **Inbound (server):** accepting and dispatching `QUERY` on the REST API — body parsing, CORS
-  preflight, `Allow`/`Accept-Query` advertisement, cache-safety headers.
+  preflight, `Allow`/`Accept-Query` advertisement. ~~Cache-safety headers~~ — removed
+  2026-08-19, [ADR 0003](decisions/0003-cache-safety-default.md) option C.
 - **Outbound (client):** `WP_Http` / `wp_remote_request()` and the bundled Requests library
   sending `QUERY` as a first-class, documented method.
 - **JS client:** `@wordpress/api-fetch` emitting `QUERY` with a body through its full
   middleware chain.
-- **Cache safety:** ensuring WordPress does not enable cache poisoning by body-blind
-  intermediaries (§4).
+- **Cache safety:** ~~ensuring WordPress does not enable cache poisoning by body-blind
+  intermediaries~~ — **resolved 2026-08-19 with no core work.** No shipping cache stores a
+  `QUERY` response; RFC 9111 §3 forbids it for any cache that has not implemented §2.7 keying.
+  What remains is *reporting* two WordPress page-cache method denylists upstream
+  ([#39](../../issues/39)), which is ecosystem work, not core. See §4.1.
 - **Empirical test matrix:** proving the request body reaches PHP across real deployments (§6).
 
 ### Out of scope
@@ -302,16 +306,20 @@ or JSON body. The controller needs no changes. `wp/v2` versioning covers the res
 representation contract, not the method set; a previously-404 request beginning to succeed
 does not break a client.
 
-Two real costs, neither of them BC:
+One real cost, and it is not BC:
 
 - **Core's test suite hard-codes method sets.** Exact-match assertions exist in
   `rest-posts-controller.php:256,266`, `rest-attachments-controller.php:374,383`, and
   `rest-server.php:397,437,476,536`. A fixture update, not an API break — but see the note in
   ADR 0002, where this doubles as a free blast-radius measurement.
-- **Caching stakes rise sharply.** A _core_ endpoint answering `QUERY` behind a body-blind
-  cache is [ADR 0003](decisions/0003-cache-safety-default.md)'s poisoning scenario on exactly
-  the kind of route a CDN is configured to cache. **This, not versioning, is the reason to
-  defer first-adopter work to its own ticket.**
+
+> ⚠️ **A second cost was listed here and is gone as of 2026-08-19.** It read: *"Caching stakes
+> rise sharply — a core endpoint answering `QUERY` behind a body-blind cache is ADR 0003's
+> poisoning scenario on exactly the kind of route a CDN is configured to cache. This, not
+> versioning, is the reason to defer first-adopter work to its own ticket."* The survey in
+> §4.1 shows no CDN will cache a `QUERY` response at all, so a first-adopter core endpoint
+> carries no extra caching risk. **First-adopter work stays deferred on effort and reviewer
+> scope, not on safety** — [#34](../../issues/34).
 
 ### Anticipated objection
 
@@ -334,23 +342,55 @@ RFC 10008 §2.7 places the hard requirement on the cache, not the origin:
 > metadata.
 
 WordPress is an origin server. It does not construct cache keys and should not try to. Varnish,
-Cloudflare, Fastly, nginx, and host page caches own that. As of today **none appear to
-implement body-inclusive cache keys**, so in practice nothing will cache `QUERY` for a while.
+Cloudflare, Fastly, nginx, and host page caches own that. As of today **none implement
+body-inclusive cache keys** — and, as it turns out, none will cache `QUERY` at all.
 
-### 4.1 Cache-poisoning defense — ours, and load-bearing
+> ⚠️ **§4.1 below was falsified on 2026-08-19 and is preserved for the record.** The count in
+> the heading above — "four responsibilities, one of them a security issue" — is now **three
+> responsibilities and no security issue**. [ADR 0003](decisions/0003-cache-safety-default.md)
+> is **Accepted, option C: core emits nothing method-specific for `QUERY`.**
 
-The one that matters. A cache that does not understand `QUERY` may fall back to keying by URI
-alone. Two different request bodies to the same URI then collide, and one user's result set is
-served to another. **No `Vary` mechanism can protect against this** — `Vary` operates on
-request headers, and there is no `Vary: body`.
+### 4.1 Cache-poisoning defense — ~~ours, and load-bearing~~ not ours, and not a defect
 
-So this cannot be delegated. Current behavior is not safe by default:
+**Original reasoning, wrong:** a cache that does not understand `QUERY` may fall back to keying
+by URI alone. Two different request bodies to the same URI then collide, and one user's result
+set is served to another. No `Vary` mechanism can protect against this — `Vary` operates on
+request headers, and there is no `Vary: body`. Current behavior looked unsafe by default:
 `rest_send_nocache_headers` defaults to `is_user_logged_in()`
 (`class-wp-rest-server.php:487`), so **anonymous REST responses carry no explicit
-`Cache-Control` at all**, leaving intermediaries to apply heuristic caching. Tolerable for
-URI-keyed `GET`. Not tolerable for body-keyed `QUERY`.
+`Cache-Control` at all**, leaving intermediaries to apply heuristic caching.
 
-See [ADR 0003](decisions/0003-cache-safety-default.md).
+**Where it went wrong: body-blind is not the same as will-cache-it-anyway.** The scenario
+requires a cache that stores a `QUERY` response. Surveyed, none do —
+[`experiments/cache-survey/`](../experiments/cache-survey/):
+
+| Layer | Behavior on `QUERY` |
+|---|---|
+| Varnish | `synth(501)` + `Connection: close`, before the origin sees it (`builtin.vcl`) |
+| nginx | cache-method bitmask holds only `GET`/`HEAD`/`POST` — uncacheable even deliberately |
+| Apache `mod_cache` | `default:` → *"not cacheable by mod_cache, ignoring"* → `DECLINED` |
+| Squid | `default: return false` (`RequestMethod.cc`) |
+| Fastly | *"all other methods will cause a `pass`"* |
+| Cloudflare | *"does not cache… anything other than a `GET`"* |
+
+RFC 9111 §3 also forbids the feared failure directly: a cache MUST NOT store unless the request
+method is **understood**, defined as recognizing it *and* implementing all specified
+caching-related behavior. A cache that recognized `QUERY` but skipped §2.7 keying has not
+understood it.
+
+The one live vector is WordPress-side — **W3 Total Cache Pro with REST caching enabled**, whose
+method **denylist** default-allows `QUERY`. Severity is **confusion, not disclosure**: every
+parameter expressible in a `QUERY` body is expressible in a `GET` query string. Reported
+upstream rather than worked around in core.
+
+A `Cache-Control` header — the obvious mitigation, and what this section proposed — would not
+have reached that layer at all. It decides in PHP on the write path and honors
+`DONOTCACHEPAGE`, which **core references zero times**.
+
+See [ADR 0003](decisions/0003-cache-safety-default.md) for the decision and the reasoning error
+behind the original text. The stray availability finding — Varnish's `501` — is a
+**deployment** problem, not a caching one; it belongs with the hardening-allowlist 403 in
+[#32](../../issues/32).
 
 ### 4.2 The `Location` indirection — ours, if adopted
 
@@ -471,10 +511,17 @@ WordPress boundary — they are per-deployment configuration on a vendor's relea
 no core patch can influence them. Measuring them would produce a snapshot that rots fast and
 concede a burden of proof the project does not carry.
 
-This does not weaken §4. The cache-safety default assumes **no** intermediary implements
-RFC 10008 §2.7 body-inclusive cache keys, which is the conservative direction. Having no Axis B
-data makes that assumption the only defensible one rather than an open question — see
-[ADR 0003](decisions/0003-cache-safety-default.md).
+This does not weaken §4 — but the argument it used to make was too comfortable. It said the
+absence of Axis B data made the conservative assumption *"the only defensible one rather than
+an open question."* That is how "we cannot measure it" became "therefore assume the worst,"
+which is the reasoning [ADR 0003](decisions/0003-cache-safety-default.md) reversed on
+2026-08-19.
+
+**Descoping live measurement did not licence skipping documentary evidence.** Default configs
+and vendor source are neither Axis B nor an assumption; they sit between the two, they are
+inside the WordPress boundary in the sense that matters (a site owner can read them), and they
+answered the question outright — [`experiments/cache-survey/`](../experiments/cache-survey/).
+Axis B stays descoped; §4.1's conclusion did not survive it.
 
 What a site owner will actually hit first is a `GET POST`-only hardening allowlist, which
 403s `QUERY` on both nginx and Apache. That is measured, it is site configuration rather than a
@@ -592,7 +639,13 @@ unilaterally here.**
 missing number
 
 **Q5 — Does the cache-safety default belong in core or in the route?** §4.1.
-→ [ADR 0003](decisions/0003-cache-safety-default.md)
+**✅ ANSWERED 2026-08-19 — neither. There is no default.** The question presupposed that some
+cache would store a `QUERY` response; none does, and RFC 9111 §3 forbids it for any cache that
+recognizes the method without implementing §2.7 keying. Core emits nothing method-specific.
+The residual work is two upstream plugin reports ([#39](../../issues/39)), and the residual
+severity is confusion rather than disclosure.
+→ [ADR 0003](decisions/0003-cache-safety-default.md),
+[`experiments/cache-survey/`](../experiments/cache-survey/)
 
 **Q6 — If we adopt the `Location` indirection, who mints the URI?** §4.2.
 → [ADR 0004](decisions/0004-location-indirection.md)
