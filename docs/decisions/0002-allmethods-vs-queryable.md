@@ -1,7 +1,8 @@
 # ADR 0002 — Should QUERY join ALLMETHODS, or be opt-in only?
 
-**Status:** Proposed — undecided, but **no longer blocked**
-**Date:** 2026-08-16
+**Status:** Proposed — undecided. **The lean reversed from C to D on 2026-08-19**; see
+[Recommendation](#recommendation-lean-reversed-to-d-2026-08-19).
+**Date:** 2026-08-16, revised 2026-08-19
 **Blocks:** core patch (gap 2)
 **Related:** [scope.md](../scope.md) Q3 — answered 2026-08-16; see "Open" below
 
@@ -84,10 +85,22 @@ Treat `QUERY` as a read method alongside `GET`, since both are safe and idempote
 
 - **+** Semantically the tightest fit — `QUERY` genuinely is a read.
 - **+** Read handlers are the ones most likely to be safe under `QUERY`.
-- **−** Same BC problem as A, and `READABLE` is used far more than `ALLMETHODS`. Strictly worse
-  on blast radius.
-- **−** A `READABLE` handler reads `$request['param']` from the query string; it will not see a
-  body. Silent empty results across a huge surface.
+- **−** Same BC surface as A, and `READABLE` is used far more than `ALLMETHODS` — 77 uses in core
+  against 1.
+- **−** Turns the cache-safety question on for the entire read surface at once, rather than per
+  route. See ADR 0003; this is now the strongest surviving objection.
+- **−** ~~A `READABLE` handler reads `$request['param']` from the query string; it will not see a
+  body. Silent empty results across a huge surface.~~
+
+> ⚠️ **Corrected 2026-08-19 — this was false, and it was the primary argument against D.**
+> It is the *same* stale claim already corrected for option E, which was fixed in E's bullets and
+> never propagated here. Measured on unmodified trunk: `get_parameter_order()` adds the `JSON`
+> source with **no method check**, and `parse_body_params()` already runs for `QUERY`
+> (`class-wp-rest-request.php:373-375`) — the parsed body sits in `$this->params['POST']` and is
+> simply never consulted, because `'QUERY'` is missing from the `$accepts_body_data` allowlist at
+> `:377`. A `READABLE` handler under D receives fully populated, fully schema-validated params
+> from a JSON body today, and from a form-encoded body once gap 3 lands. There are no silent empty
+> results. **Do not take this argument to Trac; it is refutable in one test.**
 
 ### E. `QUERYABLE` plus an optional `QUERY → GET` route fallback
 
@@ -127,16 +140,60 @@ conflated with the constants decision — which is why it is recorded here as a 
 rather than a fifth alternative. Expect the ticket reporter to advocate for it, and engage on
 the gap-3 ordering rather than on silent discard in general.
 
-## Recommendation (not yet decided)
+## Recommendation — lean reversed to D, 2026-08-19
 
-Lean **C**: ship `QUERYABLE`, leave `ALLMETHODS` and `READABLE` untouched, and record the
-intent to revisit. This is the version most likely to survive review, and the project's whole
-posture is additive-only ([README](../../README.md) principle 4).
+> **Previously:** lean **C**, with "option D should be explicitly ruled out in the ticket." That
+> instruction rested on the silent-body-discard claim corrected above. With the claim gone, the
+> reason for ruling D out went with it.
 
-**Option D should be explicitly ruled out in the ticket** — someone will propose it because the
-semantics look right. Rule it out on the silent-body-discard argument across all 77 `READABLE`
-routes, **not** on its measured failure count; the count is 20 but decomposes into one unrelated
-core bug and six fixture updates, and anyone who checks will say so.
+Lean **D**: `READABLE = 'GET, QUERY'`, so every read route answers `QUERY` with no work by any
+route author.
+
+The case for it is that the mechanics are proven end to end and cost nothing. Under D plus gap 3,
+a `READABLE` route registers `QUERY`, dispatches to the same callback, resolves body params
+through the existing precedence chain, schema-validates them, and advertises the method in
+`Allow`, `OPTIONS` and `targetHints` — measured against the real posts controller, with no
+controller changes. That is `QUERY` support for the entire read surface for one constant and one
+allowlist entry.
+
+**D and E produce the identical dispatch outcome.** The only difference is who decides: D turns it
+on for every read route on upgrade, E turns it on per route. Since the mechanics are settled
+either way, this is no longer a technical question — it is a question about defaults.
+
+### What D requires before it can be proposed
+
+Hard prerequisites, in order:
+
+1. **Gap 3** (#2) — without it a form-encoded `QUERY` returns an unfiltered `200` on every read
+   route. This is the disclosure-shaped failure and D makes it default-on. Non-negotiably first.
+2. **Trac#65905 / [#13136](https://github.com/WordPress/wordpress-develop/pull/13136)** — array-form
+   `methods` must comma-split before `READABLE` becomes multi-method, or 27 plugins / 1.19M installs
+   break. A sequencing constraint, not a blocker: it is already up.
+3. **ADR 0003** (#18) — cache safety was previously treated as gating nothing. Under D it gates
+   everything, because D turns body-varying responses on across the whole read surface at once.
+4. **Measure the method-branching risk** — plugin code doing `'GET' === $request->get_method()`
+   silently stops matching. This is the only surviving objection that is still an assertion rather
+   than a number, and this project's rule is to convert those before publishing.
+
+### How to take it to the community
+
+**Propose D, and put "on by default vs. opt-in" on the table as the explicit question.** Do not
+present D as the obvious reading and hope nobody raises E. State the trade in our own words first:
+
+- On by default (D): every read endpoint gains `QUERY` immediately; nobody has to migrate; the
+  constant stays semantically honest. The cost is that each route's author never answered the
+  cache-safety question.
+- Opt-in (B/C, or E per route): each author decides. The cost is that `QUERY` support arrives
+  route by route, which for most sites means never.
+
+Also state plainly, before anyone else does: **core cannot measure the BC risk for any of these
+options.** Core uses `ALLMETHODS` once, no core test sends a `QUERY` with a body, and plugin
+breakage is unmeasured except for the array-form case. Leading with that is worth more than being
+caught by it.
+
+Option A remains available and is strictly smaller in blast radius than D; it is not the
+recommendation because `ALLMETHODS` is the constant nobody reaches for when they mean "this is a
+read."
 
 ## Measured blast radius
 
@@ -184,13 +241,31 @@ Decomposed:
 
 - **14** — `REST_Block_Renderer_Controller_Test`, all `404 is identical to 200`. Not fixture
   churn; the route stopped existing. Cause is a **latent core bug**, below.
-- **6** — assertion text only, and all six are core *correctly* advertising the new method:
-  `Allow: GET, QUERY` on two OPTIONS tests, `QUERY` added to `targetHints`, to the block-directory
-  schema, and to the site-health route's method map. Every one is a fixture that needs updating,
-  not a behavior that broke.
+- **5** — assertion text only, every one of them core *correctly* advertising the new method.
+  Verified against source 2026-08-19:
 
-So option D's real score is **one core bug plus six fixture updates — zero genuine behavioral
-breakage.** That is much weaker evidence against D than `20` suggests, and the case against D has
+  | Test | Assertion |
+  |---|---|
+  | `WP_Test_REST_Posts_Controller::test_allow_header_sent_on_options_request` | `rest-posts-controller.php:256` — `assertSame( $headers['Allow'], 'GET' )` |
+  | `WP_Test_REST_Attachments_Controller::test_allow_header_sent_on_options_request` | `rest-attachments-controller.php:374` — same |
+  | `Tests_REST_Server::test_populates_target_hints_for_logged_out_user` | `rest-server.php:2779` — `assertSame( array( 'GET' ), ...['allow'] )` |
+  | `Tests_REST_Server::test_populates_target_hints_for_administrator` | `:2766` — same, full method list |
+  | `WP_REST_Block_Directory_Controller_Test::test_get_item_schema` | `rest-block-directory-controller.php:204` — `assertSame( array( 'GET' ), $data['endpoints'][0]['methods'] )` |
+
+- **1** — **not a fixture update.** `WP_Test_REST_Site_Health_Controller::test_page_cache_endpoint`
+  (`rest-site-health-controller.php:120-123`) asserts
+  `assertSame( array( WP_REST_Server::READABLE => true ), $route['methods'] )` — using the constant
+  **as an array key**. Under D the expected side becomes the single key `'GET, QUERY'` while the
+  actual is two keys. It cannot be fixed by adding `QUERY` to a string; the assertion's shape
+  assumes `READABLE` names exactly one method.
+
+  This is the same latent assumption as Trac#65905 — code treating a multi-method constant as a
+  single method name — in core's own test suite rather than in a plugin, and
+  [#13136](https://github.com/WordPress/wordpress-develop/pull/13136) does **not** fix it. Two
+  independent sites in core carry that assumption; how many carry it in plugins is unmeasured.
+
+So option D's real score is **one core bug, five fixture updates, and one test that needs
+rewriting — zero genuine behavioral breakage.** That is much weaker evidence against D than `20` suggests, and the case against D has
 to rest on semantics rather than the count (see below).
 
 ### The latent core bug this uncovered
@@ -228,12 +303,14 @@ the same shape of independently-landable artifact as the CORS clobber (#16).
 
 - It **does not discriminate between A, B and C.** All three are 0 in core. The decision must be
   argued on ecosystem BC and on what the constants are supposed to *mean*, not on failure counts.
-- It **does not vindicate option D either.** The strongest objection to D was never the count: it
-  is that D makes all 77 `READABLE` routes advertise and accept `QUERY`, dispatching to handlers
-  that read `$request['param']` from the query string and will never look at the body. That is
-  the option E silent-discard failure, applied to the entire read surface by default. **No test in
-  core sends a `QUERY` with a body, so the suite cannot see this.** The recommendation to rule out
-  D stands, on those grounds.
+- It **does not vindicate option D either**, and it cannot: **no test in core sends a `QUERY` with
+  a body**, so the suite is blind to the only behavior that matters. What settled D's mechanics was
+  the body and fallback probes, not this sweep.
+
+  > ⚠️ **Superseded 2026-08-19.** This bullet previously argued that D dispatches to handlers
+  > "that read `$request['param']` from the query string and will never look at the body." That is
+  > the corrected claim — see option D above. D's surviving objections are cache safety,
+  > method-branching handlers, and sequencing behind gap 3 and Trac#65905.
 - Plugin breakage remains unmeasurable this way and has to be argued rather than counted. Say this
   before someone else says it.
 
@@ -303,13 +380,20 @@ Reproductions: `experiments/blast-radius/rest-query-body-probe.php` and
 - ~~What actually happens today when an `ALLMETHODS` route receives a `QUERY` with a JSON
   body?~~ **Answered 2026-08-16** — params populate and validate normally; see "What a `QUERY`
   body actually does today." The BC objection to A is weaker than this ADR assumed.
-- **Does that change the recommendation?** It weakens the strongest argument for B/C over A while
-  strengthening nothing for A on the ecosystem side, where the risk was always about plugin
-  authors' expectations rather than about parameter plumbing. The lean toward C stands, but it
-  now rests on "route authors should opt into a method they must consciously support" rather than
-  on "their handlers would break." That is a weaker and more honest claim. **Decide explicitly
-  whether it is still enough.**
+- ~~**Does that change the recommendation?**~~ **Answered 2026-08-19 — yes, it reversed it.** The
+  lean was C on the strength of "their handlers would break." Handlers do not break. What is left
+  is "route authors should consciously opt into a method they must support," which is a claim about
+  defaults rather than about safety — and it is not strong enough to carry C on its own. Lean is
+  now **D**; see Recommendation.
+- **How many plugins branch on `$request->get_method()` inside a REST callback?** The last
+  surviving objection to D that is still an assertion rather than a number. Measure it the way the
+  array-form bug was measured — a plugin-directory regex sweep — before taking D to Trac.
+- **Does the cache-safety default (ADR 0003) survive contact with D?** Under B/C it is a per-route
+  concern; under D it applies to the whole read surface on upgrade. ADR 0003 was written assuming
+  the former. Re-read it against D before deciding either.
 - Does `EDITABLE`/`CREATABLE` need any statement, or is silence correct?
-- Report the array-form normalization bug to core? It is real, confirmed on trunk, and has a
-  failing test — but it was found while measuring `QUERY`, and filing it needs the same
-  "framed without reference to `QUERY`" treatment as #16.
+- ~~Report the array-form normalization bug to core?~~ **Done** — filed 2026-08-18 as
+  [Trac#65905](https://core.trac.wordpress.org/ticket/65905), patched in
+  [wordpress-develop#13136](https://github.com/WordPress/wordpress-develop/pull/13136). Unlike #16
+  it *does* disclose the `QUERY` motivation, because under D the overlap is the strongest argument
+  available.
