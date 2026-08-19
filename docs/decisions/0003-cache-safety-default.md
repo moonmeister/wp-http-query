@@ -165,9 +165,19 @@ Not silence — **the survey**. Three things, none of them core behavior:
    right there and reviewers read RFCs. A ten-row table beats an assurance, and beats silence,
    which reads as not-considered. Tracked as
    [#21](https://github.com/moonmeister/wp-http-query/issues/21).
-2. **File upstream with WP Super Cache and W3 Total Cache.** Both use denylists, so both
-   default-allow *every* future method, not just `QUERY`. Filing before the core patch converts
-   "plugins can fix compatibility on release" from a hope into a citation.
+2. **Write the upstream reports for WP Super Cache and W3 Total Cache — and hold them until
+   `QUERY` is reachable.** Both use denylists, so both default-allow *every* future method, not
+   just `QUERY`. Drafted and locator-verified in [`docs/submissions/`](../submissions/); filed
+   when the feature plugin publishes or a core release carries `QUERY` dispatch, tracked as
+   [#39](https://github.com/moonmeister/wp-http-query/issues/39).
+
+   **This was decided the other way first, on 2026-08-19, and reversed the same day.** The
+   argument for filing immediately was that it converts "plugins can fix compatibility on
+   release" from a hope into a citation. True, but it buys that citation with someone else's
+   backlog: today nothing sends `QUERY` to a WordPress site, so the hazard is unreachable and a
+   maintainer is right to deprioritize it. Writing the reports now captures the findings while
+   they are fresh; sending them now would be asking two volunteer teams to act on our schedule
+   rather than the risk's.
 3. **Document the `QUERY`-behind-Varnish `501`** for site owners. Not a caching problem — an
    availability one, and the same family as the `GET POST` hardening-allowlist 403 in
    [#32](https://github.com/moonmeister/wp-http-query/issues/32).

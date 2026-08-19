@@ -1,6 +1,9 @@
 # Draft — W3 Total Cache: method denylist + REST caching = URI-keyed `QUERY` responses
 
-**Status: draft. Not filed.** Alex files; see [#39](../../../../issues/39).
+**Status: written and parked. Do not file yet.** Filing triggers on the feature plugin's
+publication ([#23](../../../../issues/23)) or a core release carrying `QUERY` dispatch
+([#11](../../../../issues/11)) — whichever lands first. Alex files; see
+[#39](../../../../issues/39).
 
 - **Target:** [`BoldGrid/w3-total-cache`](https://github.com/BoldGrid/w3-total-cache) — issues
   enabled (`W3EDGE/w3-total-cache` redirects here)
@@ -8,7 +11,9 @@
 - **Read against:** W3 Total Cache **2.10.5** (wordpress.org download, 2026-08-19)
 - **Severity:** **cache confusion, not disclosure.** Say so explicitly — see below
 
-**Before filing:** decide whether this goes to the public tracker or to their security contact.
+**Before filing:** re-read `PgCache_ContentGrabber.php` against the then-current release — every
+line number below will have moved, and the `pgcache.rest` gating may have changed shape. Then
+decide whether this goes to the public tracker or to their security contact.
 Our read is **public tracker** — the reasoning is in "On disclosure" at the bottom, and it is
 worth a second opinion rather than a default.
 

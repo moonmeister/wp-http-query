@@ -244,7 +244,9 @@ response is 4xx, no-cache headers are forced. `QUERY` work must not regress that
   intermediaries~~ — **resolved 2026-08-19 with no core work.** No shipping cache stores a
   `QUERY` response; RFC 9111 §3 forbids it for any cache that has not implemented §2.7 keying.
   What remains is *reporting* two WordPress page-cache method denylists upstream
-  ([#39](../../issues/39)), which is ecosystem work, not core. See §4.1.
+  ([#39](../../issues/39)) — ecosystem work, not core, and **deferred until something actually
+  sends `QUERY`**: the reports are written in [docs/submissions/](submissions/) and filed when
+  the feature plugin publishes or a core release carries `QUERY`. See §4.1.
 - **Empirical test matrix:** proving the request body reaches PHP across real deployments (§6).
 
 ### Out of scope
@@ -381,7 +383,8 @@ understood it.
 The one live vector is WordPress-side — **W3 Total Cache Pro with REST caching enabled**, whose
 method **denylist** default-allows `QUERY`. Severity is **confusion, not disclosure**: every
 parameter expressible in a `QUERY` body is expressible in a `GET` query string. Reported
-upstream rather than worked around in core.
+upstream rather than worked around in core — reports written in
+[docs/submissions/](submissions/), filed on release ([#39](../../issues/39)).
 
 A `Cache-Control` header — the obvious mitigation, and what this section proposed — would not
 have reached that layer at all. It decides in PHP on the write path and honors
@@ -642,8 +645,9 @@ missing number
 **✅ ANSWERED 2026-08-19 — neither. There is no default.** The question presupposed that some
 cache would store a `QUERY` response; none does, and RFC 9111 §3 forbids it for any cache that
 recognizes the method without implementing §2.7 keying. Core emits nothing method-specific.
-The residual work is two upstream plugin reports ([#39](../../issues/39)), and the residual
-severity is confusion rather than disclosure.
+The residual work is two upstream plugin reports ([#39](../../issues/39)) — written, and parked
+until `QUERY` is reachable on a real site — and the residual severity is confusion rather than
+disclosure.
 → [ADR 0003](decisions/0003-cache-safety-default.md),
 [`experiments/cache-survey/`](../experiments/cache-survey/)
 

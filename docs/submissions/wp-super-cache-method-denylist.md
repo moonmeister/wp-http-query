@@ -1,6 +1,9 @@
 # Draft — WP Super Cache: method denylist default-allows unknown HTTP methods
 
-**Status: draft. Not filed.** Alex files; see [#39](../../../../issues/39).
+**Status: written and parked. Do not file yet.** Filing triggers on the feature plugin's
+publication ([#23](../../../../issues/23)) or a core release carrying `QUERY` dispatch
+([#11](../../../../issues/11)) — whichever lands first. Alex files; see
+[#39](../../../../issues/39).
 
 - **Target:** [`Automattic/wp-super-cache`](https://github.com/Automattic/wp-super-cache) — issues enabled
 - **Type:** issue, not PR. The fix is one line, but which methods belong on an allowlist is
@@ -8,8 +11,11 @@
 - **Read against:** WP Super Cache **3.1.1** (wordpress.org download, 2026-08-19)
 - **Severity:** latent. Not exploitable today — see "Why this is not urgent" below
 
-**Before filing:** re-read `wp-cache-phase1.php` against the then-current release, and check
-the issue tracker for an existing report of the same shape.
+**Before filing:** re-read `wp-cache-phase1.php` against the then-current release — line numbers
+will have moved — and check the issue tracker for an existing report of the same shape. Check
+one thing in particular: **if the REST exclusion at `wp-cache-phase2.php:2145` has been narrowed
+in the meantime, this report changes from "latent" to "live"** and needs rewriting, not just
+re-numbering.
 
 ---
 

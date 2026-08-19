@@ -121,9 +121,11 @@ it is the kind of mitigation that looks responsible and does nothing.
 - Any core-side default — `no-store`, `private, no-cache`, or a capability signal — is
   disproportionate to that, and would be the first method-specific cache behavior in the REST
   API.
-- Two upstream plugin issues are worth filing regardless: WPSC and W3TC should switch to
-  allowlists. **Drafted** in [`docs/submissions/`](../../docs/submissions/) — not filed;
-  see [#39](../../../../issues/39).
+- Two upstream plugin issues are worth filing eventually: WPSC and W3TC should switch to
+  allowlists. **Written and parked** in [`docs/submissions/`](../../docs/submissions/) — they
+  go out when something actually sends `QUERY` to a WordPress site, which is the feature
+  plugin's publication or a core release. Nothing is exposed by waiting; nothing sends `QUERY`
+  today. See [#39](../../../../issues/39).
 
 → [ADR 0003](../../docs/decisions/0003-cache-safety-default.md) for the decision this produced.
 
