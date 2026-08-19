@@ -66,6 +66,22 @@ This is where the risk actually lives. These run in PHP, inside or ahead of Word
 | **WP Super Cache** | `in_array( …, array( 'POST', 'PUT', 'DELETE' ) )` — **`QUERY` passes** | **denylist** | ✅ yes — `REST_REQUEST` sets `is_rest`, then *"REST API detected. Caching disabled."* Saved by the REST check, not the method check. **The cache key does not include the method** |
 | **W3 Total Cache** | `in_array( …, array( 'DELETE','PUT','OPTIONS','TRACE','CONNECT','POST' ) )` — **`QUERY` passes** | **denylist** | ⚠️ **only while `pgcache.rest !== 'cache'`.** Pro users who enable REST caching get a dedicated `rest` cache group, and `QUERY` clears the method gate |
 
+**Exact locators**, re-verified 2026-08-19 against the wordpress.org downloads, for the two
+denylists — these are what the upstream reports in
+[`docs/submissions/`](../../docs/submissions/) cite:
+
+| Claim | File | Version |
+| --- | --- | --- |
+| WPSC read-path denylist | `wp-cache-phase1.php:151` | WPSC 3.1.1 |
+| WPSC write-path branches | `wp-cache-phase2.php:2096-2103` | WPSC 3.1.1 |
+| WPSC REST exclusion | `wp-cache-phase2.php:2006` (sets `is_rest`), `:2145` (refuses) | WPSC 3.1.1 |
+| WPSC cache key — host, port, URI, gzip, cookies, `Accept`; **no method, no body** | `get_wp_cache_key()`, `wp-cache-phase2.php:34-53` | WPSC 3.1.1 |
+| W3TC denylist | `PgCache_ContentGrabber.php:662`, in `_can_read_cache()` | W3TC 2.10.5 |
+| W3TC REST exclusion, skipped when `pgcache.rest === 'cache'` | `PgCache_ContentGrabber.php:769-775` | W3TC 2.10.5 |
+| W3TC `rest` cache group, Pro only | `get_cache_group_by_uri()`, `:1467-1473` | W3TC 2.10.5 |
+| W3TC key extension — `useragent`, `referrer`, `cookie`, `encryption`; **no method, no body** | `_get_page_key()`, `:1672`, `:1710-1716` | W3TC 2.10.5 |
+| W3TC honors `DONOTCACHEPAGE` | `:762-767` | W3TC 2.10.5 |
+
 ### The one residual vector
 
 **W3 Total Cache Pro with REST caching explicitly enabled.** There, a `QUERY` clears the method
@@ -106,7 +122,8 @@ it is the kind of mitigation that looks responsible and does nothing.
   disproportionate to that, and would be the first method-specific cache behavior in the REST
   API.
 - Two upstream plugin issues are worth filing regardless: WPSC and W3TC should switch to
-  allowlists.
+  allowlists. **Drafted** in [`docs/submissions/`](../../docs/submissions/) — not filed;
+  see [#39](../../../../issues/39).
 
 → [ADR 0003](../../docs/decisions/0003-cache-safety-default.md) for the decision this produced.
 
