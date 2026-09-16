@@ -135,6 +135,11 @@ Two findings:
   `WP_REST_Server::` constant at all** — the rest pass plain strings like `array( 'POST' )`, which
   are immune. That is why a bug dating to 4.4 has stayed quiet, and it is a better explanation than
   "nobody uses arrays."
+A second sweep, measuring option D's *other* ecosystem risk — plugin callbacks that branch on
+`$request->get_method()` — lives in
+[`../plugin-spike/README.md`](../plugin-spike/README.md#method-branching-sweep), because the
+feature plugin carries the identical hazard.
+
 - The hazard is **specific to option D**. `ALLMETHODS` is already multi-method and has zero
   array-form uses, and a new single-method `QUERYABLE` cannot trip the bug. Option D would break
   **27 plugins / 1.19M installs** — unless Trac#65905 lands first, which makes this a sequencing

@@ -1,8 +1,10 @@
 # ADR 0002 — Should QUERY join ALLMETHODS, or be opt-in only?
 
 **Status:** Proposed — undecided. **The lean reversed from C to D on 2026-08-19**; see
-[Recommendation](#recommendation-lean-reversed-to-d-2026-08-19).
-**Date:** 2026-08-16, revised 2026-08-19
+[Recommendation](#recommendation-lean-reversed-to-d-2026-08-19). **D is weaker as of 2026-09-15** —
+the method-branching sweep found a named, verified BC break on a 3M-install plugin; the lean has
+not been re-decided.
+**Date:** 2026-08-16, revised 2026-08-19 and 2026-09-15
 **Blocks:** core patch (gap 2)
 **Related:** [scope.md](../scope.md) Q3 — answered 2026-08-16; see "Open" below
 
@@ -160,6 +162,12 @@ allowlist entry.
 on for every read route on upgrade, E turns it on per route. Since the mechanics are settled
 either way, this is no longer a technical question — it is a question about defaults.
 
+> ⚠️ **Weakened 2026-09-15.** "Costs nothing" was true of core's own read surface and is not true
+> of the ecosystem's. The method-branching sweep (item 4 below) found Jetpack's `READABLE` routes
+> dispatching `QUERY` into an `else` branch that writes. That does not refute D, but it does mean
+> the question about defaults now has a cost attached to one of the answers, and the
+> recommendation was written before that cost was known.
+
 ### What D requires before it can be proposed
 
 Hard prerequisites, in order:
@@ -171,9 +179,26 @@ Hard prerequisites, in order:
    break. A sequencing constraint, not a blocker: it is already up.
 3. **ADR 0003** (#18) — cache safety was previously treated as gating nothing. Under D it gates
    everything, because D turns body-varying responses on across the whole read surface at once.
-4. **Measure the method-branching risk** — plugin code doing `'GET' === $request->get_method()`
-   silently stops matching. This is the only surviving objection that is still an assertion rather
-   than a number, and this project's rule is to convert those before publishing.
+4. ~~**Measure the method-branching risk**~~ — **measured 2026-09-15**, and it did not come back
+   clean. Between **28 plugins / 820K installs** and **65 plugins / 11.96M installs** both branch on
+   the request method *and* use `READABLE`; the sweep cannot narrow the range further because that
+   needs each `READABLE` registration followed to its callback. Both bounds were falsified by
+   reading their largest member — the upper one over-counts (WooCommerce's guard is on a
+   literal-`'GET'` route, which D does not touch), the lower one under-counts (Jetpack's branch and
+   its registration are in different files).
+
+   The failure mode is **a safe-method guard losing its grip**. Verified case: Jetpack (3M
+   installs) registers `/jetpack/v4/module/all` with `READABLE`, and its callback is
+   `if ( 'GET' === $request->get_method() ) { get_modules(); } else { activate_modules(); }`. Under
+   D, `QUERY` takes the `else` and activates modules. Authorization fails *closed* — `can_request()`
+   branches the same way onto the stricter capability — so this is a safe-method violation, not a
+   privilege escalation. Two more `READABLE` Jetpack routes reach `update_data()` the same way.
+
+   Do not argue this on polarity. 79 of the 107 at-risk lines are positive (`=== 'GET'`), which
+   looks like the safe side because `QUERY` merely skips the branch — but Jetpack is a positive
+   check and it is the worst case found, because the branch has an `else`.
+
+   Full method, regexes and search IDs: [`experiments/plugin-spike/README.md`](../../experiments/plugin-spike/README.md#method-branching-sweep).
 
 ### How to take it to the community
 
@@ -385,9 +410,19 @@ Reproductions: `experiments/blast-radius/rest-query-body-probe.php` and
   is "route authors should consciously opt into a method they must support," which is a claim about
   defaults rather than about safety — and it is not strong enough to carry C on its own. Lean is
   now **D**; see Recommendation.
-- **How many plugins branch on `$request->get_method()` inside a REST callback?** The last
-  surviving objection to D that is still an assertion rather than a number. Measure it the way the
-  array-form bug was measured — a plugin-directory regex sweep — before taking D to Trac.
+- ~~**How many plugins branch on `$request->get_method()` inside a REST callback?**~~ **Answered
+  2026-09-15 — 170 plugins / 16.9M installs branch at all, of which 28–65 plugins / 0.82–11.96M
+  installs also use `READABLE`.** See "What D requires" item 4; method in
+  [`experiments/plugin-spike/README.md`](../../experiments/plugin-spike/README.md#method-branching-sweep).
+- **Does the Jetpack case change the recommendation?** Not yet argued. It is the first *concrete*
+  BC break attributable to D rather than to a fixture, and it is the kind a reviewer will find
+  immediately — Jetpack is on 3M sites. Three responses are available and none has been worked
+  through: (a) accept it, since D is a major-version behavior change and "safe method performs a
+  write" is the plugin's bug to fix; (b) retreat to opt-in (B/C/E), which is exactly the default
+  this ADR reversed on; (c) keep D but have core refuse `QUERY` where the route's callback is
+  shared with a write registration, which is undetectable in general. **Do not take D to Trac
+  before this has an answer** — it converts "unmeasured BC risk" into "named 3M-install
+  regression," which is a much harder room.
 - **Does the cache-safety default (ADR 0003) survive contact with D?** Under B/C it is a per-route
   concern; under D it applies to the whole read surface on upgrade. ADR 0003 was written assuming
   the former. Re-read it against D before deciding either.
