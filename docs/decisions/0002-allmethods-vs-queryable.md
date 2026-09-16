@@ -142,6 +142,34 @@ conflated with the constants decision — which is why it is recorded here as a 
 rather than a fifth alternative. Expect the ticket reporter to advocate for it, and engage on
 the gap-3 ordering rather than on silent discard in general.
 
+### F. Reach without the method — dispatch `QUERY` but present it as `GET`
+
+❌ **Considered and rejected 2026-09-15.** Recorded because it is the obvious third way out of the
+dilemma the Jetpack finding creates, and someone will propose it.
+
+Any of D or E, plus masking `WP_REST_Request::get_method()` so the handler sees `'GET'`.
+
+- **+** It makes the entire method-branching hazard vanish at a stroke. Jetpack's
+  `if ( 'GET' === $request->get_method() )` matches, takes the read branch, and behaves exactly as
+  it does today — as do all 107 at-risk lines, without touching one of them.
+- **+** Every existing read route becomes queryable with no BC risk at all.
+- **−** **It makes `QUERY` a lie at the application layer.** A handler that cannot tell it received
+  `QUERY` cannot implement `QUERY` semantics: no method-specific representation, no meaningful
+  `Accept-Query` negotiation, no `415` on a query format it does not support. Everything RFC 10008
+  §3 asks a resource to do requires knowing.
+- **−** It is the same mistake as the `X-HTTP-Method-Override` tunnel, which this project already
+  documents as "a tunnel, NOT the method" (`plugin/wp-http-query.php:309-312`) — intermediaries see
+  one method, the application sees another.
+- **−** It interacts badly with gap 3: the `rest_request_parameter_order` fix keys on the method
+  *being* `QUERY`, so masking has to happen after parameter resolution or on the public accessor
+  only. Solvable, but the need to special-case it is a smell.
+- **−** For the feature plugin it is self-defeating. The plugin exists to measure ecosystem
+  readiness for `QUERY`; hiding `QUERY` from the ecosystem guarantees a null result.
+
+**Consequence: there is no safe-and-broad option.** The choice is between reach with a known BC
+cost (A/D/E) and consent with near-zero adoption (B/C). Rejecting F removes the escape hatch and
+sharpens that trade rather than resolving it.
+
 ## Recommendation — lean reversed to D, 2026-08-19
 
 > **Previously:** lean **C**, with "option D should be explicitly ruled out in the ticket." That
@@ -418,11 +446,24 @@ Reproductions: `experiments/blast-radius/rest-query-body-probe.php` and
   BC break attributable to D rather than to a fixture, and it is the kind a reviewer will find
   immediately — Jetpack is on 3M sites. Three responses are available and none has been worked
   through: (a) accept it, since D is a major-version behavior change and "safe method performs a
-  write" is the plugin's bug to fix; (b) retreat to opt-in (B/C/E), which is exactly the default
-  this ADR reversed on; (c) keep D but have core refuse `QUERY` where the route's callback is
-  shared with a write registration, which is undetectable in general. **Do not take D to Trac
-  before this has an answer** — it converts "unmeasured BC risk" into "named 3M-install
-  regression," which is a much harder room.
+  write" is the plugin's bug to fix; (b) retreat to opt-in (B/C), which is exactly the default this
+  ADR reversed on — note **E is not a retreat**, it hits the same callback and breaks Jetpack
+  identically; (c) keep D but have core refuse `QUERY` where a read route's callback is also
+  registered against a write method.
+
+  **(c) is more viable than first stated.** It was recorded here as "undetectable in general,"
+  which is wrong: the *shared-callback* shape is fully detectable from the endpoint map — build
+  callback → methods across all routes and skip any `READABLE` handler whose callback appears
+  under a write method elsewhere. That is exactly Jetpack's `process` on `/module/all` (`READABLE`)
+  and `/module/all/active` (`EDITABLE`). Only the single-registration internal-branch case is
+  undetectable. The cost is a post-registration pass, which is architecturally awkward but not
+  impossible — and the feature plugin can prototype it from `rest_endpoints` before anyone proposes
+  it.
+
+  Option **F** (mask the method) was the fourth response and is rejected — see above.
+
+  **Do not take D to Trac before this has an answer** — it converts "unmeasured BC risk" into
+  "named 3M-install regression," which is a much harder room.
 - **Does the cache-safety default (ADR 0003) survive contact with D?** Under B/C it is a per-route
   concern; under D it applies to the whole read surface on upgrade. ADR 0003 was written assuming
   the former. Re-read it against D before deciding either.
