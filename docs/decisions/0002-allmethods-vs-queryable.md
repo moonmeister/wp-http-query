@@ -1,14 +1,46 @@
 # ADR 0002 — Should QUERY join ALLMETHODS, or be opt-in only?
 
-**Status:** Proposed — undecided. **The lean reversed from C to D on 2026-08-19**; see
-[Recommendation](#recommendation-lean-reversed-to-d-2026-08-19). **D is weaker as of 2026-09-15** —
-the method-branching sweep found a named, verified BC break on a 3M-install plugin; the lean has
-not been re-decided.
-**Date:** 2026-08-16, revised 2026-08-19 and 2026-09-15
-**Blocks:** core patch (gap 2)
+**Status:** **Accepted — option B.** `QUERYABLE = 'QUERY'`, strictly additive; `ALLMETHODS` and
+`READABLE` are left alone. Decided 2026-09-15. The lean went C → D (2026-08-19) → B; see
+[Decision](#decision--option-b-2026-09-15) for why the D reversal did not survive measurement.
+**Date:** 2026-08-16, revised 2026-08-19, decided 2026-09-15
+**Blocks:** nothing further — gap 2's *constant* is settled. **The reach question is not**, and
+moved to [ADR 0005](0005-reach-for-existing-read-routes.md).
 **Related:** [scope.md](../scope.md) Q3 — answered 2026-08-16; see "Open" below
 
 ---
+
+## Decision — option B, 2026-09-15
+
+Core gains `const QUERYABLE = 'QUERY';`. Nothing else changes: no existing route in core or in any
+plugin begins accepting `QUERY` on upgrade. Route authors opt in by naming the constant.
+
+**Why not D,** which this ADR leant toward for four weeks: the reversal to D rested on one
+sentence — *"Handlers do not break. What is left is a claim about defaults rather than about
+safety."* The 2026-09-15 method-branching sweep falsified it. Handlers do break, by a different
+mechanism than the one that had been refuted: code that used `'GET'` as a synonym for "this request
+is safe" stops guarding the moment a second safe method exists. Jetpack (3M installs) registers
+three routes with `READABLE` whose callbacks are
+`if ( 'GET' === $request->get_method() ) { read } else { write }`, so under D a `QUERY` activates
+modules or writes settings. Between 28 plugins / 820K installs and 65 plugins / 11.96M installs
+carry the shape. Against WordPress's BC bar, a named regression on a 3M-install plugin is not a
+patch anyone will carry.
+
+**Why not C,** which was the lean before D. C is B plus a documented intent to fold `QUERY` into
+`ALLMETHODS` in a later major. That promise is now known to be a promise to break things: an
+`ALLMETHODS` route reaches the same `else` branch by the same mechanism. It is lower *volume* than
+D — `ALLMETHODS` is rare — but it is not structurally safer, and committing future maintainers to
+a measured BC break is worse than staying silent. **B is C with the bad half removed.**
+
+**Why not A or E.** A is D's mechanism at lower volume. E dispatches to the same callback and
+breaks Jetpack identically, so it is not the safe alternative to D it reads as. F (mask the method)
+is rejected on principle — see option F.
+
+**What B costs, stated plainly:** `QUERY` support arrives route by route, which for most sites
+means never. That is the real argument for D and it survives this decision intact. It is not
+answered here; it is moved to [ADR 0005](0005-reach-for-existing-read-routes.md), which is where
+option (c) and the feature plugin's evidence-gathering now live. **Closing this ADR on B is not a
+verdict on reach.** It settles only what the constants mean.
 
 ## Context
 
@@ -171,6 +203,12 @@ cost (A/D/E) and consent with near-zero adoption (B/C). Rejecting F removes the 
 sharpens that trade rather than resolving it.
 
 ## Recommendation — lean reversed to D, 2026-08-19
+
+> ❌ **Superseded 2026-09-15 by [Decision](#decision--option-b-2026-09-15).** Kept verbatim because
+> the reasoning below is sound given what was known, and the way it failed is the useful part: it
+> reversed on "handlers do not break," which was true of the mechanism it had just refuted
+> (parameter population) and false of one nobody had looked for yet (method branching). Refuting
+> one objection is not the same as clearing the option.
 
 > **Previously:** lean **C**, with "option D should be explicitly ruled out in the ticket." That
 > instruction rested on the silent-body-discard claim corrected above. With the claim gone, the
@@ -442,32 +480,17 @@ Reproductions: `experiments/blast-radius/rest-query-body-probe.php` and
   2026-09-15 — 170 plugins / 16.9M installs branch at all, of which 28–65 plugins / 0.82–11.96M
   installs also use `READABLE`.** See "What D requires" item 4; method in
   [`experiments/plugin-spike/README.md`](../../experiments/plugin-spike/README.md#method-branching-sweep).
-- **Does the Jetpack case change the recommendation?** Not yet argued. It is the first *concrete*
-  BC break attributable to D rather than to a fixture, and it is the kind a reviewer will find
-  immediately — Jetpack is on 3M sites. Three responses are available and none has been worked
-  through: (a) accept it, since D is a major-version behavior change and "safe method performs a
-  write" is the plugin's bug to fix; (b) retreat to opt-in (B/C), which is exactly the default this
-  ADR reversed on — note **E is not a retreat**, it hits the same callback and breaks Jetpack
-  identically; (c) keep D but have core refuse `QUERY` where a read route's callback is also
-  registered against a write method.
-
-  **(c) is more viable than first stated.** It was recorded here as "undetectable in general,"
-  which is wrong: the *shared-callback* shape is fully detectable from the endpoint map — build
-  callback → methods across all routes and skip any `READABLE` handler whose callback appears
-  under a write method elsewhere. That is exactly Jetpack's `process` on `/module/all` (`READABLE`)
-  and `/module/all/active` (`EDITABLE`). Only the single-registration internal-branch case is
-  undetectable. The cost is a post-registration pass, which is architecturally awkward but not
-  impossible — and the feature plugin can prototype it from `rest_endpoints` before anyone proposes
-  it.
-
-  Option **F** (mask the method) was the fourth response and is rejected — see above.
-
-  **Do not take D to Trac before this has an answer** — it converts "unmeasured BC risk" into
-  "named 3M-install regression," which is a much harder room.
-- **Does the cache-safety default (ADR 0003) survive contact with D?** Under B/C it is a per-route
-  concern; under D it applies to the whole read surface on upgrade. ADR 0003 was written assuming
-  the former. Re-read it against D before deciding either.
-- Does `EDITABLE`/`CREATABLE` need any statement, or is silence correct?
+- ~~**Does the Jetpack case change the recommendation?**~~ **Answered 2026-09-15 — yes, it ended
+  it.** See [Decision](#decision--option-b-2026-09-15). Response (c) — keep D's reach but refuse
+  `QUERY` where a read route's callback is also registered against a write method — survived and
+  moved to [ADR 0005](0005-reach-for-existing-read-routes.md) along with the rest of the reach
+  question.
+- ~~**Does the cache-safety default (ADR 0003) survive contact with D?**~~ **Moot for this ADR as
+  of 2026-09-15.** ADR 0003 was written assuming `QUERY` is a per-route concern, which is exactly
+  what B makes it. The question reappears under [ADR 0005](0005-reach-for-existing-read-routes.md)
+  if reach is granted; it does not bear on the constant.
+- Does `EDITABLE`/`CREATABLE` need any statement, or is silence correct? **Still open**, but small
+  and non-blocking — B is additive, so silence is defensible by default.
 - ~~Report the array-form normalization bug to core?~~ **Done** — filed 2026-08-18 as
   [Trac#65905](https://core.trac.wordpress.org/ticket/65905), patched in
   [wordpress-develop#13136](https://github.com/WordPress/wordpress-develop/pull/13136). Unlike #16

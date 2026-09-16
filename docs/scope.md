@@ -283,10 +283,19 @@ written for it. That is migration, performed implicitly across the ecosystem.
 > `$_GET`.
 >
 > With that gone, the case against migrating is about **route authors' expectations**, not
-> broken handlers — and ADR 0002's lean has reversed to **option D**, which migrates every
-> `READABLE` route deliberately. The second row above is no longer "unchanged by this project."
-> The open question for the community is **on by default versus opt-in**, and that is the
-> question to put to them rather than to answer here.
+> broken handlers — and ADR 0002's lean reversed to **option D**, which migrates every
+> `READABLE` route deliberately.
+
+> ⚠️ **Revised again 2026-09-15 — the D lean did not survive measurement, and ADR 0002 is now
+> closed on option B.** "Route authors' expectations" turned out to understate it: the
+> method-branching sweep found that handlers *do* break, by a mechanism nobody had looked for.
+> Plugin code using `'GET'` as a synonym for "this request is safe" stops guarding when a second
+> safe method exists — Jetpack (3M installs) writes on a `QUERY` to a `READABLE` route. So the
+> second row above **is** "unchanged by this project" after all, and the two rows are no longer the
+> same decision as ADR 0002: the constant is settled (additive `QUERYABLE`, nothing migrates) and
+> the migration question moved to [ADR 0005](decisions/0005-reach-for-existing-read-routes.md).
+> **On by default versus opt-in is still the question for the community** — it just belongs to
+> 0005 now.
 
 ### First adopter — deferred, not rejected
 
@@ -632,14 +641,19 @@ on the merits and stop waiting for a rationale that probably was never written d
 "deliberately restricted" as unsupported unless someone produces the citation.
 
 **Q4 — Should `QUERY` be on by default, or opt-in only?**
-Restated 2026-08-19. It was previously "should `QUERY` join `ALLMETHODS`?", which framed the
-choice too narrowly — ADR 0002's lean is now **option D**, `READABLE` gaining `QUERY`, which is
-a broader default than `ALLMETHODS` and a safer one, since `ALLMETHODS` also covers writes.
-Either way the substance is the same: does core turn `QUERY` on for existing routes, or does
-each route author opt in? **This is the question to put to the community, not to answer
+Restated 2026-08-19, **half-answered 2026-09-15.** The constants half is decided: ADR 0002 closed
+on **option B**, additive `QUERYABLE`, nothing migrates. The defaults half is still open and is now
+[ADR 0005](decisions/0005-reach-for-existing-read-routes.md) — does core grant existing read routes
+`QUERY`, and by what mechanism?
+
+What changed: [#38](../../issues/38)'s sweep supplied the missing number and then some. Handlers
+that branch on `$request->get_method()` do break — 28–65 plugins / 0.82M–11.96M installs carry the
+shape, and Jetpack (3M) performs a write on a `QUERY` to a `READABLE` route. That killed the D
+lean. **It does not settle Q4**, because option B's cost is that `QUERY` arrives route by route,
+which for most sites means never. **Still the question to put to the community, not to answer
 unilaterally here.**
-→ [ADR 0002](decisions/0002-allmethods-vs-queryable.md), [#38](../../issues/38) for the
-missing number
+→ [ADR 0005](decisions/0005-reach-for-existing-read-routes.md),
+[evidence](../experiments/plugin-spike/README.md#method-branching-sweep)
 
 **Q5 — Does the cache-safety default belong in core or in the route?** §4.1.
 **✅ ANSWERED 2026-08-19 — neither. There is no default.** The question presupposed that some
