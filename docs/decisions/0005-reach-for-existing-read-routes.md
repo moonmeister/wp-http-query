@@ -80,12 +80,38 @@ body." **Do not cite a green core suite as evidence for any option here.**
 
 ### 1. No reach
 
-B and nothing else. Existing routes never gain `QUERY` without their author's action.
+B and nothing else. No route gains `QUERY` without its author's action.
 
 - **+** Zero BC risk. Nothing to argue.
 - **−** `QUERY` is shipped and unused. Concedes the ticket's opening question.
 
-### 2. Reach by constant — `READABLE = 'GET, QUERY'`
+### 2. Core adopts `QUERYABLE` on its own read collections
+
+**Core is an author.** This ADR's first draft folded this into option 1 — "existing routes never
+gain `QUERY` without their author's action" — which quietly assumed authors are third parties.
+Core owns ~35 `get_items` registrations and can add `QUERYABLE` to them explicitly, route by route,
+reviewed individually.
+
+- **+** Delivers the surface anyone actually wants a query method for: `QUERY /wp/v2/posts`,
+  `/wp/v2/users`, `/wp/v2/media`. That is most of the practical value of options 3–5 without any of
+  the mechanism.
+- **+** **Safe for a structural reason, not a hopeful one.** `WP_REST_Controller` registers one
+  callback per method — `get_items`/`get_item` read, `create_item`/`update_item`/`delete_item`
+  write — with no sharing across the line, so the Jetpack shape cannot occur in core's own
+  controllers. Verified 2026-09-15 across `src/wp-includes/rest-api/endpoints/`.
+- **+** Incremental and reversible. Each controller is a separate reviewable change; a bad one is
+  revertable without touching a constant.
+- **+** Scopes the safety guarantee correctly: **default where core can vouch for the code, opt-in
+  where it cannot.**
+- **−** Does nothing for plugin routes, which is most of the REST surface on a real site.
+- **−** Needs gap 3 first, same as everything else here.
+- **−** **The residual risk is not zero, it is different in kind.** Plugin *filters* hooked onto
+  core routes — `rest_prepare_post`, `rest_post_query`, `rest_request_after_callbacks` — begin
+  seeing `QUERY` on routes they already touch. Much lower risk than plugin route registrations,
+  since filters rarely branch on the method, and **unmeasured**: the sweep looked at registrations,
+  not filter callbacks.
+
+### 3. Reach by constant — `READABLE = 'GET, QUERY'`
 
 ADR 0002's option D, reproposed as a reach mechanism rather than a constants question.
 
@@ -95,18 +121,18 @@ ADR 0002's option D, reproposed as a reach mechanism rather than a constants que
   veto.
 - **−** Sequencing: needs gap 3 and Trac#65905 first.
 
-### 3. Reach by dispatch — `QUERY → GET` fallback
+### 4. Reach by dispatch — `QUERY → GET` fallback
 
 ADR 0002's option E. Core already does this for `HEAD → GET`
 (`class-wp-rest-server.php:1190-1196`).
 
 - **+** Follows a pattern core ships and reviewers accept.
-- **+** Can be made per-route opt-in, which option 2 cannot.
+- **+** Can be made per-route opt-in, which option 3 cannot.
 - **−** **Not the safe alternative it reads as.** Core's `HEAD` fallback preserves
-  `get_method()`, so the handler still sees `QUERY` and Jetpack breaks identically. Options 2 and 3
+  `get_method()`, so the handler still sees `QUERY` and Jetpack breaks identically. Options 3 and 4
   are the same test.
 
-### 4. Reach with a hazard check
+### 5. Reach with a hazard check
 
 Grant reach, but refuse `QUERY` where the shared-callback shape is present: build callback →
 methods across all registered routes, and skip any read handler whose callback also appears under a
@@ -118,10 +144,10 @@ write method.
 - **−** Catches only the shared-callback subset. A single-registration handler that branches
   internally is invisible, and 100 of the 107 at-risk lines are unclassified bare `if`s.
 - **−** Costs a post-registration pass, which is architecturally awkward in core — and it cannot be
-  expressed as a constant, so it is a new dispatch mechanism rather than a refinement of option 2.
+  expressed as a constant, so it is a new dispatch mechanism rather than a refinement of option 3.
 - **−** Callback identity comparison is fiddly: strings, `array( $obj, 'method' )`, closures.
 
-### 5. ~~Reach without the method~~
+### 6. ~~Reach without the method~~
 
 ❌ **Rejected 2026-09-15** — ADR 0002 option F. Dispatch `QUERY` but have `get_method()` report
 `'GET'`. Makes the entire hazard vanish without touching a line of plugin code, and is rejected
@@ -132,7 +158,7 @@ because it makes `QUERY` a lie at the application layer: a handler that cannot t
 ## What the plugin does about this
 
 **The feature plugin implements the option under test, not the option preferred.** Its
-`rest_endpoints` filter currently adds `QUERY` to every handler accepting `GET` — option 2 — which
+`rest_endpoints` filter currently adds `QUERY` to every handler accepting `GET` — option 3 — which
 means it reproduces the Jetpack break on any site running both. That is not a bug to fix; it is the
 instrument working. A plugin that diverged from core's mechanism would stop being evidence, and
 feedback from plugin usage is the whole reason the project pivoted to a plugin.
@@ -142,8 +168,8 @@ Two things that do not violate that and are not yet built:
 - An escape-hatch filter defaulting to allow-everything, so a tester who hits Jetpack can unblock
   without uninstalling. Core has the same shape in `rest_endpoints` itself.
 - Non-behavioral detection: find the shared-callback shape and *report* it while still dispatching
-  into it. Turns "our plugin breaks Jetpack" into "our plugin measures how often option 2 would" —
-  and is the option 4 prototype.
+  into it. Turns "our plugin breaks Jetpack" into "our plugin measures how often option 3 would" —
+  and is the option 5 prototype.
 
 A `readme.txt` warning is required either way: this implements a proposed core behavior, it will
 break plugins that treat `'GET'` as a synonym for "safe," and here is the Jetpack example.
@@ -162,8 +188,10 @@ break plugins that treat `'GET'` as a synonym for "safe," and here is the Jetpac
   read. The top entries were fetched and read; the `easy-facebook-likebox` family (12 files) and
   the `beyondseo` cluster were not.
 - **Does ADR 0003 survive reach?** It was decided assuming `QUERY` is a per-route concern, which is
-  what ADR 0002's option B makes it. Options 2–4 turn body-varying responses on across the read
+  what ADR 0002's option B makes it. Options 3–5 turn body-varying responses on across the read
   surface at once. Re-read ADR 0003 against whichever option is chosen before deciding.
 - **Is reach core's job at all?** The plugin already delivers it to sites that opt in. If that is
-  sufficient, option 1 costs nothing and this ADR closes. Argue this before arguing the mechanisms —
-  it may dissolve the question rather than answer it.
+  sufficient, options 1–2 cost nothing further and this ADR closes. Argue this before arguing the
+  mechanisms — it may dissolve the question rather than answer it. Note that option 2 is not a
+  no-op version of option 1: it ships `QUERY /wp/v2/posts` by default, which is most of what
+  "reach" was ever wanted for, and it does so without a new mechanism.

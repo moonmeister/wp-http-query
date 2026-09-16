@@ -5,12 +5,14 @@ in this directory has been sent.** Filing is a human step, always.
 
 | Draft | Target | Status |
 | --- | --- | --- |
+| [`trac-65616-approach.md`](trac-65616-approach.md) | [Trac #65616](https://core.trac.wordpress.org/ticket/65616) | **In draft** — reply to khokansardar's three-phase proposal |
 | [`wp-super-cache-method-denylist.md`](wp-super-cache-method-denylist.md) | [`Automattic/wp-super-cache`](https://github.com/Automattic/wp-super-cache) | **Parked** — file on trigger, [#39](../../../../issues/39) |
 | [`w3-total-cache-method-denylist.md`](w3-total-cache-method-denylist.md) | [`BoldGrid/w3-total-cache`](https://github.com/BoldGrid/w3-total-cache) | **Parked** — file on trigger, [#39](../../../../issues/39) |
 
-Both are read against a specific plugin version, stated at the top of each file. **Re-verify
-before filing** — the whole point of citing file and line is that the citation is checkable, and
-a stale one is worse than none.
+Each is read against a specific version — a plugin release for the two cache reports, a trunk
+revision for the Trac draft — stated at the top of the file. **Re-verify before filing.** The
+whole point of citing file and line is that the citation is checkable, and a stale one is worse
+than none.
 
 ## Parked, not blocked
 

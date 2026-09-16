@@ -30,23 +30,69 @@ const NAMESPACE_ = 'wp-http-query/v1';
 /**
  * Media types this plugin accepts as query formats.
  *
- * Deliberately just JSON for now — see ADR 0001, which is undecided. Advertising
- * this is not the same as core blessing it.
+ * ADR 0001 decided option B: JSON and form-encoded, matching what core already
+ * parses for the other body-bearing methods. No new parsing is introduced —
+ * closing the gap-3 lookup order is what makes the form-encoded case work.
  */
 function accepted_query_types(): array {
-	return (array) apply_filters( 'wp_http_query_accepted_types', array( 'application/json' ) );
+	return (array) apply_filters(
+		'wp_http_query_accepted_types',
+		array( 'application/json', 'application/x-www-form-urlencoded' )
+	);
 }
 
 /* -------------------------------------------------------------------------
  * Gap 1 — Access-Control-Allow-Methods is a hardcoded string in core.
  *
- * rest-api.php:814 emits it with no filter at that point, so a cross-origin
- * QUERY preflight fails. Core's callback is unhooked and replaced.
+ * rest_send_cors_headers() emits the list with a raw header() call and no hook
+ * at that point, so a cross-origin QUERY preflight fails.
+ *
+ * Trac#46992 (wordpress-develop#13151) adds a 'rest_allowed_cors_methods'
+ * filter. Where that exists, one add_filter does the whole job. Where it does
+ * not, core's callback has to be unhooked and replaced wholesale — which this
+ * plugin will keep needing for as long as it supports cores that predate the
+ * filter, so the fallback is permanent rather than temporary.
  * ---------------------------------------------------------------------- */
+
+/**
+ * Whether core's CORS method list is filterable.
+ *
+ * Feature detection, not version sniffing: the $result and $request parameters
+ * arrived in the same change as the filter, and an alpha build of the release
+ * carrying it would fail a version comparison against '7.2'.
+ */
+function core_cors_is_filterable(): bool {
+	static $filterable = null;
+
+	if ( null === $filterable ) {
+		try {
+			$filterable = ( new \ReflectionFunction( 'rest_send_cors_headers' ) )->getNumberOfParameters() >= 3;
+		} catch ( \ReflectionException $e ) {
+			$filterable = false;
+		}
+	}
+
+	return $filterable;
+}
 
 add_action(
 	'rest_api_init',
 	static function (): void {
+		if ( core_cors_is_filterable() ) {
+			add_filter(
+				'rest_allowed_cors_methods',
+				static function ( array $methods ): array {
+					if ( ! in_array( METHOD, $methods, true ) ) {
+						$methods[] = METHOD;
+					}
+
+					return $methods;
+				}
+			);
+
+			return;
+		}
+
 		remove_filter( 'rest_pre_serve_request', 'rest_send_cors_headers' );
 		add_filter( 'rest_pre_serve_request', __NAMESPACE__ . '\\send_cors_headers' );
 	},
@@ -112,6 +158,104 @@ add_filter(
 );
 
 /* -------------------------------------------------------------------------
+ * Gap 2 — READABLE is 'GET', so no existing read route matches QUERY.
+ *
+ * ADR 0002 closed on an additive QUERYABLE constant, so core gives existing
+ * read routes nothing. Whether they should get it anyway, and how, is ADR
+ * 0005, which is open. This filter implements its option 3 — reach by
+ * widening READABLE — because the plugin's job is to be the experiment: it
+ * runs the option under test, not the option preferred, or it stops being
+ * evidence about what core would do.
+ *
+ * That includes the cost. Option 3 breaks plugins that read 'GET' as a
+ * synonym for "safe" — Jetpack activates modules on a QUERY to a READABLE
+ * route — and this filter reproduces that on any site running both. Scoped
+ * to sites that installed it deliberately, which is the whole difference
+ * between measuring the hazard and shipping it. See ADR 0005 and
+ * experiments/plugin-spike/.
+ *
+ * match_request_to_handler() is a plain array-key lookup on the normalized
+ * method map, and 'rest_endpoints' runs BEFORE that normalization
+ * (class-wp-rest-server.php:973, normalizer at :1007). So what this filter
+ * hands back is raw registration input — a bare string, a comma-separated
+ * string, or an array — not the method map.
+ * ---------------------------------------------------------------------- */
+
+add_filter(
+	'rest_endpoints',
+	static function ( array $endpoints ): array {
+		foreach ( $endpoints as $route => $handlers ) {
+			// Core wraps the single-handler shape after this filter, not before.
+			if ( isset( $handlers['callback'] ) ) {
+				$endpoints[ $route ] = add_query_to_handler( $handlers );
+				continue;
+			}
+
+			foreach ( $handlers as $key => $handler ) {
+				// Non-numeric keys are route options ('schema', ...), which core
+				// moves out during normalization. Leave them alone.
+				if ( ! is_numeric( $key ) || ! is_array( $handler ) ) {
+					continue;
+				}
+
+				$endpoints[ $route ][ $key ] = add_query_to_handler( $handler );
+			}
+		}
+
+		return $endpoints;
+	}
+);
+
+/**
+ * Adds QUERY alongside GET on a single route handler.
+ *
+ * Returns the handler untouched unless it accepts GET and does not already
+ * accept QUERY.
+ *
+ * @param array $handler Raw, pre-normalization route handler.
+ * @return array
+ */
+function add_query_to_handler( array $handler ): array {
+	if ( ! isset( $handler['methods'] ) ) {
+		return $handler;
+	}
+
+	$entries = is_array( $handler['methods'] ) ? $handler['methods'] : array( $handler['methods'] );
+	$names   = array();
+
+	foreach ( $entries as $entry ) {
+		if ( ! is_string( $entry ) ) {
+			return $handler;
+		}
+
+		foreach ( explode( ',', $entry ) as $name ) {
+			$names[] = strtoupper( trim( $name ) );
+		}
+	}
+
+	if ( ! in_array( 'GET', $names, true ) || in_array( METHOD, $names, true ) ) {
+		return $handler;
+	}
+
+	$names[] = METHOD;
+
+	/*
+	 * Hand back a STRING, never an array. get_routes() comma-splits the string
+	 * form but not the array form, so an array entry carrying a multi-method
+	 * constant registers one unmatchable key — Trac#65905, patched in
+	 * wordpress-develop#13136 but not yet released. Writing the string form
+	 * means this plugin cannot trip that bug, on any core version.
+	 *
+	 * It also incidentally repairs the routes it touches: flattening
+	 * array( 'GET', 'POST, PUT, PATCH' ) to a string makes POST/PUT/PATCH
+	 * matchable again. Routes without GET are not touched and stay broken.
+	 */
+	$handler['methods'] = implode( ', ', $names );
+
+	return $handler;
+}
+
+/* -------------------------------------------------------------------------
  * Accept-Query advertisement (RFC 10008 §3).
  *
  * Structured Fields List syntax — NOT the legacy Accept grammar, despite the
@@ -149,37 +293,20 @@ add_filter(
 );
 
 /* -------------------------------------------------------------------------
- * Cache safety (ADR 0003 — undecided; this is the conservative default).
+ * Cache safety — deliberately nothing. ADR 0003, option C.
  *
- * A cache that does not understand QUERY may key by URI alone, colliding two
- * different request bodies. There is no Vary mechanism that prevents this —
- * Vary works on headers, and there is no Vary: body. So the origin must be
- * conservative until the operator asserts their edge is body-aware.
+ * An earlier version of this file sent Cache-Control: private, no-cache on
+ * every QUERY response, on the theory that a body-blind cache would collide
+ * two different request bodies on one URI-keyed entry. That threat model was
+ * falsified: no shipping cache stores a QUERY response at all. Varnish
+ * synth(501)s it before the origin sees it, nginx's cache-method bitmask holds
+ * only GET/HEAD/POST and cannot be configured otherwise, mod_cache, Squid,
+ * Fastly and Cloudflare all allowlist, and RFC 9111 §3 forbids storing a
+ * response whose request method the cache has not understood.
+ *
+ * Emitting a header against a risk that does not exist would teach operators
+ * that QUERY is uncacheable by nature. See experiments/cache-survey/.
  * ---------------------------------------------------------------------- */
-
-add_filter(
-	'rest_post_dispatch',
-	static function ( $response, $server, $request ) {
-		if ( ! $response instanceof \WP_REST_Response || METHOD !== $request->get_method() ) {
-			return $response;
-		}
-
-		/**
-		 * Whether this deployment's edge implements RFC 10008 §2.7 body-inclusive
-		 * cache keys. Body-aware-ness is a property of the DEPLOYMENT, not of any
-		 * route — which is why this is a site-level signal, not a route argument.
-		 *
-		 * Do not set this true unless you know your cache keys on request content.
-		 */
-		if ( ! apply_filters( 'wp_http_query_edge_is_body_aware', false ) ) {
-			$response->header( 'Cache-Control', 'private, no-cache' );
-		}
-
-		return $response;
-	},
-	12,
-	3
-);
 
 /* -------------------------------------------------------------------------
  * Demo route.
