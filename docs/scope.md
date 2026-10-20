@@ -377,7 +377,7 @@ requires a cache that stores a `QUERY` response. Surveyed, none do —
 
 | Layer | Behavior on `QUERY` |
 |---|---|
-| Varnish | `synth(501)` + `Connection: close`, before the origin sees it (`builtin.vcl`) |
+| Varnish / Vinyl | 8.0 – 9.0.x: `synth(501)` + `Connection: close`, before the origin sees it. 9.1.0+: `return (pass)`. ≤ 7.x: `pipe` (`builtin.vcl`) |
 | nginx | cache-method bitmask holds only `GET`/`HEAD`/`POST` — uncacheable even deliberately |
 | Apache `mod_cache` | `default:` → *"not cacheable by mod_cache, ignoring"* → `DECLINED` |
 | Squid | `default: return false` (`RequestMethod.cc`) |
@@ -400,8 +400,8 @@ have reached that layer at all. It decides in PHP on the write path and honors
 `DONOTCACHEPAGE`, which **core references zero times**.
 
 See [ADR 0003](decisions/0003-cache-safety-default.md) for the decision and the reasoning error
-behind the original text. The stray availability finding — Varnish's `501` — is a
-**deployment** problem, not a caching one; it belongs with the hardening-allowlist 403 in
+behind the original text. The stray availability finding — Varnish's `501`, in
+8.0 – 9.0.x only — is a **deployment** problem, not a caching one; it belongs with the hardening-allowlist 403 in
 [#32](../../issues/32).
 
 ### 4.2 The `Location` indirection — ours, if adopted

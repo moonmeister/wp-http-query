@@ -112,7 +112,7 @@ construction and does not need revisiting.
 Found while surveying what actually happens to a `QUERY` request across edge and page caches:
 [experiments/cache-survey](https://github.com/moonmeister/wp-http-query/tree/main/experiments/cache-survey).
 Every edge cache surveyed — Varnish, nginx, `mod_cache`, Squid, Fastly, Cloudflare — refuses to
-store `QUERY` responses, five by allowlist and Varnish by returning `501`. W3TC with REST
+store `QUERY` responses, five by allowlist and Varnish by returning `501` (8.0 – 9.0.x) or `pass` (9.1.0+). W3TC with REST
 caching enabled was the **only** layer of ten where the response gets stored.
 
 Note that a `Cache-Control` header from WordPress would not change this: the decision here

@@ -95,7 +95,7 @@ Found while surveying what actually happens to a `QUERY` request across edge and
 [experiments/cache-survey](https://github.com/moonmeister/wp-http-query/tree/main/experiments/cache-survey).
 
 The finding for the survey was the opposite of alarming — **no shipping edge cache stores a
-`QUERY` response**: Varnish returns `501`, nginx's cache-method bitmask cannot even express it,
+`QUERY` response**: Varnish returns `501` (8.0 – 9.0.x) or `pass`es it (9.1.0+), nginx's cache-method bitmask cannot even express it,
 and `mod_cache`, Squid, Fastly and Cloudflare all allowlist. RFC 9111 §3 independently forbids
 storing a response whose method the cache has not *understood*.
 

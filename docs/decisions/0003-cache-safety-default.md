@@ -127,8 +127,9 @@ falsified. It is now the decision.
 
 ### Why
 
-**Every edge cache is safe by construction, not by luck.** Varnish returns `501` before the
-request reaches the origin. nginx cannot be configured to cache `QUERY` even deliberately — the
+**Every edge cache is safe by construction, not by luck.** Varnish/Vinyl 8.0 – 9.0.x return
+`501` before the request reaches the origin; 9.1.0+ forward `QUERY` with `return (pass)`, never
+caching it. nginx cannot be configured to cache `QUERY` even deliberately — the
 accepting bitmask holds only `GET`, `HEAD`, `POST`. Apache's `mod_cache`, Squid, Fastly and
 Cloudflare all use allowlists. And RFC 9111 §3 forbids storing a response whose request method
 the cache has not *understood*, where understanding means implementing its caching behavior —
@@ -178,7 +179,8 @@ Not silence — **the survey**. Three things, none of them core behavior:
    maintainer is right to deprioritize it. Writing the reports now captures the findings while
    they are fresh; sending them now would be asking two volunteer teams to act on our schedule
    rather than the risk's.
-3. **Document the `QUERY`-behind-Varnish `501`** for site owners. Not a caching problem — an
+3. **Document the `QUERY`-behind-Varnish `501`** for site owners — Varnish/Vinyl 8.0 – 9.0.x
+   only; upstream fixed it in 9.1.0 (Vinyl `ffa2c6dfd9`). Not a caching problem — an
    availability one, and the same family as the `GET POST` hardening-allowlist 403 in
    [#32](https://github.com/moonmeister/wp-http-query/issues/32).
 
@@ -187,6 +189,8 @@ Not silence — **the survey**. Three things, none of them core behavior:
 Named in advance, so reopening is a trigger rather than a judgment call:
 
 - Any cache or page-cache plugin ships `QUERY` support **without** RFC 10008 §2.7 body keying.
+  Vinyl plans `QUERY` caching ([#4531](https://code.vinyl-cache.org/vinyl-cache/vinyl-cache/issues/4531));
+  its plan keys on the body, so it should not trip this — check when it lands.
 - A route is found where a `QUERY` body can express something a `GET` query string cannot —
   that would turn confusion into disclosure and change the severity outright.
 - WordPress core adopts `DONOTCACHEPAGE`, or any first-party page-cache layer, making a

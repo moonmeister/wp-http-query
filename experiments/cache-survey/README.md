@@ -33,7 +33,7 @@ out-of-the-box behavior, not the entire deployed fleet.
 
 | System | Behavior | Source |
 | --- | --- | --- |
-| **Varnish** | `synth(501)` + `Connection: close`. **The request never reaches the origin** | `bin/varnishd/builtin.vcl`, `vcl_req_method` |
+| **Varnish / Vinyl** | Version-dependent. **8.0 – 9.0.x:** `synth(501)` + `Connection: close`, so **the request never reaches the origin**. **9.1.0+** (Vinyl 2026-09-16, Varnish 2026-09-21): `QUERY` is allowlisted and falls through to `return (pass)` — forwarded, never cached. **≤ 7.x:** unknown methods `pipe`d — forwarded, never cached | `bin/vinyld/builtin.vcl` (was `bin/varnishd/`), `vcl_req_method`; fix is Vinyl `ffa2c6dfd9` |
 | **nginx** | `proxy_cache_methods` defaults to `GET HEAD`, and the accepting bitmask contains only `GET`, `HEAD`, `POST` — so `QUERY` **cannot be made cacheable even deliberately** | `ngx_http_upstream_cache_method_mask`, `src/http/ngx_http_upstream.c` |
 | **Apache `mod_cache`** | `default:` → *"Method '%s' not cacheable by mod_cache, ignoring"* → `DECLINED`. Only `M_GET` proceeds; `PUT`/`POST`/`DELETE` invalidate | `modules/cache/mod_cache.c`, `cache_quick_handler` and `cache_handler` |
 | **Squid** | `default: return false` — *"RFC 2616 defines all unregistered or unspecified methods as non-cacheable"* | `src/http/RequestMethod.cc`, `respMaybeCacheable()` |
@@ -50,9 +50,15 @@ Note the two distinct safety mechanisms, because they fail differently:
 
 - **Allowlist** (`nginx`, `mod_cache`, Squid, Fastly, Cloudflare) — a new method is
   non-cacheable by default. Safe as methods are added.
-- **Rejection** (Varnish) — a new method is not merely uncached, it is **refused with a 501**.
-  Safe for caching, but an *availability* problem: `QUERY` cannot traverse a stock Varnish at
-  all.
+- **Rejection** (Varnish/Vinyl 8.0 – 9.0.x) — a new method is not merely uncached, it is
+  **refused with a 501**. Safe for caching, but an *availability* problem: `QUERY` cannot
+  traverse a stock Varnish in that range at all. Fixed upstream in 9.1.0, which `pass`es
+  `QUERY`; for 8.0 – 9.0.x, add `if (req.method == "QUERY") { return (pass); }` to
+  `vcl_req_method`.
+- **Watch:** Vinyl [#4531](https://code.vinyl-cache.org/vinyl-cache/vinyl-cache/issues/4531)
+  plans to *cache* `QUERY` by default, keyed on the request body (RFC 10008 §2.7). If it ships,
+  Vinyl leaves this table's "never cached" column — conformantly, since the key includes the
+  body — and ADR 0003's evidence needs re-reading.
 
 ## Result — WordPress page caches
 
@@ -133,5 +139,9 @@ it is the kind of mitigation that looks responsible and does nothing.
 
 Nothing to run. Every claim above is a direct read of a public default config or source file;
 the "Source" column names the file and function. Re-check against current releases before
-citing on Trac — `builtin.vcl` in particular has changed shape across Varnish majors (older
-releases `pipe`d unknown methods rather than returning 501; either way, never cached).
+citing on Trac — `builtin.vcl` in particular has changed shape across Varnish majors (≤ 7.x
+`pipe`d unknown methods, 8.0 – 9.0.x returned 501, 9.1.0+ `pass`es `QUERY`; in every case,
+never cached). Upstream left GitHub in 2026 and was renamed **Vinyl Cache**
+(<https://code.vinyl-cache.org/vinyl-cache/vinyl-cache>); "Varnish Cache" is now Varnish
+Software's distribution of it (<https://github.com/varnish/varnish>). The
+`varnishcache/varnish-cache` GitHub repo is archived — don't search it for current state.
