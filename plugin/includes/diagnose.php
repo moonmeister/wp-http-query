@@ -440,8 +440,15 @@ function diagnose_cache_probe( array $first, array $second ): array {
 		}
 	}
 
-	$repeated_hash = $a['sent'] !== $b['sent'] && $a['hash'] === $b['hash'];
-	if ( $repeated_hash || $a['fresh'] === $b['fresh'] ) {
+	/*
+	 * Stored: the second answer repeats the first one's fresh value, or
+	 * carries the hash of the body the first probe sent. Compared with what
+	 * was sent, not between the two responses: if both bodies were stripped
+	 * on the way, both hashes are the empty body's, and that's a lost body,
+	 * not a cache.
+	 */
+	$repeated_sent = $a['sent'] !== $b['sent'] && $b['hash'] === $a['sent'];
+	if ( $repeated_sent || $a['fresh'] === $b['fresh'] ) {
 		$vendors = array_unique( array_filter( array_column( $headers, 'hint' ), static fn ( string $hint ): bool => '' !== $hint && ! str_contains( $hint, ' ' ) ) );
 		$message = __( 'A cache between you and WordPress is storing QUERY responses without keying on the body: two different requests to the same URL got the same answer, so one visitor’s search can get another’s results.', 'wp-http-query' );
 		if ( $vendors ) {
@@ -458,7 +465,7 @@ function diagnose_cache_probe( array $first, array $second ): array {
 	}
 
 	if ( $a['hash'] !== $a['sent'] || $b['hash'] !== $b['sent'] ) {
-		return $result( 'altered', __( 'Couldn’t check for caching: the probe’s body arrived changed, so its answers can’t be compared.', 'wp-http-query' ) );
+		return $result( 'altered', __( 'Couldn’t check for caching: a probe’s body was lost or changed on the way to WordPress, so its answers can’t be compared. The QUERY check above tests whether bodies get through.', 'wp-http-query' ) );
 	}
 
 	return $result( 'clean', __( 'No caching detected: two different QUERY bodies sent to the same URL got two different, fresh answers.', 'wp-http-query' ) );
