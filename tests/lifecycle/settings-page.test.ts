@@ -21,12 +21,14 @@ import { ECHO, FIXTURE_OPTED_IN_ROUTE, rest } from '../http';
 import { NO_LOCAL_CLI, type Site, sites } from '../sites';
 import {
 	deleteOption,
+	FIXTURE_DEMO_ROUTE_OFF,
 	FIXTURE_PRESET_FILTER_OFF,
 	getOption,
 	PRESETS_OPTION,
 	setOption,
 	snapshotOption,
 } from './site-state';
+import { FRESH, Session } from './session';
 
 const PAGE = '/wp-admin/options-general.php?page=wp-http-query';
 const CHECKBOX = 'id="wp_http_query_presets-core-collections"';
@@ -34,60 +36,8 @@ const PRESET_ROUTE = '/wp/v2/posts';
 /** Registered by the test fixture with QUERYABLE in its methods. */
 const SELF_REGISTERED_ROUTE = '/wp-http-query-test/v1/queryable';
 
-const FRESH = { connection: 'close' };
-
-/** A logged-in wp-admin session: a cookie jar and fetch that doesn't follow redirects. */
-class Admin {
-	private cookies = new Map< string, string >();
-
-	constructor( private site: Site ) {}
-
-	async request( path: string, init: { method?: string; form?: URLSearchParams } = {} ): Promise< Response > {
-		const headers: Record< string, string > = { ...FRESH };
-		if ( this.cookies.size ) {
-			headers.cookie = [ ...this.cookies ].map( ( [ k, v ] ) => `${ k }=${ v }` ).join( '; ' );
-		}
-		if ( init.form ) {
-			headers[ 'content-type' ] = 'application/x-www-form-urlencoded';
-		}
-
-		const res = await fetch( `${ this.site.url }${ path }`, {
-			method: init.method ?? ( init.form ? 'POST' : 'GET' ),
-			headers,
-			body: init.form?.toString(),
-			redirect: 'manual',
-		} );
-
-		for ( const line of res.headers.getSetCookie() ) {
-			const [ pair ] = line.split( ';' );
-			const eq = pair.indexOf( '=' );
-			this.cookies.set( pair.slice( 0, eq ), pair.slice( eq + 1 ) );
-		}
-
-		return res;
-	}
-
-	async logIn(): Promise< void > {
-		this.cookies.set( 'wordpress_test_cookie', 'WP%20Cookie%20check' );
-		const res = await this.request( '/wp-login.php', {
-			form: new URLSearchParams( {
-				log: 'admin',
-				pwd: 'password',
-				testcookie: '1',
-				'redirect_to': '/wp-admin/',
-			} ),
-		} );
-		if ( res.status !== 302 || ! [ ...this.cookies.keys() ].some( ( k ) => k.startsWith( 'wordpress_logged_in_' ) ) ) {
-			throw new Error( `Login to ${ this.site.url } failed: ${ res.status }` );
-		}
-	}
-
-	async html( path: string ): Promise< string > {
-		const res = await this.request( path );
-		expect( res.status, `GET ${ path }` ).toBe( 200 );
-		return res.text();
-	}
-
+/** A logged-in wp-admin session that can also submit the settings page's form. */
+class Admin extends Session {
 	/** Submits the settings page's form, as a browser would, with or without the box ticked. */
 	async savePreset( checked: boolean ): Promise< Response > {
 		const page = await this.html( PAGE );
@@ -142,16 +92,19 @@ describe.each( sites )( 'settings page: $label', ( site ) => {
 	const admin = new Admin( site );
 	let restorePresets = () => {};
 	let restoreFilterSwitch = () => {};
+	let restoreDemoSwitch = () => {};
 
 	beforeAll( async () => {
 		restorePresets = snapshotOption( site, PRESETS_OPTION );
 		restoreFilterSwitch = snapshotOption( site, FIXTURE_PRESET_FILTER_OFF );
+		restoreDemoSwitch = snapshotOption( site, FIXTURE_DEMO_ROUTE_OFF );
 		setOption( site, FIXTURE_PRESET_FILTER_OFF, 1 );
 		deleteOption( site, PRESETS_OPTION );
 		await admin.logIn();
 	} );
 
 	afterAll( () => {
+		restoreDemoSwitch();
 		restoreFilterSwitch();
 		restorePresets();
 	} );
@@ -177,8 +130,18 @@ describe.each( sites )( 'settings page: $label', ( site ) => {
 		expect( rows[ FIXTURE_OPTED_IN_ROUTE ] ).toBe( 'wp_http_query_routes filter' );
 		expect( rows[ '/wp/v2/posts/(?P<id>[\\d]+)' ] ).toBe( 'wp_http_query_routes filter' );
 		expect( rows[ SELF_REGISTERED_ROUTE ] ).toBe( 'Registered by the route itself (methods include QUERY)' );
-		expect( rows[ ECHO ] ).toBe( 'Registered by the route itself (methods include QUERY)' );
+		// The test fixture makes the echo route public.
+		expect( rows[ ECHO ] ).toBe( 'Demo route: public' );
 		expect( rows ).not.toHaveProperty( PRESET_ROUTE );
+	} );
+
+	it( 'says the echo route is admins only when the filter is left at its default', async () => {
+		setOption( site, FIXTURE_DEMO_ROUTE_OFF, 1 );
+		try {
+			expect( statusRows( await admin.html( PAGE ) )[ ECHO ] ).toBe( 'Demo route: admins only (used by the self-test)' );
+		} finally {
+			deleteOption( site, FIXTURE_DEMO_ROUTE_OFF );
+		}
 	} );
 
 	it( 'links to the page from the Plugins screen', async () => {

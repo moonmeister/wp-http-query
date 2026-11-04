@@ -600,9 +600,10 @@ function render_presets_field(): void {
  * Reads the REST server's normalized route table, the same one that matches
  * requests and drives Accept-Query, so it lists what actually answers QUERY.
  * Anything there that opted_in_route_sources() doesn't account for registered
- * QUERY itself.
+ * QUERY itself. The plugin's own echo route is 'demo:public' or 'demo:admins',
+ * from demo_route_is_public(), the same check its permission_callback makes.
  *
- * @return array<string, string> Route key => 'preset:<name>', 'filter' or 'route'.
+ * @return array<string, string> Route key => 'preset:<name>', 'filter', 'route', 'demo:public' or 'demo:admins'.
  */
 function query_route_sources(): array {
 	$opted_in = opted_in_route_sources();
@@ -611,7 +612,13 @@ function query_route_sources(): array {
 	foreach ( rest_get_server()->get_routes() as $route => $handlers ) {
 		foreach ( $handlers as $handler ) {
 			if ( ! empty( $handler['methods'][ METHOD ] ) ) {
-				$sources[ $route ] = $opted_in[ $route ] ?? 'route';
+				if ( isset( $opted_in[ $route ] ) ) {
+					$sources[ $route ] = $opted_in[ $route ];
+				} elseif ( ECHO_ROUTE === $route ) {
+					$sources[ $route ] = demo_route_is_public() ? 'demo:public' : 'demo:admins';
+				} else {
+					$sources[ $route ] = 'route';
+				}
 				break;
 			}
 		}
@@ -646,6 +653,10 @@ function render_status(): void {
 			$why = __( 'wp_http_query_routes filter', 'wp-http-query' );
 		} elseif ( 'route' === $source ) {
 			$why = __( 'Registered by the route itself (methods include QUERY)', 'wp-http-query' );
+		} elseif ( 'demo:public' === $source ) {
+			$why = __( 'Demo route: public', 'wp-http-query' );
+		} elseif ( 'demo:admins' === $source ) {
+			$why = __( 'Demo route: admins only (used by the self-test)', 'wp-http-query' );
 		} else {
 			$why = sprintf(
 				/* translators: %s: Preset name, such as core-collections. */
@@ -722,17 +733,21 @@ add_filter(
 
 /*
  * -------------------------------------------------------------------------
- * Demo route: off unless a site turns it on.
+ * Demo route: admins only unless a site makes it public.
  *
  * QUERY /wp-json/wp-http-query/v1/echo reports how the server parsed the
- * request. It is unauthenticated and reflects its input, so it is only
- * registered when the 'wp_http_query_register_demo_route' filter returns true:
+ * request. It is always registered, because the self-test below sends QUERY
+ * to it, but by default only users with manage_options may call it: anyone
+ * else gets core's standard 401 (signed out) or 403. It reflects its input,
+ * so making it public is a site's choice, through the
+ * 'wp_http_query_register_demo_route' filter (named for when it controlled
+ * registration; the name stays so existing opt-ins keep working):
  *
  *     add_filter( 'wp_http_query_register_demo_route', '__return_true' );
  *
  * The default is false, not WP_DEBUG: WP_DEBUG is often left on for staging
- * sites that are publicly reachable, and a route that appears or disappears
- * with a debugging constant is a surprise. Opting in is one line.
+ * sites that are publicly reachable, and a route that opens up with a
+ * debugging constant is a surprise. Opting in is one line.
  *
  * The route is registrable on stock core with no patch: register_rest_route()
  * has no method allowlist, set_method() only uppercases, and
@@ -745,24 +760,46 @@ add_filter(
  * ----------------------------------------------------------------------
  */
 
+/** The echo route's key, as the REST server lists it. */
+const ECHO_ROUTE = '/' . NAMESPACE_ . '/echo';
+
+/**
+ * Whether anyone may call the echo route, not just admins.
+ *
+ * The one place this is decided: the route's permission_callback and the
+ * settings page's status table both read it.
+ */
+function demo_route_is_public(): bool {
+	/**
+	 * Filters whether the diagnostic echo route is public.
+	 *
+	 * The route is always registered. When this is false, only users with
+	 * manage_options may call it.
+	 *
+	 * @param bool $public Whether anyone may call QUERY /wp-http-query/v1/echo. Default false.
+	 */
+	return (bool) apply_filters( 'wp_http_query_register_demo_route', false );
+}
+
+/**
+ * Who may call the echo route: anyone when it's public, otherwise admins.
+ *
+ * Returning false lets core send its standard rest_forbidden error, 401 for a
+ * signed-out request and 403 for a signed-in one.
+ */
+function can_call_echo(): bool {
+	return demo_route_is_public() || current_user_can( 'manage_options' );
+}
+
 add_action(
 	'rest_api_init',
 	static function (): void {
-		/**
-		 * Filters whether to register the diagnostic echo route.
-		 *
-		 * @param bool $register Whether to register QUERY /wp-http-query/v1/echo. Default false.
-		 */
-		if ( ! apply_filters( 'wp_http_query_register_demo_route', false ) ) {
-			return;
-		}
-
 		register_rest_route(
 			NAMESPACE_,
 			'/echo',
 			array(
 				'methods'             => METHOD,
-				'permission_callback' => '__return_true',
+				'permission_callback' => __NAMESPACE__ . '\\can_call_echo',
 				'callback'            => __NAMESPACE__ . '\\handle_echo',
 			)
 		);

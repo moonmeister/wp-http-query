@@ -19,8 +19,8 @@
  *
  * /wp/v2/types is deliberately left alone: the default-off tests use it.
  *
- * It also turns on the plugin's diagnostic echo route, which is off by
- * default, explicitly rather than relying on wp-env's WP_DEBUG, unless the
+ * It also makes the plugin's diagnostic echo route public (it is admins only
+ * by default), explicitly rather than relying on wp-env's WP_DEBUG, unless the
  * lifecycle suite has switched that off (DEMO_ROUTE_OFF below).
  *
  * @package WPHttpQuery
@@ -45,8 +45,8 @@ const PRESET_FILTER_OFF = 'wp_http_query_fixture_preset_filter_off';
 
 /**
  * Set only by the serial lifecycle suite, through WP-CLI, to check the echo
- * route is gone when the plugin's filter is left at its default. Never set
- * by an HTTP request.
+ * route is admins only when the plugin's filter is left at its default.
+ * Never set by an HTTP request.
  */
 const DEMO_ROUTE_OFF = 'wp_http_query_fixture_demo_route_off';
 
