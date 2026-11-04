@@ -1,0 +1,138 @@
+name: PR Preview - Publish
+
+# After "PR Preview - Build" succeeds on a pull request, this:
+#   1. uploads that run's zip to the public `ci-artifacts` prerelease (pr-<N>-<SHA>.zip),
+#   2. checks the asset is listed there and downloads without auth, and
+#   3. posts ONE comment on the PR with a "Preview in Playground" button and the download link,
+#      updated in place on every new push.
+#
+# One writer owns the comment: WordPress/action-wp-playground-pr-preview in `mode: comment`,
+# given a comment-template that already contains the download link. Nothing else edits it.
+# (The reusable preview-publish.yml can't take a comment-template, so this job uses the same
+# project's expose-artifact-on-public-url helper plus the action directly.)
+#
+# Trust: workflow_run always runs this file from the default branch, never from the PR, and it
+# never checks out PR code. The zip is treated as opaque bytes. The helper refuses to touch the
+# release unless the build run, the PR, its head repo, branch and SHA all agree. Never change
+# this to pull_request_target. Third-party actions are pinned to commit SHAs because this job
+# can write.
+
+on:
+  workflow_run:
+    workflows: ['PR Preview - Build']
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  # One publish at a time per PR branch, so comment updates land in push order.
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Playground button and download link
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read         # download the build run's artifact
+      contents: write       # upload to the ci-artifacts prerelease
+      pull-requests: write  # post and update the comment
+    steps:
+      - name: Find the pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_PRS: ${{ toJSON(github.event.workflow_run.pull_requests) }}
+          HEAD_OWNER: ${{ github.event.workflow_run.head_repository.owner.login }}
+          HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          # Same-repo runs list their PR. Fork runs list none, so look it up by head branch,
+          # as the action's README describes. The helper below re-checks whichever we pick.
+          numbers=$(jq -r '.[].number' <<<"$RUN_PRS")
+          if [ -z "$numbers" ]; then
+            numbers=$(gh api --paginate --method GET "repos/$GITHUB_REPOSITORY/pulls" \
+              -f head="$HEAD_OWNER:$HEAD_BRANCH" -f state=open -f per_page=100 \
+              --jq ".[] | select(.head.repo.full_name == \"$HEAD_REPO\" and .head.ref == \"$HEAD_BRANCH\") | .number")
+          fi
+          if [ "$(wc -w <<<"$numbers")" -ne 1 ]; then
+            echo "::error::Expected exactly one PR for $HEAD_REPO:$HEAD_BRANCH, found: ${numbers:-none}"
+            exit 1
+          fi
+          echo "number=$numbers" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the zip to the ci-artifacts prerelease
+        id: expose
+        uses: WordPress/action-wp-playground-pr-preview/.github/actions/expose-artifact-on-public-url@1b15093d61b5e98cdfeb31466f34ade495762cd7 # v4
+        with:
+          artifact-name: wp-playground-preview-pr${{ steps.pr.outputs.number }}-${{ github.event.workflow_run.head_sha }}
+          artifact-filename: zips/wp-http-query.zip
+          artifact-source-run-id: ${{ github.event.workflow_run.id }}
+          pr-number: ${{ steps.pr.outputs.number }}
+          commit-sha: ${{ github.event.workflow_run.head_sha }}
+          artifacts-to-keep: '2'
+          github-token: ${{ github.token }}
+
+      - name: Look up the public download URL
+        id: asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSET: ${{ steps.expose.outputs.artifact-name }}
+        run: |
+          set -euo pipefail
+          url=$(gh release view ci-artifacts --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq ".assets[] | select(.name == \"$ASSET\") | .url")
+          if [ -z "$url" ]; then
+            echo "::error::$ASSET is not on the ci-artifacts release"
+            exit 1
+          fi
+          # The link is for people without a GitHub login: check it works without a token.
+          curl -fsSL -o /dev/null --retry 3 --retry-all-errors "$url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Write the blueprint
+        id: blueprint
+        env:
+          ZIP_URL: ${{ steps.asset.outputs.url }}
+        run: |
+          set -euo pipefail
+          # Latest WordPress, PHP 8.3, logged in as admin, the built zip active with the
+          # core-collections preset on and the echo demo route enabled (through the
+          # wp_http_query_register_demo_route filter where the plugin has it; harmless where it
+          # doesn't), opening on Settings > General where the preset is.
+          blueprint=$(jq -nc --arg url "$ZIP_URL" '{
+            "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+            preferredVersions: { php: "8.3", wp: "latest" },
+            landingPage: "/wp-admin/options-general.php",
+            steps: [
+              { step: "login", username: "admin" },
+              { step: "installPlugin",
+                pluginData: { resource: "url", url: $url },
+                options: { activate: true } },
+              { step: "setSiteOptions",
+                options: { wp_http_query_presets: ["core-collections"] } },
+              { step: "writeFile",
+                path: "/wordpress/wp-content/mu-plugins/wp-http-query-demo-route.php",
+                data: "<?php\n// Playground preview: turn on the /wp-http-query/v1/echo demo route.\n// A no-op on builds where the route is always registered.\nadd_filter( \"wp_http_query_register_demo_route\", \"__return_true\" );\n" }
+            ]
+          }')
+          echo "json=$blueprint" >> "$GITHUB_OUTPUT"
+
+      - name: Post or update the preview comment
+        uses: WordPress/action-wp-playground-pr-preview@1b15093d61b5e98cdfeb31466f34ade495762cd7 # v4
+        with:
+          mode: comment
+          pr-number: ${{ steps.pr.outputs.number }}
+          blueprint: ${{ steps.blueprint.outputs.json }}
+          github-token: ${{ github.token }}
+          comment-template: |
+            ### Try this PR
+
+            {{PLAYGROUND_BUTTON}}
+
+            Opens WordPress (latest, PHP 8.3) in your browser with this PR's build of the plugin active, the `core-collections` preset on, the `/wp-http-query/v1/echo` demo route enabled, and Settings → General open.
+
+            **Download the plugin zip:** [${{ steps.expose.outputs.artifact-name }}](${{ steps.asset.outputs.url }}) (no GitHub login needed; it unzips to `wp-http-query/`). Built from ${{ github.event.workflow_run.head_sha }}.
