@@ -67,8 +67,24 @@ add_action(
 			return;
 		}
 
-		remove_filter( 'rest_pre_serve_request', 'rest_send_cors_headers' );
-		add_filter( 'rest_pre_serve_request', __NAMESPACE__ . '\\send_cors_headers' );
+		/*
+		 * Swap core's handler only while it's hooked, and at its own priority.
+		 * A site that removed it has turned REST CORS off: adding ours anyway
+		 * would turn it back on, echoing any Origin with credentials allowed.
+		 * A site that re-hooked it at another priority would otherwise get
+		 * both, since remove_filter() only matches the priority it's given,
+		 * and core's, running second, would overwrite our method list.
+		 *
+		 * The filter path above needs none of this: once core's handler is
+		 * gone, rest_allowed_cors_methods never runs.
+		 */
+		$priority = has_filter( 'rest_pre_serve_request', 'rest_send_cors_headers' );
+		if ( false === $priority ) {
+			return;
+		}
+
+		remove_filter( 'rest_pre_serve_request', 'rest_send_cors_headers', $priority );
+		add_filter( 'rest_pre_serve_request', __NAMESPACE__ . '\\send_cors_headers', $priority );
 	},
 	20
 );

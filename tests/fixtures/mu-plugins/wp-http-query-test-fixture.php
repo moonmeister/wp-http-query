@@ -19,6 +19,10 @@
  *
  * /wp/v2/types is deliberately left alone: the default-off tests use it.
  *
+ * Two more switches, also set only by the lifecycle suite, change how core's
+ * REST CORS handler is hooked, as a site might: REMOVE_CORE_CORS removes it
+ * (REST CORS off), REHOOK_CORE_CORS moves it to priority 11.
+ *
  * It also makes the plugin's diagnostic echo route public (it is admins only
  * by default), explicitly rather than relying on wp-env's WP_DEBUG, unless the
  * lifecycle suite has switched that off (DEMO_ROUTE_OFF below).
@@ -49,6 +53,34 @@ const PRESET_FILTER_OFF = 'wp_http_query_fixture_preset_filter_off';
  * Never set by an HTTP request.
  */
 const DEMO_ROUTE_OFF = 'wp_http_query_fixture_demo_route_off';
+
+/**
+ * Set only by the serial lifecycle suite, through WP-CLI: removes core's REST
+ * CORS handler, the way a site turns REST CORS off. Never set by an HTTP request.
+ */
+const REMOVE_CORE_CORS = 'wp_http_query_fixture_remove_core_cors';
+
+/**
+ * Set only by the serial lifecycle suite, through WP-CLI: moves core's REST
+ * CORS handler from priority 10 to 11. Never set by an HTTP request.
+ */
+const REHOOK_CORE_CORS = 'wp_http_query_fixture_rehook_core_cors';
+
+// Core hooks rest_send_cors_headers on rest_api_init at 10; the plugin swaps
+// it on rest_api_init at 20. In between is where a site would change it.
+add_action(
+	'rest_api_init',
+	static function (): void {
+		if ( get_option( REMOVE_CORE_CORS ) ) {
+			remove_filter( 'rest_pre_serve_request', 'rest_send_cors_headers' );
+		}
+		if ( get_option( REHOOK_CORE_CORS ) ) {
+			remove_filter( 'rest_pre_serve_request', 'rest_send_cors_headers' );
+			add_filter( 'rest_pre_serve_request', 'rest_send_cors_headers', 11 );
+		}
+	},
+	15
+);
 
 add_filter(
 	'wp_http_query_public_demo_route',

@@ -12,6 +12,12 @@ export const FIXTURE_PRESET_FILTER_OFF = 'wp_http_query_fixture_preset_filter_of
 /** Test fixture switch that stops it turning the plugin's echo route on. */
 export const FIXTURE_DEMO_ROUTE_OFF = 'wp_http_query_fixture_demo_route_off';
 
+/** Test fixture switch that removes core's REST CORS handler, as a site turning REST CORS off does. */
+export const FIXTURE_REMOVE_CORE_CORS = 'wp_http_query_fixture_remove_core_cors';
+
+/** Test fixture switch that moves core's REST CORS handler to priority 11. */
+export const FIXTURE_REHOOK_CORE_CORS = 'wp_http_query_fixture_rehook_core_cors';
+
 /** Whether an option row exists, read from the database, ignoring registered defaults. */
 export function optionExists( site: Site, name: string ): boolean {
 	return wp( site, [ 'option', 'list', `--search=${ name }`, '--format=count' ] ).trim() !== '0';

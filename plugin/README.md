@@ -14,7 +14,11 @@ own routes, and sending it.
 
 - **Parses `QUERY` request bodies**, JSON and form-encoded, into the request's parameters, the
   same way core does for `POST`.
-- **Adds `QUERY` to CORS**, so browsers on other origins can send it.
+- **Adds `QUERY` to CORS**, so browsers on other origins can send it. From WordPress 7.2 it uses
+  core's `rest_allowed_cors_methods` filter. Before 7.2 core has no filter there, so the plugin
+  swaps core's CORS handler for a copy that adds `QUERY`; a CORS plugin that sends its own
+  `Access-Control-Allow-Methods` later in the request overrides it. A site that has turned REST
+  CORS off, by removing core's handler, stays off.
 - **Sends `Accept-Query: "application/json"`** on routes that accept `QUERY`, so clients can see
   which body format to use.
 - **Adds `QUERY` to the routes you choose**, and to no others. See

@@ -127,9 +127,16 @@ What the tests check against this route, on every test site:
 - `{"per_page":100}` as JSON, and `per_page=0` form-encoded, both return `400 rest_invalid_param`.
 - An anonymous `QUERY` gets the read (`200`); an anonymous `POST` to the same route gets `401`.
 
-**Use the string form of `methods`.** `'GET, QUERY'` works on every core version. In the array
-form, an entry that lists more than one method, like `array( 'POST, PUT', 'QUERY' )`, registers
-one unmatchable key on cores before 7.2
+**Use the string form of `methods`.** `'GET, QUERY'` works on every core version.
+
+> **Warning:** before WordPress 7.2, a comma-separated string inside the **array** form breaks
+> the route. `'methods' => array( WP_REST_Server::READABLE . ', ' . QUERYABLE )` registers one
+> key, `GET, QUERY`, that no request matches. Use the string form,
+> `WP_REST_Server::READABLE . ', ' . QUERYABLE`, or one method per array element,
+> `array( 'GET', QUERYABLE )`.
+
+In the array form, an entry that lists more than one method, like `array( 'POST, PUT', 'QUERY' )`,
+registers one unmatchable key on cores before 7.2
 ([Trac#65905](https://core.trac.wordpress.org/ticket/65905), fixed in
 [r63756](https://core.trac.wordpress.org/changeset/63756)). `array( 'GET', 'QUERY' )`, one method
 per entry, is also safe.
