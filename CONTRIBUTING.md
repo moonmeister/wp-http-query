@@ -9,7 +9,7 @@ compatibility matrix behind it. Start with the [README](README.md) for what the 
 | Tool | Why | Check |
 |---|---|---|
 | **Docker** (Desktop, OrbStack, or similar) | Runs the WordPress test sites. **It must be running** before any `make` target that touches the sites | `docker info` |
-| **Node.js 22.13+** and npm (26, the current LTS, recommended; `nvm use` reads `.nvmrc`) | Runs [wp-env](https://www.npmjs.com/package/@wordpress/env) and the [vitest](https://vitest.dev) suite | `node -v` |
+| **Node.js 24.18+** and npm (26, the current LTS, recommended; `nvm use` reads `.nvmrc`) | Runs [wp-env](https://www.npmjs.com/package/@wordpress/env) and the [vitest](https://vitest.dev) suite | `node -v` |
 | **make** | Entry point for everything below. Preinstalled on macOS and most Linux | `make -v` |
 | `jq` *(matrix only)* | Used by `matrix/run.sh` | `jq --version` |
 

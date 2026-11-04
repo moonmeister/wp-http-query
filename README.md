@@ -257,7 +257,7 @@ make check      # start the WordPress test sites, then run the decision tests
 plugin active: **7.0.8** on `:8870` and **7.1.4** on `:8871` (the plugin's pre-7.2 CORS fallback),
 and **nightly** on `:8872` (core's `rest_allowed_cors_methods`, r64730). `make test` runs the
 vitest suite in [`tests/`](tests/) over real HTTP against all three. `make help` lists the rest. Requires Docker and
-Node 22.13+ (26 recommended). **New here? [CONTRIBUTING.md](CONTRIBUTING.md)** walks through setup, the commands and
+Node 24.18+ (26 recommended). **New here? [CONTRIBUTING.md](CONTRIBUTING.md)** walks through setup, the commands and
 troubleshooting.
 
 **Each test file encodes a decision**, and its header names the ADR and issue. When a decision

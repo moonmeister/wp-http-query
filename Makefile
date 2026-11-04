@@ -7,7 +7,7 @@
 #   make down      stop all three
 #   make destroy   remove all three and their data (asks first)
 #
-# Requires Docker and Node 22.13+ (26, the current LTS, recommended; see .nvmrc).
+# Requires Docker and Node 24.18+ (26, the current LTS, recommended; see .nvmrc).
 
 .DEFAULT_GOAL := help
 .PHONY: help install up down destroy status open test check
