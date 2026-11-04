@@ -31,7 +31,7 @@ You get two WordPress sites, both with `plugin/` mounted and active:
 | **stable** | <http://localhost:8871> | 7.1.4, pinned | Tests the plugin's pre-7.2 CORS fallback |
 | **nightly** | <http://localhost:8872> | Latest nightly build | Tests the 7.2+ path through core's `rest_allowed_cors_methods` |
 
-Admin is at `/wp-admin`, user `admin`, password `password`.
+Admin is at `/wp-admin`, user `admin`, password `password`. `make open` opens it for you.
 
 The plugin directory is **mounted, not copied**, so edits to `plugin/wp-http-query.php` take effect
 on the next request. No restart needed.
@@ -47,6 +47,7 @@ Run `make help` for the list. The ones you'll use:
 | `make check` | `make up`, then `make test` |
 | `make test-stable` / `make test-nightly` | Test against one site only |
 | `make status` | Show whether each site is running, and its URL |
+| `make open` | Open wp-admin for both sites in your browser. `make open ENV=nightly` opens one |
 | `make down` | Stop both sites. Data is kept; `make up` brings them back as they were |
 | `make destroy` | Delete both sites and their data. Asks before each one. Use it to start from scratch |
 
