@@ -165,17 +165,32 @@ add_filter(
  * Gap 2 — READABLE is 'GET', so no existing read route matches QUERY.
  *
  * ADR 0002 closed on an additive QUERYABLE constant, so core gives existing
- * read routes nothing. Which routes this plugin adds QUERY to is ADR 0005.
+ * read routes nothing. Which routes this plugin adds QUERY to is ADR 0005,
+ * decided 2026-11-04: reach is OFF by default and opt-in, never every route.
  *
- * PLACEHOLDER. Decided 2026-11-04: reach will be opt-in, with options for
- * which routes get QUERY, and never every route by default. This filter
- * still implements ADR 0005 option 3 (every route that accepts GET) and is
- * to be replaced before the plugin is published.
+ * Why not every route: plugins read 'GET' as a synonym for "safe". Jetpack
+ * registers READABLE routes whose callbacks do
+ * `if ( 'GET' === $request->get_method() ) { read } else { write }`, so a
+ * QUERY to them activates modules. See ADR 0005 and experiments/plugin-spike/.
  *
- * Why it has to go: option 3 breaks plugins that read 'GET' as a synonym
- * for "safe". Jetpack activates modules on a QUERY to a READABLE route, and
- * this filter reproduces that on any site running both. See ADR 0005 and
- * experiments/plugin-spike/.
+ * QUERY reaches a route in exactly three ways:
+ *
+ * 1. The route registers it. Put QUERYABLE (or 'QUERY') in 'methods':
+ *
+ *        register_rest_route( 'my/v1', '/things', array(
+ *            'methods'  => WP_REST_Server::READABLE . ', ' . \WPHttpQuery\QUERYABLE,
+ *            ...
+ *        ) );
+ *
+ *    This already works on stock core; the plugin adds nothing for it.
+ *
+ * 2. A site lists the route in the 'wp_http_query_routes' filter.
+ *
+ * 3. A site enables a preset: the option set on Settings → General, then
+ *    the 'wp_http_query_presets' filter, which code can use to override it.
+ *
+ * Only handlers that accept GET gain QUERY. Write handlers on the same route
+ * never do (add_query_to_handler()).
  *
  * match_request_to_handler() is a plain array-key lookup on the normalized
  * method map, and 'rest_endpoints' runs BEFORE that normalization
@@ -184,10 +199,118 @@ add_filter(
  * string, or an array — not the method map.
  * ---------------------------------------------------------------------- */
 
+/**
+ * Userland stand-in for core's future WP_REST_Server::QUERYABLE (ADR 0002,
+ * option B). Use it in 'methods' when registering a route that answers QUERY.
+ */
+const QUERYABLE = METHOD;
+
+/** Option holding the enabled preset names. The only thing the plugin stores. */
+const PRESETS_OPTION = 'wp_http_query_presets';
+
+/**
+ * Route lists, by preset name.
+ *
+ * 'core-collections' is core's public read collections: ADR 0005 option 2,
+ * done by the plugin rather than by core. Each route's GET handler is a
+ * WP_REST_Controller::get_items() that was checked for branching on the
+ * request method (get_method(), is_method(), REQUEST_METHOD) in 7.0.8, 7.1.4
+ * and 7.2-beta4: the only hits are is_method( 'HEAD' ), which QUERY does not
+ * match, so QUERY gets the full GET response. See ADR 0005 for the record.
+ *
+ * Exact route keys, not patterns. Single-item routes are not included.
+ *
+ * @return array<string, string[]>
+ */
+function presets(): array {
+	return array(
+		'core-collections' => array(
+			'/wp/v2/posts',
+			'/wp/v2/pages',
+			'/wp/v2/media',
+			'/wp/v2/comments',
+			'/wp/v2/categories',
+			'/wp/v2/tags',
+			'/wp/v2/users',
+			'/wp/v2/search',
+		),
+	);
+}
+
+/**
+ * Names of the enabled presets.
+ *
+ * The stored option, then the 'wp_http_query_presets' filter, so code can
+ * enable or disable a preset whatever the setting says:
+ *
+ *     add_filter( 'wp_http_query_presets', function ( array $presets ) {
+ *         $presets[] = 'core-collections';
+ *         return $presets;
+ *     } );
+ *
+ * Unknown names are ignored, with a _doing_it_wrong() notice.
+ *
+ * @return string[]
+ */
+function enabled_presets(): array {
+	$names = (array) apply_filters( 'wp_http_query_presets', sanitize_presets( get_option( PRESETS_OPTION, array() ) ) );
+	$known = array();
+
+	foreach ( $names as $name ) {
+		if ( isset( presets()[ $name ] ) ) {
+			$known[] = $name;
+		} else {
+			_doing_it_wrong(
+				'wp_http_query_presets',
+				sprintf( 'Unknown preset "%s". Known presets: %s.', esc_html( (string) $name ), esc_html( implode( ', ', array_keys( presets() ) ) ) ),
+				'0.1.0'
+			);
+		}
+	}
+
+	return array_values( array_unique( $known ) );
+}
+
+/**
+ * Route keys that gain QUERY on their GET handlers.
+ *
+ * Starts from the enabled presets' routes and passes them through the
+ * 'wp_http_query_routes' filter. Add to the list rather than replacing it,
+ * or the presets are dropped:
+ *
+ *     add_filter( 'wp_http_query_routes', function ( array $routes ) {
+ *         $routes[] = '/my-plugin/v1/things';
+ *         $routes[] = '/wp/v2/posts/(?P<id>[\d]+)'; // The registered regex, verbatim.
+ *         return $routes;
+ *     } );
+ *
+ * Entries match registered route keys exactly: no patterns, no prefixes.
+ * The keys are listed at GET /wp-json/.
+ *
+ * @return string[]
+ */
+function opted_in_routes(): array {
+	$routes = array();
+	foreach ( enabled_presets() as $name ) {
+		$routes = array_merge( $routes, presets()[ $name ] );
+	}
+
+	return array_values( array_unique( array_filter(
+		(array) apply_filters( 'wp_http_query_routes', $routes ),
+		'is_string'
+	) ) );
+}
+
 add_filter(
 	'rest_endpoints',
 	static function ( array $endpoints ): array {
-		foreach ( $endpoints as $route => $handlers ) {
+		foreach ( opted_in_routes() as $route ) {
+			if ( ! isset( $endpoints[ $route ] ) || ! is_array( $endpoints[ $route ] ) ) {
+				continue;
+			}
+
+			$handlers = $endpoints[ $route ];
+
 			// Core wraps the single-handler shape after this filter, not before.
 			if ( isset( $handlers['callback'] ) ) {
 				$endpoints[ $route ] = add_query_to_handler( $handlers );
@@ -256,6 +379,91 @@ function add_query_to_handler( array $handler ): array {
 	$handler['methods'] = implode( ', ', $names );
 
 	return $handler;
+}
+
+/* -------------------------------------------------------------------------
+ * Preset setting — Settings → General.
+ *
+ * Only presets get UI. Route lists and QUERYABLE stay code-only. One option,
+ * a list of enabled preset names, default empty. Settings → General because a
+ * single checkbox doesn't justify its own menu item, and Permalinks, the
+ * closer fit, saves its own form instead of going through options.php, so the
+ * Settings API can't register fields there. uninstall.php deletes the option.
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Keeps known preset names only.
+ *
+ * @param mixed $value Raw option value.
+ * @return string[]
+ */
+function sanitize_presets( $value ): array {
+	if ( ! is_array( $value ) ) {
+		return array();
+	}
+
+	return array_values( array_intersect( array_keys( presets() ), $value ) );
+}
+
+add_action(
+	'init',
+	static function (): void {
+		register_setting(
+			'general',
+			PRESETS_OPTION,
+			array(
+				'type'              => 'array',
+				'description'       => 'HTTP QUERY presets enabled on this site.',
+				'sanitize_callback' => __NAMESPACE__ . '\\sanitize_presets',
+				'default'           => array(),
+				'show_in_rest'      => false,
+			)
+		);
+	}
+);
+
+add_action(
+	'admin_init',
+	static function (): void {
+		// options.php already requires manage_options for the general group;
+		// this keeps the field off the page for anyone else too.
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		add_settings_field(
+			PRESETS_OPTION,
+			'HTTP QUERY',
+			__NAMESPACE__ . '\\render_presets_field',
+			'general',
+			'default',
+			array( 'label_for' => PRESETS_OPTION . '-core-collections' )
+		);
+	}
+);
+
+/**
+ * Renders the preset checkbox on Settings → General.
+ */
+function render_presets_field(): void {
+	$stored    = sanitize_presets( get_option( PRESETS_OPTION, array() ) );
+	$effective = enabled_presets();
+	$id        = PRESETS_OPTION . '-core-collections';
+
+	printf(
+		'<input type="hidden" name="%1$s[]" value="" /><label for="%2$s"><input type="checkbox" id="%2$s" name="%1$s[]" value="core-collections" %3$s /> %4$s</label>',
+		esc_attr( PRESETS_OPTION ),
+		esc_attr( $id ),
+		checked( in_array( 'core-collections', $stored, true ), true, false ),
+		esc_html__( 'Accept QUERY on core’s read collections (posts, pages, media, comments, categories, tags, users, search)', 'wp-http-query' )
+	);
+
+	if ( in_array( 'core-collections', $stored, true ) !== in_array( 'core-collections', $effective, true ) ) {
+		printf(
+			'<p class="description">%s</p>',
+			esc_html__( 'Code on this site overrides this setting through the wp_http_query_presets filter.', 'wp-http-query' )
+		);
+	}
 }
 
 /* -------------------------------------------------------------------------
