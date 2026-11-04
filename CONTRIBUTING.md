@@ -91,7 +91,9 @@ from:
 | `gap-1-cors.test.ts` | `QUERY` is in `Access-Control-Allow-Methods`, and core's defaults are kept |
 | `adr-0003-no-cache-headers.test.ts` | [ADR 0003](docs/decisions/0003-cache-safety-default.md) C: no cache headers added |
 | `method-override-tunnel.test.ts` | `POST` + `X-HTTP-Method-Override: QUERY` is handled as `QUERY` |
-| `adr-0005-reach.test.ts` | [ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md): existing routes don't gain `QUERY` by default |
+| `adr-0005-reach.test.ts` | [ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md): no route gains `QUERY` by default; the route, filter and preset opt-ins work; write handlers never gain it; a form-encoded `QUERY /wp/v2/posts` search filters a real collection |
+| `lifecycle/adr-0005-preset-setting.test.ts` | ADR 0005: the stored preset setting switches reach, and the filter overrides it |
+| `lifecycle/plugin-lifecycle.test.ts` | [#22](../../issues/22): deactivated, the site is stock; uninstall deletes the option |
 
 The tests make real HTTP requests to both sites, so they cover what a client would actually see:
 headers on the wire, CORS, and what the web server passes through.
@@ -102,8 +104,20 @@ changed, update the expected value on purpose. Don't loosen the assertion.
 **`it.fails` marks a decision the plugin doesn't meet yet.** The test asserts the decided behavior
 and is expected to fail, so the suite stays green and the gap stays visible. When the plugin
 catches up, vitest reports the `.fails` test as an error. That's your cue to remove the marker.
-Today this applies to the reach tests, until [#1](../../issues/1) replaces the every-`GET`-route
-placeholder.
+No test uses it today.
+
+**Opt-ins for the tests live in a fixture mu-plugin**,
+[`tests/fixtures/mu-plugins/`](tests/fixtures/mu-plugins/), mounted on every site. It enables the
+`core-collections` preset, opts in `/wp/v2/taxonomies` and `/wp/v2/posts/(?P<id>[\d]+)`, and
+registers two test routes. `/wp/v2/types` is deliberately left alone for the default-off tests.
+Global setup seeds two posts through WP-CLI, idempotently. Changing the mappings in the
+`.wp-env*.json` files needs `make up` to take effect.
+
+**Tests that change site state go in `tests/lifecycle/`.** They deactivate the plugin, run its
+uninstall routine or write options, so they'd break the main suite if they ran alongside it.
+`make test` runs them after the main suite, one file at a time
+(`vitest.lifecycle.config.ts`), and each restores what it changed in `afterAll`, failure or not.
+`npx vitest run` alone skips them. They take about a minute and a half: every step is a WP-CLI call.
 
 **`it.todo` marks a test that can't be written yet**, usually because the behavior isn't designed.
 

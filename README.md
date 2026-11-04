@@ -82,7 +82,7 @@ working order and the reason for it. The table below is the same tree without th
 | Capability | Venue | Milestone |
 |---|---|---|
 | [#5 Feature plugin](../../issues/5) — **the deliverable.** Run it on a real install ([#22](../../issues/22)), then publish ([#23](../../issues/23)) | this repo | Plugin v1 |
-| [#1 Method constants & route matching](../../issues/1) — gap 2. **Reach is opt-in** (decided 2026-11-04): the plugin will offer options for which routes get `QUERY`, never everything by default. Designing those options is open ([ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md)); the current every-`GET`-route filter is a placeholder | this repo | Plugin v1 |
+| [#1 Method constants & route matching](../../issues/1) — gap 2. **Reach is opt-in** (decided and built 2026-11-04): off by default; routes opt in with `QUERYABLE`, sites with the `wp_http_query_routes` filter or the `core-collections` preset ([ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md), [usage](plugin/README.md#choosing-which-routes-accept-query)) | this repo | Plugin v1 |
 | ~~[#2 Request body parsing](../../issues/2)~~ — gap 3. **In the plugin** via `rest_request_parameter_order` | this repo | ✅ |
 | ~~[#3 CORS preflight](../../issues/3)~~ — gap 1. **In the plugin**, using core's `rest_allowed_cors_methods` on 7.2+ ([r64730](https://core.trac.wordpress.org/changeset/64730)) and a replacement handler before that | this repo | ✅ |
 | ~~[#4 `Accept-Query`](../../issues/4)~~ — **in the plugin.** Cache safety needs nothing ([ADR 0003](docs/decisions/0003-cache-safety-default.md) option C) | this repo | ✅ |
@@ -115,8 +115,8 @@ multi-method constant away from breaking its own routes.
 Trac#65616 before the plugin has shipped. *Ecosystem* runs in parallel and gates nothing.
 *Deferred* is named so it is not rediscovered as a gap.
 
-The project has no external blockers. What remains is designing the plugin's opt-in reach
-options ([ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md)) and shipping it.
+The project has no external blockers. Opt-in reach is built
+([ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md)); what remains is shipping it.
 
 ### Explicitly not doing
 
@@ -238,7 +238,7 @@ scripts/env.sh        Drives the two wp-env environments; wrapped by the Makefil
 | Gap 3 behavior measured | **Done 2026-08-16**, unmodified trunk. A `QUERY` with a **JSON** body already populates and schema-validates params correctly — dispatched at the real posts controller it filters the collection and `400`s a bad `per_page`. Only **form-encoded** bodies are lost, and they return the full unfiltered collection with a `200`. Gap 3 is the only gap whose failure is a silent wrong answer, so it should be patched first. [Probes](experiments/blast-radius/) |
 | Core bug found (unrelated to `QUERY`) | `register_rest_route()` does not comma-split `methods` given in array form, so `array( READABLE, EDITABLE )` registers the bogus key `'POST, PUT, PATCH'` and `POST` 404s. Confirmed on unmodified trunk, [failing test written](experiments/blast-radius/rest-array-methods-probe.php). Latent in core — its one array-form route uses single-method constants. Measured in the plugin directory: 3 plugins / 2,000 installs hit it today, but 27 plugins / 1.19M installs would break if `READABLE` ever gained a second method. Filed as [Trac#65905](https://core.trac.wordpress.org/ticket/65905), patched in [wordpress-develop#13136](https://github.com/WordPress/wordpress-develop/pull/13136) |
 | Requests upstream PR | **In flight upstream, not ours** — [#1075](https://github.com/WordPress/Requests/pull/1075) open, milestone 2.1.0, CI-blocked on [test-server#13](https://github.com/RequestsPHP/test-server/pull/13) |
-| Feature plugin | **The deliverable.** All three gaps worked around in userland, with `Accept-Query` and a demo route. Passed 6/6 in a phpunit harness on unmodified trunk (2026-09-15, [plugin-spike](experiments/plugin-spike/)). **Never run on a real install** ([#22](../../issues/22)); no packaging yet ([#23](../../issues/23)); opt-in reach options still to design ([ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md)) |
+| Feature plugin | **The deliverable.** All three gaps worked around in userland, with `Accept-Query` and a demo route. Passed 6/6 in a phpunit harness on unmodified trunk (2026-09-15, [plugin-spike](experiments/plugin-spike/)). **Never run on a real install** ([#22](../../issues/22)); no packaging yet ([#23](../../issues/23)); opt-in reach built 2026-11-04 ([ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md), [usage](plugin/README.md#choosing-which-routes-accept-query)) |
 | CORS clobber ([#16](../../issues/16)) | **Fixed for 7.2** in [r64730](https://core.trac.wordpress.org/changeset/64730) (2026-10-26, adamsilverstein), reworked from [wordpress-develop#13151](https://github.com/WordPress/wordpress-develop/pull/13151). Adds `rest_allowed_cors_methods`, which the plugin uses |
 | Core patch (`QUERY`) | **Parked behind the plugin.** ADRs 0001–0003 are decided and both patches (gap 3, `QUERYABLE`) are written on `feat-http-query`, but nothing goes upstream until the plugin has shipped. The branch predates 7.2 and needs a rebase |
 | Trac tickets | **Both filed tickets fixed for 7.2:** [#46992](https://core.trac.wordpress.org/ticket/46992) (r64730) and [#65905](https://core.trac.wordpress.org/ticket/65905) (r63756). Checked 2026-11-04. Trac#65616 (the `QUERY` proposal) is untouched and waits on the plugin |
@@ -260,8 +260,9 @@ troubleshooting.
 
 **Each test file encodes a decision**, and its header names the ADR and issue. When a decision
 changes, the test changes with it, on purpose. Tests for decisions the plugin doesn't meet yet
-are marked `it.fails` (currently the opt-in reach tests, until #1 replaces the placeholder), so
-the suite stays green while keeping the gap visible.
+are marked `it.fails` (none today), so the suite stays green while keeping the gap visible. Tests
+that change site state (deactivating the plugin, writing options) run afterwards, one at a time,
+from [`tests/lifecycle/`](tests/lifecycle/).
 
 ### Compatibility matrix
 
@@ -284,5 +285,4 @@ Requires Docker and `jq`. Results land in `matrix/results/`. See
    silently.
 4. **Additive only.** No existing route changes behavior. See ADR 0002. This applies to the plugin
    too: reach is opt-in, never all routes by default
-   ([ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md)). The current every-`GET`-route
-   filter is a placeholder that breaks this, and it gets replaced before publishing.
+   ([ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md)).
