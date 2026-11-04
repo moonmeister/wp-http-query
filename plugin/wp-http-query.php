@@ -130,7 +130,7 @@ function send_cors_headers( $value ) {
 		header( 'Access-Control-Allow-Methods: OPTIONS, GET, POST, PUT, PATCH, DELETE, QUERY' );
 		header( 'Access-Control-Allow-Credentials: true' );
 		header( 'Vary: Origin', false );
-	} elseif ( ! headers_sent() && 'GET' === $_SERVER['REQUEST_METHOD'] && ! is_user_logged_in() ) {
+	} elseif ( ! headers_sent() && isset( $_SERVER['REQUEST_METHOD'] ) && 'GET' === $_SERVER['REQUEST_METHOD'] && ! is_user_logged_in() ) {
 		header( 'Vary: Origin', false );
 	}
 
@@ -495,7 +495,7 @@ function render_presets_field(): void {
 
 add_filter(
 	'rest_post_dispatch',
-	static function ( $response, $server, $request ) {
+	static function ( $response, $server ) {
 		if ( ! $response instanceof \WP_REST_Response ) {
 			return $response;
 		}
@@ -523,7 +523,7 @@ add_filter(
 		return $response;
 	},
 	11,
-	3
+	2
 );
 
 /*
