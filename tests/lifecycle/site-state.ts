@@ -18,6 +18,9 @@ export const FIXTURE_REMOVE_CORE_CORS = 'wp_http_query_fixture_remove_core_cors'
 /** Test fixture switch that moves core's REST CORS handler to priority 11. */
 export const FIXTURE_REHOOK_CORE_CORS = 'wp_http_query_fixture_rehook_core_cors';
 
+/** Test fixture switch that removes core's REST CORS handler late, on rest_api_init at priority 99. */
+export const FIXTURE_REMOVE_CORE_CORS_LATE = 'wp_http_query_fixture_remove_core_cors_late';
+
 /** Whether an option row exists, read from the database, ignoring registered defaults. */
 export function optionExists( site: Site, name: string ): boolean {
 	return wp( site, [ 'option', 'list', `--search=${ name }`, '--format=count' ] ).trim() !== '0';

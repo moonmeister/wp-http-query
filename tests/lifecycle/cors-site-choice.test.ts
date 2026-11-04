@@ -2,8 +2,10 @@
  * CORS: the plugin respects a site that turned REST CORS off, or moved it.
  *
  * Before 7.2 core has no filter on its CORS method list, so the plugin swaps
- * core's rest_send_cors_headers() for its own copy. It does that only while
- * core's handler is hooked, and at the priority it's hooked at:
+ * core's rest_send_cors_headers() for its own copy. It decides when the
+ * response is served, not on rest_api_init, so a change a site makes at any
+ * rest_api_init priority counts. It swaps only while core's handler is
+ * hooked, and at the priority it's hooked at:
  *
  * - A site that removed core's handler has turned REST CORS off. Adding the
  *   plugin's copy anyway would turn it back on, echoing any Origin with
@@ -22,7 +24,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CORE_COLLECTIONS, ORIGIN, rest, tokens } from '../http';
 import { NO_LOCAL_CLI, sites } from '../sites';
 import { FRESH } from './session';
-import { deleteOption, FIXTURE_REHOOK_CORE_CORS, FIXTURE_REMOVE_CORE_CORS, setOption, snapshotOption } from './site-state';
+import {
+	deleteOption,
+	FIXTURE_REHOOK_CORE_CORS,
+	FIXTURE_REMOVE_CORE_CORS,
+	FIXTURE_REMOVE_CORE_CORS_LATE,
+	setOption,
+	snapshotOption,
+} from './site-state';
 
 const ROUTE = CORE_COLLECTIONS[ 0 ];
 
@@ -34,13 +43,16 @@ describe.each( sites )( 'CORS, as the site configured it: $label', ( site ) => {
 
 	let restoreRemove = () => {};
 	let restoreRehook = () => {};
+	let restoreRemoveLate = () => {};
 
 	beforeAll( () => {
 		restoreRemove = snapshotOption( site, FIXTURE_REMOVE_CORE_CORS );
 		restoreRehook = snapshotOption( site, FIXTURE_REHOOK_CORE_CORS );
+		restoreRemoveLate = snapshotOption( site, FIXTURE_REMOVE_CORE_CORS_LATE );
 	} );
 
 	afterAll( () => {
+		restoreRemoveLate();
 		restoreRehook();
 		restoreRemove();
 	} );
@@ -65,6 +77,22 @@ describe.each( sites )( 'CORS, as the site configured it: $label', ( site ) => {
 			}
 		} finally {
 			deleteOption( site, FIXTURE_REMOVE_CORE_CORS );
+		}
+	} );
+
+	it( 'leaves REST CORS off when the site removed core’s handler late in rest_api_init', async () => {
+		setOption( site, FIXTURE_REMOVE_CORE_CORS_LATE, 1 );
+		try {
+			for ( const res of [ await preflight(), await get() ] ) {
+				// Allow-Headers isn't the handler's: WP_REST_Server::serve_request()
+				// sends it on every REST response, CORS on or off.
+				const allow = [ ...res.headers.keys() ].filter(
+					( name ) => name.startsWith( 'access-control-allow-' ) && name !== 'access-control-allow-headers'
+				);
+				expect( allow ).toEqual( [] );
+			}
+		} finally {
+			deleteOption( site, FIXTURE_REMOVE_CORE_CORS_LATE );
 		}
 	} );
 

@@ -75,19 +75,38 @@ add_action(
 		 * both, since remove_filter() only matches the priority it's given,
 		 * and core's, running second, would overwrite our method list.
 		 *
+		 * Decided when the response is served, not here: a site can remove or
+		 * move core's handler at any rest_api_init priority, after this one.
+		 * swap_cors_handler() runs first on rest_pre_serve_request, and
+		 * WP_Hook re-sorts a running hook when a callback is added to it, so
+		 * ours still runs at core's priority later in the same pass.
+		 *
 		 * The filter path above needs none of this: once core's handler is
 		 * gone, rest_allowed_cors_methods never runs.
 		 */
-		$priority = has_filter( 'rest_pre_serve_request', 'rest_send_cors_headers' );
-		if ( false === $priority ) {
-			return;
-		}
-
-		remove_filter( 'rest_pre_serve_request', 'rest_send_cors_headers', $priority );
-		add_filter( 'rest_pre_serve_request', __NAMESPACE__ . '\\send_cors_headers', $priority );
+		add_filter( 'rest_pre_serve_request', __NAMESPACE__ . '\\swap_cors_handler', PHP_INT_MIN );
 	},
 	20
 );
+
+/**
+ * Swaps core's CORS handler for send_cors_headers(), at core's priority, if
+ * it's still hooked. Before 7.2 only, as the first rest_pre_serve_request
+ * callback.
+ *
+ * @param mixed $value Passthrough value.
+ * @return mixed
+ */
+function swap_cors_handler( $value ) {
+	$priority = has_filter( 'rest_pre_serve_request', 'rest_send_cors_headers' );
+
+	if ( false !== $priority ) {
+		remove_filter( 'rest_pre_serve_request', 'rest_send_cors_headers', $priority );
+		add_filter( 'rest_pre_serve_request', __NAMESPACE__ . '\\send_cors_headers', $priority );
+	}
+
+	return $value;
+}
 
 /**
  * Replacement for core's rest_send_cors_headers() that includes QUERY.
