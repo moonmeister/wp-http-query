@@ -42,6 +42,25 @@ Admin is at `/wp-admin`, user `admin`, password `password`. `make open` opens it
 The plugin directory is **mounted, not copied**, so edits to `plugin/wp-http-query.php` take effect
 on the next request. No restart needed.
 
+## Try it by hand
+
+```sh
+make demo
+```
+
+The test sites above aren't what a real install looks like: they mount a test fixture
+(`tests/fixtures/mu-plugins/`) that opts routes in, turns the preset on and makes the echo route
+public, plus the example plugin. `make demo` starts a separate site with none of that: the latest
+nightly on <http://localhost:8873> (`admin` / `password`), only `plugin/` mounted and active,
+pretty permalinks, and default settings. It opens **Settings → HTTP QUERY**, where
+**Test your server** runs the self-test. No route accepts `QUERY` until you tick
+**Core collections**, and the echo route is admins only. The README's
+[Try the plugin](README.md#try-the-plugin) walks through it.
+
+`make demo-down` stops it (data kept), `make demo-destroy` removes it (asks first). The test-site
+targets never touch it. WP-CLI works as for the others (`scripts/env.sh wp demo plugin list`). For
+a newer nightly, `npx wp-env start --update --config=.wp-env.demo.json`.
+
 ## Commands
 
 Run `make help` for the list. The ones you'll use:

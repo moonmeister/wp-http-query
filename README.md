@@ -253,6 +253,34 @@ scripts/env.sh        Drives the two wp-env environments; wrapped by the Makefil
 
 ## Quick start
 
+### Try the plugin
+
+Needs Docker running and Node 24.18+ (`nvm use`). npm dependencies install on the first run.
+
+```sh
+make demo
+```
+
+You get the latest nightly WordPress at <http://localhost:8873> with the plugin active, default
+settings and none of the test fixtures. It opens **Settings → HTTP QUERY**; log in as `admin` /
+`password`.
+
+1. On **Settings → HTTP QUERY**, the "Routes that accept QUERY" table lists only the plugin's own
+   two routes: no core route accepts `QUERY` yet, so a `QUERY` to `/wp-json/wp/v2/posts` gets `404`.
+2. Tick **Core collections** and click **Save Changes**.
+3. Send a `QUERY`. It returns `200` and the matching posts (the sample "Hello world!" post):
+
+   ```sh
+   curl -X QUERY http://localhost:8873/wp-json/wp/v2/posts -H 'Content-Type: application/json' -d '{"search":"hello"}'
+   ```
+
+4. Click **Test your server**. It runs four checks, from your browser and from the server, and
+   explains each result.
+
+`make demo-down` stops it and keeps its data; `make demo` brings it back. `make demo-destroy`
+removes it (asks first). It's separate from the test sites: `make up`, `make test`, `make down`
+and `make destroy` never touch it. More in [CONTRIBUTING.md](CONTRIBUTING.md#try-it-by-hand).
+
 ### Plugin tests
 
 ```sh

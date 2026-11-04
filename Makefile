@@ -9,10 +9,15 @@
 #   make down      stop all three
 #   make destroy   remove all three and their data (asks first)
 #
+#   make demo          a separate site for trying the plugin by hand: nightly, :8873, plugin only,
+#                      default settings, no test fixtures. Opens Settings → HTTP QUERY
+#   make demo-down     stop it
+#   make demo-destroy  remove it and its data (asks first)
+#
 # Requires Docker and Node 24.18+ (26, the current LTS, recommended; see .nvmrc). make lint needs PHP and Composer instead.
 
 .DEFAULT_GOAL := help
-.PHONY: help install up down destroy status open test check lint
+.PHONY: help install up down destroy status open test check lint demo demo-down demo-destroy
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -44,6 +49,16 @@ test: install ## Run the decision tests (all sites, or SITES=7.0,nightly)
 	SITES=$(SITES) npx vitest run --config vitest.lifecycle.config.ts
 
 check: up test ## Start everything, then test
+
+demo: install ## Start the try-by-hand site (nightly :8873, plugin only, defaults) and open its settings
+	scripts/env.sh start demo
+	scripts/env.sh open demo
+
+demo-down: install ## Stop the demo site
+	scripts/env.sh stop demo
+
+demo-destroy: install ## Remove the demo site and its data (asks first)
+	scripts/env.sh destroy demo
 
 .PHONY: dist
 dist: ## Build the plugin zip, dist/wp-http-query-<version>.zip (VERSION=x.y.z stamps a version)
