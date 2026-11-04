@@ -1,8 +1,8 @@
 name: Nightly
 
 # Once a day, if main has moved since the last one, build main and publish it as the single
-# rolling `nightly` prerelease: the tag moves to main's HEAD, the release body is rewritten, and
-# its one asset, wp-http-query-nightly.zip, is replaced. Quiet days are skipped. It's never
+# rolling `nightly` prerelease: its one asset, wp-http-query-nightly.zip, is replaced, then the tag
+# moves to main's HEAD and the release body is rewritten. Quiet days are skipped. It's never
 # marked latest, and no other release is ever created. Run it by hand from the Actions tab
 # (Nightly > Run workflow) or `gh workflow run nightly.yml`. See RELEASING.md.
 
@@ -71,6 +71,33 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
+      # Order matters. The skip check (scripts/nightly-should-build.sh) skips when the tag is at
+      # main's HEAD and the zip is attached, so the tag moves only after the new zip is up. Moved
+      # first, a failed upload would leave the tag at HEAD over the old zip, and every later run
+      # would skip until main moved again. This way any failure before the tag moves leaves it
+      # behind HEAD, and the next run rebuilds. Only a release created by the very first run
+      # tags HEAD early, and it has no zip yet, which the skip check also treats as build.
+      - name: Upload the zip to the Nightly prerelease
+        if: steps.decide.outputs.result == 'build'
+        env:
+          SHA: ${{ steps.decide.outputs.sha }}
+        run: |
+          set -euo pipefail
+          if ! gh release view nightly --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # First run only. The notes are written once the zip is up, below.
+            gh release create nightly --repo "$GITHUB_REPOSITORY" --target "$SHA" \
+              --title Nightly --prerelease --latest=false --notes "Being built."
+          fi
+
+          # Replace the zip, then delete anything else, so exactly one asset remains.
+          gh release upload nightly "dist/$ASSET" --repo "$GITHUB_REPOSITORY" --clobber
+          gh release view nightly --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' |
+            while IFS= read -r name; do
+              if [ "$name" != "$ASSET" ]; then
+                gh release delete-asset nightly "$name" --repo "$GITHUB_REPOSITORY" --yes
+              fi
+            done
+
       - name: Move the nightly tag to main's HEAD
         if: steps.decide.outputs.result == 'build'
         env:
@@ -85,7 +112,7 @@ jobs:
               -f ref=refs/tags/nightly -f sha="$SHA" >/dev/null
           fi
 
-      - name: Create or update the Nightly prerelease
+      - name: Update the Nightly prerelease's notes and target
         if: steps.decide.outputs.result == 'build'
         env:
           SHA: ${{ steps.decide.outputs.sha }}
@@ -104,19 +131,5 @@ jobs:
             echo "Download **$ASSET** below and install it with Plugins → Add New → Upload Plugin. Released versions are on the [Releases page](https://github.com/$GITHUB_REPOSITORY/releases)."
           } > "$notes"
 
-          if gh release view nightly --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release edit nightly --repo "$GITHUB_REPOSITORY" \
-              --title Nightly --prerelease --latest=false --draft=false --notes-file "$notes"
-          else
-            gh release create nightly --repo "$GITHUB_REPOSITORY" --verify-tag \
-              --title Nightly --prerelease --latest=false --notes-file "$notes"
-          fi
-
-          # Replace the zip, then delete anything else, so exactly one asset remains.
-          gh release upload nightly "dist/$ASSET" --repo "$GITHUB_REPOSITORY" --clobber
-          gh release view nightly --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' |
-            while IFS= read -r name; do
-              if [ "$name" != "$ASSET" ]; then
-                gh release delete-asset nightly "$name" --repo "$GITHUB_REPOSITORY" --yes
-              fi
-            done
+          gh release edit nightly --repo "$GITHUB_REPOSITORY" --target "$SHA" \
+            --title Nightly --prerelease --latest=false --draft=false --notes-file "$notes"

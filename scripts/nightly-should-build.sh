@@ -10,6 +10,10 @@
 #   - its tag, or failing that the release's target, is the HEAD commit.
 # Anything else, including a failed or unexpected lookup, means build: a needless rebuild is
 # cheap, and a skipped one leaves a stale nightly.
+#
+# The tag is trusted as "this commit's zip is up" because the workflow moves it only after the
+# upload succeeded (see the comment above its upload step). A run that fails before then leaves
+# the tag behind HEAD, so the next run builds.
 set -euo pipefail
 
 repo=${1:?usage: scripts/nightly-should-build.sh <owner/repo> <head sha>}
