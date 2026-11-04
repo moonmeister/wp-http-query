@@ -42,3 +42,7 @@ test: install ## Run the decision tests (all sites, or SITES=7.0,nightly)
 	SITES=$(SITES) npx vitest run --config vitest.lifecycle.config.ts
 
 check: up test ## Start everything, then test
+
+.PHONY: dist
+dist: ## Build the plugin zip, dist/wp-http-query-<version>.zip
+	scripts/dist.sh

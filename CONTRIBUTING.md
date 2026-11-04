@@ -52,6 +52,7 @@ Run `make help` for the list. The ones you'll use:
 | `make open` | Open wp-admin for all three sites in your browser. `make open ENV=nightly` opens one |
 | `make down` | Stop all three sites. Data is kept; `make up` brings them back as they were |
 | `make destroy` | Delete all three sites and their data. Asks before each one. Use it to start from scratch |
+| `make dist` | Build the installable zip, `dist/wp-http-query-<version>.zip`. No Docker needed. See [RELEASING.md](RELEASING.md) |
 
 ### WP-CLI
 
@@ -157,5 +158,7 @@ build, run `npx wp-env start --update --config=.wp-env.nightly.json`.
   and say how you measured it. The README's [Principles](README.md#principles) explain why.
 - **Text for other trackers is drafted, not sent.** [`docs/submissions/`](docs/submissions/) holds
   drafts for Trac and other projects. Filing is a human step.
+- **Releases follow [RELEASING.md](RELEASING.md).** A pushed `v*` tag creates a draft GitHub
+  release; a maintainer publishes it.
 - **Keep the core fork clean.** Core patches live in the `wordpress-develop` fork. Project notes,
   scratch files and experiments belong here, not there.
