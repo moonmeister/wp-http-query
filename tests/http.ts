@@ -5,6 +5,21 @@ export const ECHO = '/wp-http-query/v1/echo';
 
 export const ORIGIN = 'http://example.test';
 
+/** The plugin's 'core-collections' preset, as listed in plugin/wp-http-query.php presets(). */
+export const CORE_COLLECTIONS = [
+	'/wp/v2/posts',
+	'/wp/v2/pages',
+	'/wp/v2/media',
+	'/wp/v2/comments',
+	'/wp/v2/categories',
+	'/wp/v2/tags',
+	'/wp/v2/users',
+	'/wp/v2/search',
+];
+
+/** A core route the test fixture opts in through wp_http_query_routes. */
+export const FIXTURE_OPTED_IN_ROUTE = '/wp/v2/taxonomies';
+
 export interface Echo {
 	method: string;
 	json_params: Record< string, unknown > | null;

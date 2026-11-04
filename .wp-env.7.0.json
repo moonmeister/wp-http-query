@@ -3,7 +3,8 @@
 	"core": "https://wordpress.org/wordpress-7.0.8.zip",
 	"phpVersion": "8.4",
 	"mappings": {
-		"wp-content/plugins/wp-http-query": "./plugin"
+		"wp-content/plugins/wp-http-query": "./plugin",
+		"wp-content/mu-plugins": "./tests/fixtures/mu-plugins"
 	},
 	"port": 8870,
 	"testsEnvironment": false
