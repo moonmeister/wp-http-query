@@ -9,3 +9,12 @@ matrix/.env
 node_modules/
 .wp-env.override.json
 .wp-env.nightly.override.json
+
+# Claude Code agent worktrees and local settings
+.claude/
+
+# Built plugin zips (make dist).
+dist/
+
+# Composer dev tooling (make lint)
+vendor/

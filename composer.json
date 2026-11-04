@@ -1,0 +1,21 @@
+{
+	"name": "moonmeister/wp-http-query",
+	"description": "Development tooling for the WP HTTP QUERY feature plugin. The plugin itself has no Composer dependencies.",
+	"type": "project",
+	"license": "GPL-2.0-or-later",
+	"require-dev": {
+		"dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+		"phpcompatibility/phpcompatibility-wp": "3.0.0-alpha2",
+		"wp-coding-standards/wpcs": "^3.4"
+	},
+	"minimum-stability": "dev",
+	"prefer-stable": true,
+	"config": {
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		}
+	},
+	"scripts": {
+		"lint": "phpcs"
+	}
+}

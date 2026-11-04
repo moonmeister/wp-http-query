@@ -1,0 +1,41 @@
+name: PR Preview - Build
+
+# Builds the plugin zip for every pull request, once:
+#   - `make dist`, then `php -l` on every PHP file in the zip;
+#   - uploads it as the `wp-playground-preview-pr<N>-<SHA>` artifact (zips/wp-http-query.zip
+#     inside), which "PR Preview - Publish" turns into a Playground button and a public
+#     download link on the PR. That artifact is also the zip to grab from the run page.
+#
+# Untrusted PR code runs here, so this workflow has a read-only token and no secrets. The
+# reusable workflow checks out without persisting credentials. See CONTRIBUTING.md
+# (PR previews) and https://github.com/WordPress/action-wp-playground-pr-preview.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: make dist
+    uses: WordPress/action-wp-playground-pr-preview/.github/workflows/preview-build.yml@v4
+    with:
+      artifacts: wp-http-query=build/wp-http-query.zip
+      build-command: |
+        set -euo pipefail
+        make dist
+        zip="dist/wp-http-query-$(scripts/plugin-version.sh).zip"
+
+        # Lint the PHP that actually ships.
+        unzipped=$(mktemp -d)
+        unzip -q "$zip" -d "$unzipped"
+        find "$unzipped" -name '*.php' -print0 | xargs -0 -n1 php -l
+
+        # A fixed path for the artifacts entry above. PR builds are unversioned (0.0.0-dev).
+        mkdir -p build
+        cp "$zip" build/wp-http-query.zip

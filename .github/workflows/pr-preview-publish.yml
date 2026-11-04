@@ -100,13 +100,13 @@ jobs:
         run: |
           set -euo pipefail
           # Latest WordPress, PHP 8.3, logged in as admin, the built zip active with the
-          # core-collections preset on and the echo demo route enabled (through the
-          # wp_http_query_register_demo_route filter where the plugin has it; harmless where it
-          # doesn't), opening on Settings > General where the preset is.
+          # core-collections preset on and the echo demo route public (through the
+          # wp_http_query_public_demo_route filter; it's admins only by default), opening on
+          # Settings > HTTP QUERY where the preset is.
           blueprint=$(jq -nc --arg url "$ZIP_URL" '{
             "$schema": "https://playground.wordpress.net/blueprint-schema.json",
             preferredVersions: { php: "8.3", wp: "latest" },
-            landingPage: "/wp-admin/options-general.php",
+            landingPage: "/wp-admin/options-general.php?page=wp-http-query",
             steps: [
               { step: "login", username: "admin" },
               { step: "installPlugin",
@@ -116,7 +116,7 @@ jobs:
                 options: { wp_http_query_presets: ["core-collections"] } },
               { step: "writeFile",
                 path: "/wordpress/wp-content/mu-plugins/wp-http-query-demo-route.php",
-                data: "<?php\n// Playground preview: turn on the /wp-http-query/v1/echo demo route.\n// A no-op on builds where the route is always registered.\nadd_filter( \"wp_http_query_register_demo_route\", \"__return_true\" );\n" }
+                data: "<?php\n// Playground preview: make the /wp-http-query/v1/echo demo route public.\nadd_filter( \"wp_http_query_public_demo_route\", \"__return_true\" );\n" }
             ]
           }')
           echo "json=$blueprint" >> "$GITHUB_OUTPUT"
@@ -133,6 +133,6 @@ jobs:
 
             {{PLAYGROUND_BUTTON}}
 
-            Opens WordPress (latest, PHP 8.3) in your browser with this PR's build of the plugin active, the `core-collections` preset on, the `/wp-http-query/v1/echo` demo route enabled, and Settings → General open.
+            Opens WordPress (latest, PHP 8.3) in your browser with this PR's build of the plugin active, the `core-collections` preset on, the `/wp-http-query/v1/echo` demo route enabled, and Settings → HTTP QUERY open.
 
             **Download the plugin zip:** [${{ steps.expose.outputs.artifact-name }}](${{ steps.asset.outputs.url }}) (no GitHub login needed; it unzips to `wp-http-query/`). Built from ${{ github.event.workflow_run.head_sha }}.

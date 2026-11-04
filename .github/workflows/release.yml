@@ -1,0 +1,60 @@
+name: Release
+
+# When a maintainer publishes a release (usually the draft release-drafter.yml keeps up to date),
+# build the plugin zip with the release's version stamped in and attach it to the release.
+# The version comes from the tag: v0.1.0 builds wp-http-query-0.1.0.zip with Version: 0.1.0.
+# The rolling `nightly` prerelease (nightly.yml) and any non-v* tag are skipped. See RELEASING.md.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  attach:
+    name: Build and attach the zip
+    if: github.event.release.tag_name != 'nightly' && startsWith(github.event.release.tag_name, 'v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write  # upload the release asset
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ github.event.release.tag_name }}
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'  # the oldest PHP the plugin supports
+          coverage: none
+
+      - name: Build the zip
+        id: build
+        run: |
+          set -euo pipefail
+          version=${TAG#v}
+          # make dist refuses a version that isn't semver.
+          make dist VERSION="$version"
+          zip="dist/wp-http-query-$version.zip"
+
+          # Lint the PHP that actually ships.
+          unzipped=$(mktemp -d)
+          unzip -q "$zip" -d "$unzipped"
+          find "$unzipped" -name '*.php' -print0 | xargs -0 -n1 php -l
+
+          echo "zip=$zip" >> "$GITHUB_OUTPUT"
+
+      - name: Attach it to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ZIP: ${{ steps.build.outputs.zip }}
+        run: gh release upload "$TAG" "$ZIP" --clobber --repo "$GITHUB_REPOSITORY"

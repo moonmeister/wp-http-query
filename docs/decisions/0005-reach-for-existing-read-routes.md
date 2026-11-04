@@ -1,13 +1,12 @@
 # ADR 0005 — Should existing read routes gain QUERY, and by what mechanism?
 
-**Status:** Proposed, partly settled. **Settled 2026-11-04 for the feature plugin: no reach by default.** The plugin will not add `QUERY` to every route; reach is opt-in, with options for which routes get it. Still open: what those options are, and what core should do.
+**Status:** Proposed, partly settled. **Settled 2026-11-04 for the feature plugin: no reach by default, opt-in per route, per site, or by preset — implemented in [#1](../../issues/1)** (see [What the plugin implements](#what-the-plugin-implements)). Still open: what core should do.
 **Date:** 2026-09-15
 **Split from:** [ADR 0002](0002-allmethods-vs-queryable.md), which closed on option B
 (`QUERYABLE`, additive) on 2026-09-15. B settles what the constants *mean*; it does not answer
 whether existing routes should become queryable, and that question had accumulated its own
 options and its own evidence.
-**Blocks:** the feature plugin's `rest_endpoints` filter — the plugin implements the option under
-test, so this ADR decides the plugin's behavior too.
+**Blocked:** the feature plugin's `rest_endpoints` filter. Unblocked 2026-11-04; see below.
 **Related:** [ADR 0003](0003-cache-safety-default.md) (reappears if reach is granted),
 [experiments/plugin-spike/](../../experiments/plugin-spike/README.md) (the evidence)
 
@@ -156,24 +155,60 @@ because it makes `QUERY` a lie at the application layer: a handler that cannot t
 `QUERY` cannot negotiate a query format, cannot `415`, and cannot vary its representation. See ADR
 0002 option F for the full argument.
 
-## What the plugin does about this
+## What the plugin implements
 
-**The feature plugin implements the option under test, not the option preferred.** Its
-`rest_endpoints` filter currently adds `QUERY` to every handler accepting `GET` — option 3 — which
-means it reproduces the Jetpack break on any site running both. That is not a bug to fix; it is the
-instrument working. A plugin that diverged from core's mechanism would stop being evidence, and
-feedback from plugin usage is the whole reason the project pivoted to a plugin.
+Decided and built 2026-11-04 ([#1](../../issues/1)). **Off by default.** No existing route gains
+`QUERY` unless one of three opt-ins names it. This supersedes the earlier position that the plugin
+should implement option 3 as an instrument: reproducing the Jetpack break on real sites was judged
+too high a price for the evidence.
 
-Two things that do not violate that and are not yet built:
+| Opt-in | Who | How |
+|---|---|---|
+| Route registers it | Route author | `'methods' => WP_REST_Server::READABLE . ', ' . \WPHttpQuery\QUERYABLE`. Works on stock core; `QUERYABLE` is the userland stand-in for core's future `WP_REST_Server::QUERYABLE` ([ADR 0002](0002-allmethods-vs-queryable.md) option B) |
+| Route list | Site, in code | `wp_http_query_routes` filter: registered route keys, matched **exactly** (`/wp/v2/posts`, or the regex key verbatim, e.g. `/wp/v2/posts/(?P<id>[\d]+)`). No patterns in v1 |
+| Preset | Site, in Settings → HTTP QUERY or code | One stored option (`wp_http_query_presets`, default empty), then the `wp_http_query_presets` filter so code can override it. One preset in v1, `core-collections`: this ADR's option 2, done by the plugin |
 
-- An escape-hatch filter defaulting to allow-everything, so a tester who hits Jetpack can unblock
-  without uninstalling. Core has the same shape in `rest_endpoints` itself.
-- Non-behavioral detection: find the shared-callback shape and *report* it while still dispatching
-  into it. Turns "our plugin breaks Jetpack" into "our plugin measures how often option 3 would" —
-  and is the option 5 prototype.
+On every opted-in route, only handlers that accept `GET` gain `QUERY`; write handlers on the same
+route never do. The plugin writes `methods` back as a string, never an array (Trac#65905).
 
-A `readme.txt` warning is required either way: this implements a proposed core behavior, it will
-break plugins that treat `'GET'` as a synonym for "safe," and here is the Jetpack example.
+**Where the setting lives** (revised 2026-11-04, in review of #43). The checkbox first went on
+Settings → General, on the grounds that one checkbox didn't justify a menu item and Permalinks, the
+closer fit, saves its own form outside `options.php`. It was too hard to find, so it moved to its
+own **Settings → HTTP QUERY** page, linked from the plugin's row on the Plugins screen. The page
+also lists every route that accepts `QUERY` and which opt-in put it there, read from the same code
+that decides reach. The option name and sanitizer are unchanged.
+
+### The `core-collections` preset
+
+`/wp/v2/posts`, `/wp/v2/pages`, `/wp/v2/media`, `/wp/v2/comments`, `/wp/v2/categories`,
+`/wp/v2/tags`, `/wp/v2/users`, `/wp/v2/search`. Collections only; single-item routes are not in it.
+
+**Method-branching check, 2026-11-04**, against the installed core in each test site (7.0.8,
+7.1.4, nightly 7.2-beta4-65250):
+
+- Each route's `GET` handler, read from `rest_get_server()->get_routes()`, is its controller's own
+  `get_items()` (`WP_REST_Posts_Controller` for posts and pages, `WP_REST_Attachments_Controller`,
+  `WP_REST_Comments_Controller`, `WP_REST_Terms_Controller` for categories and tags,
+  `WP_REST_Users_Controller`, `WP_REST_Search_Controller`). The write handler on each route is a
+  different method (`create_item`).
+- `grep -nE 'is_method\(|get_method|REQUEST_METHOD'` over those controllers,
+  `class-wp-rest-controller.php` and `rest-api/search/*.php` finds only `is_method( 'HEAD' )`
+  (posts `:414`, `:1893`/`:1894`; comments, terms, users, search likewise). `QUERY` is not `HEAD`,
+  so it gets the full `GET` response. No `'GET'` comparisons.
+- Across all of `rest-api/endpoints/`, the only method branches outside `HEAD` are the abilities
+  run controller (`in_array( get_method(), array( 'GET', 'DELETE' ) )`) and font families
+  (schema args by method). Neither is in the preset.
+
+Not checked: plugin *filters* on these routes (`rest_post_query`, `rest_prepare_post`, ...), which
+now see `QUERY` on sites that enable the preset. Option 2's residual risk, above, still applies.
+
+Tests: `tests/adr-0005-reach.test.ts` (default off, each opt-in, write handlers, and a
+form-encoded `QUERY /wp/v2/posts` search returning only the matching post) and
+`tests/lifecycle/adr-0005-preset-setting.test.ts` (the stored setting and the filter override)
+and `tests/lifecycle/settings-page.test.ts` (the settings page, saved through its real form).
+
+Still not built: the shared-callback detector (option 5) and a `readme.txt` warning for sites
+that opt in plugin routes.
 
 ## Open
 
@@ -191,7 +226,7 @@ break plugins that treat `'GET'` as a synonym for "safe," and here is the Jetpac
 - **Does ADR 0003 survive reach?** It was decided assuming `QUERY` is a per-route concern, which is
   what ADR 0002's option B makes it. Options 3–5 turn body-varying responses on across the read
   surface at once. Re-read ADR 0003 against whichever option is chosen before deciding.
-- **Is reach core's job at all?** The plugin already delivers it to sites that opt in. If that is
+- **Is reach core's job at all?** The plugin delivers it to sites that opt in (since 2026-11-04). If that is
   sufficient, options 1–2 cost nothing further and this ADR closes. Argue this before arguing the
   mechanisms — it may dissolve the question rather than answer it. Note that option 2 is not a
   no-op version of option 1: it ships `QUERY /wp/v2/posts` by default, which is most of what

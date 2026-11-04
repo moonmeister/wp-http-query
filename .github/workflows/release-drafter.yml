@@ -1,0 +1,46 @@
+name: Release Drafter
+
+# Two jobs, configured by .github/release-drafter.yml:
+#   - On every push to main, keep the draft GitHub release up to date: notes grouped from the
+#     merged PRs' labels, and the next version (v$RESOLVED_VERSION) worked out from them.
+#     Publishing the draft is a human step; release.yml then attaches the zip. See RELEASING.md.
+#   - On pull requests, the autolabeler labels the PR from its conventional title
+#     (feat: -> feature, fix: -> fix, a ! -> breaking, ...). Those labels drive the notes and
+#     the version, so PR titles matter. See CONTRIBUTING.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  draft:
+    name: Update the draft release
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write       # create and edit the draft release
+      pull-requests: read   # read the merged PRs and their labels
+    steps:
+      - uses: release-drafter/release-drafter@v7
+
+  autolabel:
+    name: Label the PR from its title
+    # Fork PRs get a read-only token, so they can't be labeled from here; label those by hand.
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read        # read .github/release-drafter.yml
+      pull-requests: write  # add and remove labels
+    steps:
+      - uses: release-drafter/release-drafter/autolabeler@v7

@@ -1,0 +1,10 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/wp-env.json",
+	"core": "https://wordpress.org/nightly-builds/wordpress-latest.zip",
+	"phpVersion": "8.4",
+	"mappings": {
+		"wp-content/plugins/wp-http-query": "./plugin"
+	},
+	"port": 8873,
+	"testsEnvironment": false
+}
