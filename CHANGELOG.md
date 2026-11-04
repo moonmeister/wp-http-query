@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `QUERY` (RFC 10008) support for the WordPress REST API on stock core, with no core patch.
-  Requires WordPress 7.0 or later and PHP 7.4 or later.
+  Requires WordPress 7.0 or later and PHP 8.0 or later.
 - `QUERY` is opt-in. It reaches a route in three ways only:
   - The route registers it. `WPHttpQuery\QUERYABLE` (`'QUERY'`) stands in for core's future
     `WP_REST_Server::QUERYABLE`.

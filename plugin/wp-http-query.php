@@ -5,7 +5,7 @@
  * Description:       HTTP QUERY (RFC 10008) support for the WordPress REST API, entirely in userland. No core patch required.
  * Version:           0.1.0-dev
  * Requires at least: 7.0
- * Requires PHP:      7.4
+ * Requires PHP:      8.0
  * Author:            Alex Moon
  * Author URI:        https://moonmeister.net
  * License:           GPL-2.0-or-later
