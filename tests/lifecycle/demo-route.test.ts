@@ -2,7 +2,7 @@
  * The diagnostic echo route is admins only by default.
  *
  * QUERY /wp-http-query/v1/echo reflects its input, so unless
- * wp_http_query_register_demo_route returns true, only manage_options users
+ * wp_http_query_public_demo_route returns true, only manage_options users
  * may call it. It is always registered, because the self-test sends QUERY to
  * it. The test fixture makes it public for the rest of the suite; this file
  * switches the fixture's filter off with a fixture-only option, set over

@@ -24,9 +24,6 @@ if ( ! defined( 'ABSPATH' ) ) {
  * The page also shows, read-only, which routes accept QUERY and why. That
  * comes from opted_in_route_sources() and the REST server's own route table,
  * the same two things that decide reach and Accept-Query, so it can't drift.
- *
- * The checkbox was on Settings → General in development builds. The option
- * name is unchanged, so a stored setting carries over.
  * ----------------------------------------------------------------------
  */
 

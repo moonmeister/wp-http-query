@@ -51,9 +51,9 @@ const PRESET_FILTER_OFF = 'wp_http_query_fixture_preset_filter_off';
 const DEMO_ROUTE_OFF = 'wp_http_query_fixture_demo_route_off';
 
 add_filter(
-	'wp_http_query_register_demo_route',
-	static function ( $register ) {
-		return get_option( DEMO_ROUTE_OFF ) ? $register : true;
+	'wp_http_query_public_demo_route',
+	static function ( $is_public ) {
+		return get_option( DEMO_ROUTE_OFF ) ? $is_public : true;
 	}
 );
 

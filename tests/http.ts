@@ -2,7 +2,7 @@ import type { Site } from './sites';
 
 /**
  * The plugin's diagnostic route. Registered with 'methods' => 'QUERY' only.
- * Admins only unless wp_http_query_register_demo_route returns true: the test
+ * Admins only unless wp_http_query_public_demo_route returns true: the test
  * fixture makes it public.
  */
 export const ECHO = '/wp-http-query/v1/echo';

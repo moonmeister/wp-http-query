@@ -266,11 +266,11 @@ its input, so by default **only admins** (`manage_options`) can call it. Anyone 
 (signed out) or `403`. To make it public while you check a setup with `curl`, then switch it back:
 
 ```php
-add_filter( 'wp_http_query_register_demo_route', '__return_true' );
+add_filter( 'wp_http_query_public_demo_route', '__return_true' );
 ```
 
-The filter's name dates from when it controlled whether the route existed at all. It's admins only
-whatever `WP_DEBUG` says, since staging sites that anyone can reach often run with `WP_DEBUG` on.
+It's admins only whatever `WP_DEBUG` says, since staging sites that anyone can reach often run with
+`WP_DEBUG` on.
 
 The self-test's cache check uses a second route, `QUERY /wp-json/wp-http-query/v1/self-test/fingerprint`.
 It's public, because caches usually skip signed-in requests, and safe to be: it answers with a

@@ -116,7 +116,7 @@ from:
 | `method-override-tunnel.test.ts` | `POST` + `X-HTTP-Method-Override: QUERY` is handled as `QUERY` |
 | `adr-0005-reach.test.ts` | [ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md): no route gains `QUERY` by default; the route, filter and preset opt-ins work; write handlers never gain it; a form-encoded `QUERY /wp/v2/posts` search filters a real collection |
 | `lifecycle/adr-0005-preset-setting.test.ts` | ADR 0005: the stored preset setting switches reach, and the filter overrides it |
-| `lifecycle/demo-route.test.ts` | The diagnostic echo route is admins only unless `wp_http_query_register_demo_route` returns true |
+| `lifecycle/demo-route.test.ts` | The diagnostic echo route is admins only unless `wp_http_query_public_demo_route` returns true |
 | `lifecycle/self-test.test.ts` | Not a decision: the self-test's button, REST routes and Site Health tests, and its verdicts for each documented failure mode, from fabricated responses |
 | `lifecycle/plugin-lifecycle.test.ts` | [#22](../../issues/22): deactivated, the site is stock; uninstall deletes the option |
 | `examples.test.ts` | Not a decision: the example plugin behind [docs/integrating.md](docs/integrating.md) works, and the guide quotes it verbatim |

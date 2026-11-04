@@ -22,10 +22,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * to it, but by default only users with manage_options may call it: anyone
  * else gets core's standard 401 (signed out) or 403. It reflects its input,
  * so making it public is a site's choice, through the
- * 'wp_http_query_register_demo_route' filter (named for when it controlled
- * registration; the name stays so existing opt-ins keep working):
+ * 'wp_http_query_public_demo_route' filter:
  *
- *     add_filter( 'wp_http_query_register_demo_route', '__return_true' );
+ *     add_filter( 'wp_http_query_public_demo_route', '__return_true' );
  *
  * The default is false, not WP_DEBUG: WP_DEBUG is often left on for staging
  * sites that are publicly reachable, and a route that opens up with a
@@ -60,7 +59,7 @@ function demo_route_is_public(): bool {
 	 *
 	 * @param bool $public Whether anyone may call QUERY /wp-http-query/v1/echo. Default false.
 	 */
-	return (bool) apply_filters( 'wp_http_query_register_demo_route', false );
+	return (bool) apply_filters( 'wp_http_query_public_demo_route', false );
 }
 
 /**

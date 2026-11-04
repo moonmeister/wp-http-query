@@ -152,12 +152,6 @@ describe.each( sites )( 'settings page: $label', ( site ) => {
 		);
 	} );
 
-	it( 'is gone from Settings → General', async () => {
-		const general = await admin.html( '/wp-admin/options-general.php' );
-		expect( general ).toContain( "name='option_page' value='general'" );
-		expect( general ).not.toContain( 'wp_http_query_presets' );
-	} );
-
 	it( 'saves the ticked box through options.php and turns the preset on', async () => {
 		const res = await admin.savePreset( true );
 		expect( res.status ).toBe( 302 );
