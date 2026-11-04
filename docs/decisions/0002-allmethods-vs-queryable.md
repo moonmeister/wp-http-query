@@ -240,9 +240,10 @@ Hard prerequisites, in order:
 
 1. **Gap 3** (#2) — without it a form-encoded `QUERY` returns an unfiltered `200` on every read
    route. This is the disclosure-shaped failure and D makes it default-on. Non-negotiably first.
-2. **Trac#65905 / [#13136](https://github.com/WordPress/wordpress-develop/pull/13136)** — array-form
+2. ~~**Trac#65905 / [#13136](https://github.com/WordPress/wordpress-develop/pull/13136)**~~ — array-form
    `methods` must comma-split before `READABLE` becomes multi-method, or 27 plugins / 1.19M installs
-   break. A sequencing constraint, not a blocker: it is already up.
+   break. **Discharged:** fixed in [r63756](https://core.trac.wordpress.org/changeset/63756)
+   (2026-09-18), milestone 7.2.
 3. **ADR 0003** (#18) — cache safety was previously treated as gating nothing. Under D it gates
    everything, because D turns body-varying responses on across the whole read surface at once.
 4. ~~**Measure the method-branching risk**~~ — **measured 2026-09-15**, and it did not come back
@@ -352,7 +353,7 @@ Decomposed:
 
   This is the same latent assumption as Trac#65905 — code treating a multi-method constant as a
   single method name — in core's own test suite rather than in a plugin, and
-  [#13136](https://github.com/WordPress/wordpress-develop/pull/13136) does **not** fix it. Two
+  [r63756](https://core.trac.wordpress.org/changeset/63756) (#13136) does **not** fix it. Two
   independent sites in core carry that assumption; how many carry it in plugins is unmeasured.
 
 So option D's real score is **one core bug, five fixture updates, and one test that needs
@@ -401,7 +402,7 @@ the same shape of independently-landable artifact as the CORS clobber (#16).
   > ⚠️ **Superseded 2026-08-19.** This bullet previously argued that D dispatches to handlers
   > "that read `$request['param']` from the query string and will never look at the body." That is
   > the corrected claim — see option D above. D's surviving objections are cache safety,
-  > method-branching handlers, and sequencing behind gap 3 and Trac#65905.
+  > method-branching handlers, and sequencing behind gap 3 and Trac#65905 (since fixed, r63756).
 - Plugin breakage remains unmeasurable this way and has to be argued rather than counted. Say this
   before someone else says it.
 
@@ -493,6 +494,7 @@ Reproductions: `experiments/blast-radius/rest-query-body-probe.php` and
   and non-blocking — B is additive, so silence is defensible by default.
 - ~~Report the array-form normalization bug to core?~~ **Done** — filed 2026-08-18 as
   [Trac#65905](https://core.trac.wordpress.org/ticket/65905), patched in
-  [wordpress-develop#13136](https://github.com/WordPress/wordpress-develop/pull/13136). Unlike #16
+  [wordpress-develop#13136](https://github.com/WordPress/wordpress-develop/pull/13136), and
+  **fixed in [r63756](https://core.trac.wordpress.org/changeset/63756), milestone 7.2**. Unlike #16
   it *does* disclose the `QUERY` motivation, because under D the overlap is the strongest argument
   available.

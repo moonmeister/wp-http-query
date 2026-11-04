@@ -215,7 +215,8 @@ Named in advance, so reopening is a trigger rather than a judgment call:
   turns `QUERY` on across the whole read surface at once and so makes caching everyone's
   problem. That still follows — but the answer is "no core behavior is warranted," which
   discharges the gate rather than raising it. D's prerequisite chain drops from four items to
-  three: gap 3, [Trac#65905](https://core.trac.wordpress.org/ticket/65905), and the
+  three: gap 3, [Trac#65905](https://core.trac.wordpress.org/ticket/65905) (since fixed in
+  [r63756](https://core.trac.wordpress.org/changeset/63756), 7.2), and the
   method-branching measurement in
   [#38](https://github.com/moonmeister/wp-http-query/issues/38).
 - **[#20](https://github.com/moonmeister/wp-http-query/issues/20) loses half its scope.** The

@@ -146,7 +146,8 @@ tickets below were read in a browser on 2026-08-16 and are verified.
   > belongs in the list, andrei.igna answering — then field churn. No patch in 8 years, no
   > committer engagement on the substance.
   >
-  > **Gap 1 went to the reopened [#46992](https://core.trac.wordpress.org/ticket/46992) instead.**
+  > **Gap 1 went to the reopened [#46992](https://core.trac.wordpress.org/ticket/46992) instead**,
+  > and was fixed there in [r64730](https://core.trac.wordpress.org/changeset/64730), milestone 7.2.
   > The two are compatible: if #43428's third proposal lands, the clobber fix simply applies on
   > the `OPTIONS` path.
 
@@ -192,7 +193,8 @@ The honest limit of that claim: a plugin *can* still win by hooking `rest_pre_se
 priority 11+. So the defensible statement is that **#46992's recorded resolution is wrong and
 the mechanism that works is undocumented and order-dependent** — not that overriding is
 impossible. Tracked as [#16](https://github.com/moonmeister/wp-http-query/issues/16) (fix the
-clobber, independent of `QUERY`) and
+clobber, independent of `QUERY`; **fixed in [r64730](https://core.trac.wordpress.org/changeset/64730),
+7.2**, which also adds the `rest_allowed_cors_methods` filter) and
 [#35](https://github.com/moonmeister/wp-http-query/issues/35) (add `QUERY` to the list, per the
 #38546 precedent).
 

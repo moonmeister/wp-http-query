@@ -195,7 +195,7 @@ formats does this route accept?* Three scopes, each additive on the last:
 | | Mechanism | Gets you |
 |---|---|---|
 | **v1 — B, as decided** | none | Parse JSON + form-encoded. No 415. Fixed `Accept-Query`, accurate for every core route, wrong for a custom-format route |
-| **v1.5** | one filter over the advertised list, receiving the request | Accurate advertising for custom routes. About the size of the `rest_allowed_cors_methods` filter added in [#13151](https://github.com/WordPress/wordpress-develop/pull/13151) |
+| **v1.5** | one filter over the advertised list, receiving the request | Accurate advertising for custom routes. About the size of the `rest_allowed_cors_methods` filter added in [r64730](https://core.trac.wordpress.org/changeset/64730) (7.2) |
 | **v2 — D** | `'accepts' => array( … )` in `register_rest_route()` | Per-resource `Accept-Query` as the RFC intends, plus a 415 that is safe because core knows which routes opted out |
 
 **This does not reopen the decision** — B remains the right minimal patch and every step above

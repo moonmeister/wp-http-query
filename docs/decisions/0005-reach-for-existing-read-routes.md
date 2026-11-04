@@ -119,7 +119,8 @@ ADR 0002's option D, reproposed as a reach mechanism rather than a constants que
 - **+** Whole read surface, zero work for route authors.
 - **−** The Jetpack class, on upgrade, for everyone. Against WordPress's BC bar this is close to a
   veto.
-- **−** Sequencing: needs gap 3 and Trac#65905 first.
+- **−** Sequencing: needs gap 3 first. (Trac#65905 was the other prerequisite; fixed in
+  [r63756](https://core.trac.wordpress.org/changeset/63756), 7.2.)
 
 ### 4. Reach by dispatch — `QUERY → GET` fallback
 
