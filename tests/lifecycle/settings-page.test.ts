@@ -18,7 +18,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ECHO, FIXTURE_OPTED_IN_ROUTE, rest } from '../http';
-import { type Site, sites } from '../sites';
+import { NO_LOCAL_CLI, type Site, sites } from '../sites';
 import {
 	deleteOption,
 	FIXTURE_PRESET_FILTER_OFF,
@@ -134,6 +134,11 @@ const query = async ( site: Site, route: string ) =>
 	( await rest( site, 'QUERY', route, { json: {}, headers: FRESH } ) ).status;
 
 describe.each( sites )( 'settings page: $label', ( site ) => {
+	if ( ! site.localCli ) {
+		it.skip( NO_LOCAL_CLI, () => {} );
+		return;
+	}
+
 	const admin = new Admin( site );
 	let restorePresets = () => {};
 	let restoreFilterSwitch = () => {};

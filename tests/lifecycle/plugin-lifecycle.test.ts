@@ -13,7 +13,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ECHO, FIXTURE_OPTED_IN_ROUTE, ORIGIN, rest, tokens } from '../http';
 import { wp } from '../seed';
-import { sites } from '../sites';
+import { NO_LOCAL_CLI, sites } from '../sites';
 import {
 	activatePlugin,
 	deactivatePlugin,
@@ -29,6 +29,11 @@ import {
 const PRESET_ROUTE = '/wp/v2/posts';
 
 describe.each( sites )( 'plugin lifecycle: $label', ( site ) => {
+	if ( ! site.localCli ) {
+		it.skip( NO_LOCAL_CLI, () => {} );
+		return;
+	}
+
 	let restorePresets = () => {};
 
 	beforeAll( () => {

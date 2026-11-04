@@ -24,8 +24,9 @@ export async function checkSites(): Promise< void > {
 export default async function () {
 	await checkSites();
 
-	// Content for the real-collection test in adr-0005-reach.test.ts.
-	for ( const site of sites ) {
+	// Content for the real-collection test in adr-0005-reach.test.ts. Only local
+	// sites: WP-CLI can't reach an overridden URL (see tests/sites.ts).
+	for ( const site of sites.filter( ( s ) => s.localCli ) ) {
 		seedPosts( site );
 	}
 }

@@ -11,6 +11,11 @@ const ENV_SH = fileURLToPath( new URL( '../scripts/env.sh', import.meta.url ) );
  * points at another install.
  */
 export function wp( site: Site, args: string[] ): string {
+	if ( ! site.localCli ) {
+		// scripts/env.sh always targets the local container; running it for an
+		// overridden URL would read or change the wrong install.
+		throw new Error( `WP-CLI is unavailable for ${ site.key }: its URL is overridden (${ site.url }).` );
+	}
 	return execFileSync( ENV_SH, [ 'wp', site.key, ...args ], {
 		encoding: 'utf8',
 		stdio: [ 'ignore', 'pipe', 'pipe' ],

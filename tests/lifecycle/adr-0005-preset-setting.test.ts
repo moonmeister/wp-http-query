@@ -18,7 +18,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CORE_COLLECTIONS, FIXTURE_OPTED_IN_ROUTE, rest } from '../http';
-import { sites } from '../sites';
+import { NO_LOCAL_CLI, sites } from '../sites';
 import {
 	deleteOption,
 	FIXTURE_PRESET_FILTER_OFF,
@@ -58,6 +58,11 @@ async function statuses( site: ( typeof sites )[ number ], routes: string[] ): P
 const all = ( status: number ) => Object.fromEntries( CORE_COLLECTIONS.map( ( r ) => [ r, status ] ) );
 
 describe.each( sites )( 'ADR 0005 preset setting: $label', ( site ) => {
+	if ( ! site.localCli ) {
+		it.skip( NO_LOCAL_CLI, () => {} );
+		return;
+	}
+
 	let restorePresets = () => {};
 	let restoreFilterSwitch = () => {};
 

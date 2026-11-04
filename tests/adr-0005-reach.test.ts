@@ -41,6 +41,9 @@ describe.each( sites )( 'ADR 0005 reach: $label', ( site ) => {
 	const ids: Record< string, number > = {};
 
 	beforeAll( async () => {
+		if ( ! site.localCli ) {
+			return; // Not seeded; the tests that need these ids are skipped below.
+		}
 		for ( const { slug } of SEED_POSTS ) {
 			ids[ slug ] = await seededPostId( site, slug );
 		}
@@ -81,7 +84,7 @@ describe.each( sites )( 'ADR 0005 reach: $label', ( site ) => {
 			expect( await res.json() ).toHaveProperty( 'category' );
 		} );
 
-		it( 'matches a parameterized route by its registered regex key', async () => {
+		it.skipIf( ! site.localCli )( 'matches a parameterized route by its registered regex key', async () => {
 			const id = ids[ SEED_POSTS[ 0 ].slug ];
 			const res = await rest( site, 'QUERY', `/wp/v2/posts/${ id }`, { json: {} } );
 			expect( res.status ).toBe( 200 );
@@ -102,7 +105,7 @@ describe.each( sites )( 'ADR 0005 reach: $label', ( site ) => {
 			expect( await res.json() ).toMatchObject( { method: 'QUERY', params: { a: 1 } } );
 		} );
 
-		it( 'adds QUERY to the GET handler only, never to write handlers on the same route', async () => {
+		it.skipIf( ! site.localCli )( 'adds QUERY to the GET handler only, never to write handlers on the same route', async () => {
 			// One GET handler, one EDITABLE (POST, PUT, PATCH), one DELETE.
 			const item = await handlerMethods( site, `/wp/v2/posts/${ ids[ SEED_POSTS[ 0 ].slug ] }` );
 			const collection = await handlerMethods( site, '/wp/v2/posts' );
@@ -120,7 +123,7 @@ describe.each( sites )( 'ADR 0005 reach: $label', ( site ) => {
 	} );
 
 	describe( 'a real collection (gap 3 end to end, #22)', () => {
-		it( 'filters QUERY /wp/v2/posts by a form-encoded search', async () => {
+		it.skipIf( ! site.localCli )( 'filters QUERY /wp/v2/posts by a form-encoded search', async () => {
 			const [ zebra ] = SEED_POSTS;
 			const res = await rest( site, 'QUERY', '/wp/v2/posts', { form: { search: zebra.term } } );
 			expect( res.status ).toBe( 200 );

@@ -11,10 +11,15 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ECHO, rest } from '../http';
-import { sites } from '../sites';
+import { NO_LOCAL_CLI, sites } from '../sites';
 import { deleteOption, FIXTURE_DEMO_ROUTE_OFF, setOption, snapshotOption } from './site-state';
 
 describe.each( sites )( 'demo route: $label', ( site ) => {
+	if ( ! site.localCli ) {
+		it.skip( NO_LOCAL_CLI, () => {} );
+		return;
+	}
+
 	let restoreSwitch = () => {};
 
 	beforeAll( () => {

@@ -13,12 +13,17 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { rest, tokens } from '../http';
-import { sites } from '../sites';
+import { NO_LOCAL_CLI, sites } from '../sites';
 import { activatePlugin, deactivatePlugin } from './site-state';
 
 const BOOKS = '/query-route-example/v1/books';
 
 describe.each( sites )( 'example plugin without wp-http-query: $label', ( site ) => {
+	if ( ! site.localCli ) {
+		it.skip( NO_LOCAL_CLI, () => {} );
+		return;
+	}
+
 	beforeAll( () => deactivatePlugin( site ) );
 	afterAll( () => activatePlugin( site ) );
 
