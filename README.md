@@ -9,6 +9,10 @@ REST API on stock WordPress, with no core patch. This repo also holds the design
 records and compatibility test matrix behind it. Core patches come later, informed by what the
 plugin proves in the field. See [Repos](#repos).
 
+**Using it:** [plugin/README.md](plugin/README.md) for site owners: install, the settings toggle,
+and checking your server passes `QUERY`. [docs/integrating.md](docs/integrating.md) for plugin
+developers: adding `QUERY` to your routes, the safe-method trap, feature detection and clients.
+
 ---
 
 ## What this project is
@@ -208,6 +212,7 @@ Tracked because they move the readiness date, not because the project waits on t
 docs/
   scope.md            Project scope, current state of trunk, open questions
   ecosystem.md        Ecosystem support status — time-sensitive, dated, re-verified
+  integrating.md      Developer guide: adding QUERY to routes, and sending it
   decisions/          ADRs for contested design calls
 matrix/
   probe/              Bare SAPI probe (no WordPress) — the make-or-break test
@@ -216,6 +221,7 @@ matrix/
   run.sh              Runs everything, emits results/results.json
   results/            Machine-readable results + generated MATRIX.md
 plugin/               The feature plugin: QUERY on the REST API, stock core, no patch
+examples/             Example plugin behind docs/integrating.md, tested on every site
 tests/                Decision tests (vitest, HTTP) run against both wp-env sites
 scripts/env.sh        Drives the two wp-env environments; wrapped by the Makefile
 ```

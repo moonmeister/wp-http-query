@@ -26,7 +26,7 @@ then runs the tests. Expect a few minutes. Later starts take seconds.
 
 CI runs the same `make check` on every PR and on pushes to `main` ([`.github/workflows/test.yml`](.github/workflows/test.yml)).
 
-You get three WordPress sites, all with `plugin/` mounted and active:
+You get three WordPress sites, all with `plugin/` and the [example plugin](examples/query-route-example/) mounted and active:
 
 | Site | URL | Core | Why it exists |
 |---|---|---|---|
@@ -96,6 +96,8 @@ from:
 | `adr-0005-reach.test.ts` | [ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md): no route gains `QUERY` by default; the route, filter and preset opt-ins work; write handlers never gain it; a form-encoded `QUERY /wp/v2/posts` search filters a real collection |
 | `lifecycle/adr-0005-preset-setting.test.ts` | ADR 0005: the stored preset setting switches reach, and the filter overrides it |
 | `lifecycle/plugin-lifecycle.test.ts` | [#22](../../issues/22): deactivated, the site is stock; uninstall deletes the option |
+| `examples.test.ts` | Not a decision: the example plugin behind [docs/integrating.md](docs/integrating.md) works, and the guide quotes it verbatim |
+| `lifecycle/examples-feature-detection.test.ts` | Not a decision: without wp-http-query, the example answers `GET` and doesn't register `QUERY` |
 
 The tests make real HTTP requests to both sites, so they cover what a client would actually see:
 headers on the wire, CORS, and what the web server passes through.
@@ -120,6 +122,11 @@ uninstall routine or write options, so they'd break the main suite if they ran a
 `make test` runs them after the main suite, one file at a time
 (`vitest.lifecycle.config.ts`), and each restores what it changed in `afterAll`, failure or not.
 `npx vitest run` alone skips them. They take about a minute and a half: every step is a WP-CLI call.
+
+**The example plugin is tested too.** [`examples/query-route-example/`](examples/query-route-example/)
+is mounted and activated on every site, next to the plugin. The full-route samples in
+[docs/integrating.md](docs/integrating.md) are copied from it, and `examples.test.ts` fails if
+they drift. Change the example and the guide together.
 
 **`it.todo` marks a test that can't be written yet**, usually because the behavior isn't designed.
 
