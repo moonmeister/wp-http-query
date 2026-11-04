@@ -36,6 +36,6 @@ jobs:
         unzip -q "$zip" -d "$unzipped"
         find "$unzipped" -name '*.php' -print0 | xargs -0 -n1 php -l
 
-        # A fixed path for the artifacts entry above; the version is in the plugin header.
+        # A fixed path for the artifacts entry above. PR builds are unversioned (0.0.0-dev).
         mkdir -p build
         cp "$zip" build/wp-http-query.zip

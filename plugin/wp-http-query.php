@@ -3,7 +3,7 @@
  * Plugin Name:       WP HTTP QUERY
  * Plugin URI:        https://github.com/moonmeister/wp-http-query
  * Description:       HTTP QUERY (RFC 10008) support for the WordPress REST API, entirely in userland. No core patch required.
- * Version:           0.1.0-dev
+ * Version:           0.0.0-dev
  * Requires at least: 7.0
  * Requires PHP:      8.0
  * Author:            Alex Moon

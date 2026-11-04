@@ -55,7 +55,7 @@ Run `make help` for the list. The ones you'll use:
 | `make open` | Open wp-admin for all three sites in your browser. `make open ENV=nightly` opens one |
 | `make down` | Stop all three sites. Data is kept; `make up` brings them back as they were |
 | `make destroy` | Delete all three sites and their data. Asks before each one. Use it to start from scratch |
-| `make dist` | Build the installable zip, `dist/wp-http-query-<version>.zip`. No Docker needed. See [RELEASING.md](RELEASING.md) |
+| `make dist` | Build the installable zip, `dist/wp-http-query-<version>.zip` (`VERSION=0.1.0` stamps a version in; default `0.0.0-dev`). No Docker needed. See [RELEASING.md](RELEASING.md) |
 
 ### WP-CLI
 
@@ -174,6 +174,29 @@ Things to know:
   `pull_request_target`.
 - **The preview is not the test suite.** It's Playground's PHP in your browser, not the wp-env
   sites the tests use.
+- **The preview zip is unversioned.** PR builds report `Version: 0.0.0-dev`, the value `plugin/`
+  always carries; real versions are stamped in only when a release is built (see
+  [RELEASING.md](RELEASING.md)).
+
+## Pull request titles
+
+PR titles must start with a [conventional commit](https://www.conventionalcommits.org/) prefix.
+They aren't cosmetic: the title labels the PR, the labels pick the next version, and the merged
+titles become the release notes.
+
+| Title | Label | Next version | Notes section |
+| --- | --- | --- | --- |
+| `feat: ...` | `feature` | minor | Features |
+| `fix: ...` | `fix` | patch | Fixes |
+| `docs: ...` | `documentation` | patch | Docs |
+| `ci:`, `build:`, `test:`, `chore:`, `style:`, `refactor:` | `maintenance` | patch | Maintenance |
+| a `!` before the colon (`feat!: ...`), or `BREAKING CHANGE` in the description | `breaking` (as well) | major | Breaking changes |
+
+A scope is fine (`fix(cors): ...`). Write the rest of the title for someone reading the release
+notes. A title without a prefix gets no label and lands under "Other changes" as a patch.
+Retitling a PR updates its labels. Add `skip-changelog` by hand to leave a PR out of the notes.
+Don't edit `Version:` or `Stable tag:` in `plugin/`, and don't add release notes to a file:
+neither is part of a PR any more.
 
 ## Troubleshooting
 
@@ -203,7 +226,9 @@ build, run `npx wp-env start --update --config=.wp-env.nightly.json`.
   and say how you measured it. The README's [Principles](README.md#principles) explain why.
 - **Text for other trackers is drafted, not sent.** [`docs/submissions/`](docs/submissions/) holds
   drafts for Trac and other projects. Filing is a human step.
-- **Releases follow [RELEASING.md](RELEASING.md).** A pushed `v*` tag creates a draft GitHub
-  release; a maintainer publishes it.
+- **Use a conventional PR title** (`feat: ...`, `fix: ...`); see
+  [Pull request titles](#pull-request-titles).
+- **Releases follow [RELEASING.md](RELEASING.md).** Release-drafter keeps a draft GitHub release
+  up to date from merged PRs; a maintainer publishes it, and the zip is built and attached then.
 - **Keep the core fork clean.** Core patches live in the `wordpress-develop` fork. Project notes,
   scratch files and experiments belong here, not there.

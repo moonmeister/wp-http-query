@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Print the plugin's version, read from the `Version:` field of its header.
-# The header is the only place the version is written down; everything else reads it from here.
+# On main that's always 0.0.0-dev: release versions are stamped into the zip at build time
+# (scripts/dist.sh), never committed. dist.sh and pr-preview-build.yml use this for the default.
 #
 # Usage: scripts/plugin-version.sh
 # Exits non-zero, with a message on stderr, if the field is missing or empty.

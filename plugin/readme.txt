@@ -4,7 +4,7 @@ Tags: rest-api, http, query
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 0.1.0-dev
+Stable tag: 0.0.0-dev
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -22,5 +22,5 @@ Settings > HTTP QUERY. See README.md in this directory for how to use it.
 
 == Changelog ==
 
-See CHANGELOG.md in the project repository:
-https://github.com/moonmeister/wp-http-query/blob/main/CHANGELOG.md
+Release notes are on the project's GitHub Releases page:
+https://github.com/moonmeister/wp-http-query/releases

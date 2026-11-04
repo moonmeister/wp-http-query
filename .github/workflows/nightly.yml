@@ -1,0 +1,122 @@
+name: Nightly
+
+# Once a day, if main has moved since the last one, build main and publish it as the single
+# rolling `nightly` prerelease: the tag moves to main's HEAD, the release body is rewritten, and
+# its one asset, wp-http-query-nightly.zip, is replaced. Quiet days are skipped. It's never
+# marked latest, and no other release is ever created. Run it by hand from the Actions tab
+# (Nightly > Run workflow) or `gh workflow run nightly.yml`. See RELEASING.md.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  nightly:
+    name: Build and publish the nightly
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write  # move the nightly tag, edit the release, replace its asset
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ASSET: wp-http-query-nightly.zip
+    steps:
+      # Always main, whichever branch a manual run was started from.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Has main moved since the last nightly?
+        id: decide
+        run: |
+          set -euo pipefail
+          head=$(git rev-parse HEAD)
+          echo "sha=$head" >> "$GITHUB_OUTPUT"
+          echo "short=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+          result=$(scripts/nightly-should-build.sh "$GITHUB_REPOSITORY" "$head")
+          echo "result=$result" >> "$GITHUB_OUTPUT"
+
+      - if: steps.decide.outputs.result == 'build'
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'  # the oldest PHP the plugin supports
+          coverage: none
+
+      - name: Build the zip
+        id: build
+        if: steps.decide.outputs.result == 'build'
+        env:
+          SHORT: ${{ steps.decide.outputs.short }}
+        run: |
+          set -euo pipefail
+          date=$(date -u +%Y%m%d)
+          version="0.0.0-nightly.$date+$SHORT"
+          make dist VERSION="$version"
+
+          unzipped=$(mktemp -d)
+          unzip -q "dist/wp-http-query-$version.zip" -d "$unzipped"
+          find "$unzipped" -name '*.php' -print0 | xargs -0 -n1 php -l
+
+          # A fixed asset name, so the nightly's download URL never changes.
+          cp "dist/wp-http-query-$version.zip" "dist/$ASSET"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Move the nightly tag to main's HEAD
+        if: steps.decide.outputs.result == 'build'
+        env:
+          SHA: ${{ steps.decide.outputs.sha }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/nightly" >/dev/null 2>&1; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/nightly" \
+              -f sha="$SHA" -F force=true >/dev/null
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref=refs/tags/nightly -f sha="$SHA" >/dev/null
+          fi
+
+      - name: Create or update the Nightly prerelease
+        if: steps.decide.outputs.result == 'build'
+        env:
+          SHA: ${{ steps.decide.outputs.sha }}
+          VERSION: ${{ steps.build.outputs.version }}
+          DATE: ${{ steps.build.outputs.date }}
+        run: |
+          set -euo pipefail
+          notes="$RUNNER_TEMP/nightly.md"
+          {
+            echo "An unreleased build of \`main\`, rebuilt each day \`main\` changes. For testing only; it isn't a release."
+            echo
+            echo "- **Built:** $DATE"
+            echo "- **Commit:** $SHA"
+            echo "- **Plugin version:** \`$VERSION\`"
+            echo
+            echo "Download **$ASSET** below and install it with Plugins → Add New → Upload Plugin. Released versions are on the [Releases page](https://github.com/$GITHUB_REPOSITORY/releases)."
+          } > "$notes"
+
+          if gh release view nightly --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit nightly --repo "$GITHUB_REPOSITORY" \
+              --title Nightly --prerelease --latest=false --draft=false --notes-file "$notes"
+          else
+            gh release create nightly --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --title Nightly --prerelease --latest=false --notes-file "$notes"
+          fi
+
+          # Replace the zip, then delete anything else, so exactly one asset remains.
+          gh release upload nightly "dist/$ASSET" --repo "$GITHUB_REPOSITORY" --clobber
+          gh release view nightly --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' |
+            while IFS= read -r name; do
+              if [ "$name" != "$ASSET" ]; then
+                gh release delete-asset nightly "$name" --repo "$GITHUB_REPOSITORY" --yes
+              fi
+            done

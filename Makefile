@@ -3,6 +3,7 @@
 #   make up        start all three WordPress sites (7.0, 7.1, nightly)
 #   make test      run the decision tests against all three (SITES=7.0,nightly for some)
 #   make check     up + test
+#   make dist      build dist/wp-http-query-<version>.zip (VERSION=0.1.0 stamps that version in)
 #   make lint      PHPCS (WordPress standard + PHPCompatibility) on plugin/
 #   make open      open wp-admin for all three (ENV=7.0, ENV=7.1 or ENV=nightly for one)
 #   make down      stop all three
@@ -45,8 +46,8 @@ test: install ## Run the decision tests (all sites, or SITES=7.0,nightly)
 check: up test ## Start everything, then test
 
 .PHONY: dist
-dist: ## Build the plugin zip, dist/wp-http-query-<version>.zip
-	scripts/dist.sh
+dist: ## Build the plugin zip, dist/wp-http-query-<version>.zip (VERSION=x.y.z stamps a version)
+	scripts/dist.sh "$(VERSION)"
 
 vendor: composer.json composer.lock
 	composer install

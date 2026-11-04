@@ -1,0 +1,82 @@
+# Release Drafter (v7) configuration, used by .github/workflows/release-drafter.yml.
+# See RELEASING.md for the flow and CONTRIBUTING.md for the PR title conventions.
+
+# --- Autolabeler: label PRs from their conventional-commit titles. ---
+# sync-labels removes a label this config manages once the title stops matching, so
+# retitling `fix: ...` to `feat: ...` swaps `fix` for `feature`. To mark a PR breaking,
+# put `!` in the title (`feat!: ...`) or `BREAKING CHANGE` in the body; a hand-added
+# `breaking` label is removed on the next sync.
+sync-labels: true
+autolabeler:
+  - labels: ['breaking']
+    title:
+      - '/^[a-z]+(\([^)]*\))?!:/i'
+    body:
+      - '/BREAKING[ -]CHANGE/'
+  - labels: ['feature']
+    title:
+      - '/^feat(\([^)]*\))?!?:/i'
+  - labels: ['fix']
+    title:
+      - '/^fix(\([^)]*\))?!?:/i'
+  - labels: ['documentation']
+    title:
+      - '/^docs(\([^)]*\))?!?:/i'
+  - labels: ['maintenance']
+    title:
+      - '/^(ci|build|test|chore|style|refactor)(\([^)]*\))?!?:/i'
+
+# --- The draft release. ---
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+
+categories:
+  # Never in the notes, and no effect on the version.
+  - type: 'pre-exclude'
+    when:
+      labels: ['skip-changelog']
+
+  # Notes sections. Each PR lands in the first matching one. Labels also drive the version:
+  # breaking -> major, feature -> minor, everything else -> patch.
+  - title: 'Breaking changes'
+    semver-increment: 'major'
+    exclusive: true
+    when:
+      label: 'breaking'
+  - title: 'Features'
+    semver-increment: 'minor'
+    exclusive: true
+    when:
+      labels: ['feature', 'enhancement']
+  - title: 'Fixes'
+    semver-increment: 'patch'
+    exclusive: true
+    when:
+      labels: ['fix', 'bug']
+  - title: 'Docs'
+    semver-increment: 'patch'
+    exclusive: true
+    when:
+      label: 'documentation'
+  - title: 'Maintenance'
+    semver-increment: 'patch'
+    exclusive: true
+    when:
+      label: 'maintenance'
+  # Unlabeled PRs (a title without a conventional prefix).
+  - title: 'Other changes'
+    semver-increment: 'patch'
+
+  # Version resolution with no notes section: no matching label means a patch release.
+  - type: 'version-resolver'
+    semver-increment: 'patch'
+
+change-template: '- $TITLE (#$NUMBER)'
+# Keep titles from turning into Markdown, mentions or HTML.
+change-title-escapes: '\<*_&@'
+no-changes-template: '- No changes'
+
+template: |
+  $CHANGES
+
+  Install: download `wp-http-query-$RESOLVED_VERSION.zip` below (attached when the release is published), then Plugins → Add New → Upload Plugin. Requires WordPress 7.0+ and PHP 8.0+.
