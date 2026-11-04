@@ -9,11 +9,12 @@ it from there.
 
 ## What's automated
 
-[`.github/workflows/release.yml`](.github/workflows/release.yml) does two things:
-
-- **On every pull request** it runs `make dist`, lints the PHP in the zip, and attaches the zip to
-  the run as the `wp-http-query-zip` artifact.
-- **On a pushed `v*` tag** it checks the tag against the header (`v0.1.0` needs `Version: 0.1.0`,
+- **On every pull request**, [`pr-preview-build.yml`](.github/workflows/pr-preview-build.yml) runs
+  `make dist`, lints the PHP in the zip, and attaches it to the run (artifact
+  `wp-playground-preview-pr<N>-<SHA>`, holding `zips/wp-http-query.zip`). The PR also gets a
+  Playground preview and a public download link; see
+  [CONTRIBUTING.md](CONTRIBUTING.md#pr-previews).
+- **On a pushed `v*` tag**, [`release.yml`](.github/workflows/release.yml) checks the tag against the header (`v0.1.0` needs `Version: 0.1.0`,
   and `-dev` versions are refused), checks `CHANGELOG.md` has a section for the version, runs
   `make dist`, and creates a **draft** GitHub release with the zip attached and that section as
   the notes. Nothing is published until you publish it.

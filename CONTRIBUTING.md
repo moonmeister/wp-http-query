@@ -132,6 +132,38 @@ uninstall routine or write options, so they'd break the main suite if they ran a
 3. Use the helpers in [`tests/http.ts`](tests/http.ts): `rest( site, 'QUERY', route, { json } )`,
    `{ form }` for form-encoded bodies, and `tokens()` for comma-separated headers.
 
+## PR previews
+
+Every pull request gets one comment, updated on each push, with a **Preview in Playground**
+button and a public download link for that commit's plugin zip. The button boots the latest
+WordPress (PHP 8.3) in your browser via [WordPress Playground](https://playground.wordpress.net),
+logged in as admin, with the zip active, the `core-collections` preset on, and Settings → General
+open. The link needs no GitHub login.
+
+Two workflows do it, using
+[`WordPress/action-wp-playground-pr-preview`](https://github.com/WordPress/action-wp-playground-pr-preview):
+
+- [`pr-preview-build.yml`](.github/workflows/pr-preview-build.yml) runs on the PR with a
+  read-only token: `make dist`, `php -l` on the zip, upload as an artifact. This is the PR's only
+  zip build.
+- [`pr-preview-publish.yml`](.github/workflows/pr-preview-publish.yml) runs on `workflow_run`
+  after a successful build. It copies the zip to the `ci-artifacts` prerelease as
+  `pr-<N>-<SHA>.zip` (keeping the latest two per PR) and posts the comment. It never checks out
+  PR code.
+
+Things to know:
+
+- **Publish-side changes only take effect once merged to `main`.** GitHub runs `workflow_run`
+  workflows from the default branch, so editing `pr-preview-publish.yml` in a PR changes nothing
+  for that PR.
+- **Fork PRs.** The build runs with a read-only token, as GitHub gives every fork PR. The publish
+  workflow runs in this repo's context, so fork PRs still get the comment, but only after a
+  maintainer approves the workflow run if GitHub asks for that. A fork's built zip is public on
+  the `ci-artifacts` release until it's pruned. Never switch either workflow to
+  `pull_request_target`.
+- **The preview is not the test suite.** It's Playground's PHP in your browser, not the wp-env
+  sites the tests use.
+
 ## Troubleshooting
 
 **"Cannot connect to the Docker daemon"**: Docker isn't running. Start it and retry.
