@@ -269,12 +269,17 @@ function enabled_presets(): array {
 	$known = array();
 
 	foreach ( $names as $name ) {
-		if ( isset( presets()[ $name ] ) ) {
+		if ( is_string( $name ) && isset( presets()[ $name ] ) ) {
 			$known[] = $name;
 		} else {
 			_doing_it_wrong(
 				'wp_http_query_presets',
-				sprintf( 'Unknown preset "%s". Known presets: %s.', esc_html( (string) $name ), esc_html( implode( ', ', array_keys( presets() ) ) ) ),
+				sprintf(
+					/* translators: 1: The preset name that was passed. 2: Comma-separated list of known preset names. */
+					esc_html__( 'Unknown preset "%1$s". Known presets: %2$s.', 'wp-http-query' ),
+					esc_html( is_scalar( $name ) ? (string) $name : gettype( $name ) ),
+					esc_html( implode( ', ', array_keys( presets() ) ) )
+				),
 				'0.1.0'
 			);
 		}
@@ -412,6 +417,11 @@ function add_query_to_handler( array $handler ): array {
 /**
  * Keeps known preset names only.
  *
+ * Also the option's sanitize_callback, so it gets whatever was posted to
+ * options.php: anything that isn't a list of known names reduces to the
+ * known names in it, or to an empty list. Non-string entries are dropped
+ * before comparing, so a nested array can't raise an array-to-string notice.
+ *
  * @param mixed $value Raw option value.
  * @return string[]
  */
@@ -420,7 +430,7 @@ function sanitize_presets( $value ): array {
 		return array();
 	}
 
-	return array_values( array_intersect( array_keys( presets() ), $value ) );
+	return array_values( array_intersect( array_keys( presets() ), array_filter( $value, 'is_string' ) ) );
 }
 
 add_action(
@@ -431,7 +441,7 @@ add_action(
 			PRESETS_OPTION,
 			array(
 				'type'              => 'array',
-				'description'       => 'HTTP QUERY presets enabled on this site.',
+				'description'       => __( 'HTTP QUERY presets enabled on this site.', 'wp-http-query' ),
 				'sanitize_callback' => __NAMESPACE__ . '\\sanitize_presets',
 				'default'           => array(),
 				'show_in_rest'      => false,
@@ -451,7 +461,8 @@ add_action(
 
 		add_settings_field(
 			PRESETS_OPTION,
-			'HTTP QUERY',
+			/* translators: Settings field title. QUERY is the HTTP method's name; keep it as is. */
+			esc_html__( 'HTTP QUERY', 'wp-http-query' ),
 			__NAMESPACE__ . '\\render_presets_field',
 			'general',
 			'default',
