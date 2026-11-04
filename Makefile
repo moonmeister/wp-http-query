@@ -38,5 +38,7 @@ open: ## Open wp-admin in a browser (all, or ENV=7.0 / ENV=7.1 / ENV=nightly)
 
 test: install ## Run the decision tests (all sites, or SITES=7.0,nightly)
 	SITES=$(SITES) npx vitest run
+	@# Then the tests that change site state, serially, never alongside the above.
+	SITES=$(SITES) npx vitest run --config vitest.lifecycle.config.ts
 
 check: up test ## Start everything, then test
