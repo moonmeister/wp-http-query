@@ -3,14 +3,15 @@
 #   make up        start all three WordPress sites (7.0, 7.1, nightly)
 #   make test      run the decision tests against all three (SITES=7.0,nightly for some)
 #   make check     up + test
+#   make lint      PHPCS (WordPress standard + PHPCompatibility) on plugin/
 #   make open      open wp-admin for all three (ENV=7.0, ENV=7.1 or ENV=nightly for one)
 #   make down      stop all three
 #   make destroy   remove all three and their data (asks first)
 #
-# Requires Docker and Node 24.18+ (26, the current LTS, recommended; see .nvmrc).
+# Requires Docker and Node 24.18+ (26, the current LTS, recommended; see .nvmrc). make lint needs PHP and Composer instead.
 
 .DEFAULT_GOAL := help
-.PHONY: help install up down destroy status open test check
+.PHONY: help install up down destroy status open test check lint
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -46,3 +47,10 @@ check: up test ## Start everything, then test
 .PHONY: dist
 dist: ## Build the plugin zip, dist/wp-http-query-<version>.zip
 	scripts/dist.sh
+
+vendor: composer.json composer.lock
+	composer install
+	@touch vendor
+
+lint: vendor ## Check plugin/ against WordPress Coding Standards and PHP 8.0+ (needs PHP + Composer)
+	vendor/bin/phpcs
