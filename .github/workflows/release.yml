@@ -3,6 +3,8 @@ name: Release
 # Pull requests: build the plugin zip and attach it to the run, so every PR shows the package builds.
 # v* tags: check the tag against the plugin header, build the zip, and create a DRAFT GitHub
 # release with it attached. A maintainer reviews and publishes the draft by hand. See RELEASING.md.
+# This is the manual fallback; releases normally come from release-on-merge.yml, whose tags (pushed
+# with GITHUB_TOKEN) don't trigger this workflow.
 
 on:
   pull_request:
@@ -50,22 +52,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Check the tag matches the plugin header Version
-        run: scripts/release-check.sh "$GITHUB_REF_NAME"
-
-      - run: make dist
-
-      - name: Create the draft release
+      # Checks the tag against the header, builds, and drafts: the same script release-on-merge.yml
+      # runs, so both paths make the same release.
+      - name: Check the tag, build, and create the draft release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          version=$(scripts/plugin-version.sh)
-          scripts/changelog-section.sh "$version" > "$RUNNER_TEMP/notes.md"
-          prerelease=()
-          case "$version" in *-*) prerelease=(--prerelease) ;; esac
-          gh release create "$GITHUB_REF_NAME" "dist/wp-http-query-$version.zip" \
-            --draft \
-            --verify-tag \
-            --title "$GITHUB_REF_NAME" \
-            --notes-file "$RUNNER_TEMP/notes.md" \
-            "${prerelease[@]}"
+        run: scripts/draft-release.sh "$GITHUB_REF_NAME"
