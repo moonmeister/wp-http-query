@@ -248,13 +248,13 @@ scripts/env.sh        Drives the two wp-env environments; wrapped by the Makefil
 ### Plugin tests
 
 ```sh
-make check      # start both WordPress environments, then run the decision tests
+make check      # start the WordPress test sites, then run the decision tests
 ```
 
-`make up` starts two [wp-env](https://www.npmjs.com/package/@wordpress/env) sites with the
-plugin active: **7.1.4** on `:8871` (the plugin's pre-7.2 CORS fallback) and **nightly** on
-`:8872` (core's `rest_allowed_cors_methods`, r64730). `make test` runs the vitest suite in
-[`tests/`](tests/) over real HTTP against both. `make help` lists the rest. Requires Docker and
+`make up` starts three [wp-env](https://www.npmjs.com/package/@wordpress/env) sites with the
+plugin active: **7.0.8** on `:8870` and **7.1.4** on `:8871` (the plugin's pre-7.2 CORS fallback),
+and **nightly** on `:8872` (core's `rest_allowed_cors_methods`, r64730). `make test` runs the
+vitest suite in [`tests/`](tests/) over real HTTP against all three. `make help` lists the rest. Requires Docker and
 Node 20+. **New here? [CONTRIBUTING.md](CONTRIBUTING.md)** walks through setup, the commands and
 troubleshooting.
 

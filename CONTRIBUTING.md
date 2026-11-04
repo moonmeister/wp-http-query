@@ -21,15 +21,18 @@ You don't need PHP, MySQL or a local WordPress install. Docker provides all of t
 make check
 ```
 
-The first run installs npm dependencies, downloads two WordPress builds and the Docker images,
+The first run installs npm dependencies, downloads three WordPress builds and the Docker images,
 then runs the tests. Expect a few minutes. Later starts take seconds.
 
-You get two WordPress sites, both with `plugin/` mounted and active:
+You get three WordPress sites, all with `plugin/` mounted and active:
 
-| Env | URL | Core | Why it exists |
+| Site | URL | Core | Why it exists |
 |---|---|---|---|
-| **stable** | <http://localhost:8871> | 7.1.4, pinned | Tests the plugin's pre-7.2 CORS fallback |
+| **7.0** | <http://localhost:8870> | 7.0.8, pinned | Previous release. Tests the plugin's pre-7.2 CORS fallback |
+| **7.1** | <http://localhost:8871> | 7.1.4, pinned | Current release. Same fallback path |
 | **nightly** | <http://localhost:8872> | Latest nightly build | Tests the 7.2+ path through core's `rest_allowed_cors_methods` |
+
+The releases are pinned so the pre-7.2 path stays covered after 7.2 ships.
 
 Admin is at `/wp-admin`, user `admin`, password `password`. `make open` opens it for you.
 
@@ -42,24 +45,23 @@ Run `make help` for the list. The ones you'll use:
 
 | Command | What it does |
 |---|---|
-| `make up` | Start both sites. Safe to re-run |
-| `make test` | Run the test suite against both sites. The sites must already be up |
+| `make up` | Start all three sites. Safe to re-run |
+| `make test` | Run the test suite against all three sites. The sites must already be up. `make test SITES=7.0,nightly` runs a subset |
 | `make check` | `make up`, then `make test` |
-| `make test-stable` / `make test-nightly` | Test against one site only |
 | `make status` | Show whether each site is running, and its URL |
-| `make open` | Open wp-admin for both sites in your browser. `make open ENV=nightly` opens one |
-| `make down` | Stop both sites. Data is kept; `make up` brings them back as they were |
-| `make destroy` | Delete both sites and their data. Asks before each one. Use it to start from scratch |
+| `make open` | Open wp-admin for all three sites in your browser. `make open ENV=nightly` opens one |
+| `make down` | Stop all three sites. Data is kept; `make up` brings them back as they were |
+| `make destroy` | Delete all three sites and their data. Asks before each one. Use it to start from scratch |
 
 ### WP-CLI
 
 ```sh
-scripts/env.sh wp stable plugin list
+scripts/env.sh wp 7.1 plugin list
 scripts/env.sh wp nightly core version
 scripts/env.sh wp nightly option get permalink_structure
 ```
 
-The first argument after `wp` picks the site (`stable` or `nightly`). The rest goes to WP-CLI.
+The first argument after `wp` picks the site (`7.0`, `7.1` or `nightly`). The rest goes to WP-CLI.
 
 The plugin's REST hooks attach on `rest_api_init`, which doesn't fire under WP-CLI, so checks like
 `has_filter( 'rest_allowed_cors_methods' )` report `false` from the command line. Test REST
@@ -75,7 +77,7 @@ npx vitest                                   # watch mode: re-runs on save
 ```
 
 To point the suite at a different WordPress install that has the plugin active, set
-`WP_STABLE_URL` or `WP_NIGHTLY_URL`.
+`WP_70_URL`, `WP_71_URL` or `WP_NIGHTLY_URL`.
 
 ## How the tests are organized
 
@@ -117,13 +119,14 @@ placeholder.
 
 **"Cannot connect to the Docker daemon"**: Docker isn't running. Start it and retry.
 
-**"WordPress environments not ready … Run `make up` first"**: the tests checked both sites before
+**"WordPress environments not ready … Run `make up` first"**: the tests checked every site before
 running and couldn't reach one. Run `make up`, or `make status` to see which site is down.
 
 **"Bind for 127.0.0.1:8871 failed: port is already allocated"**: something else holds the port.
 Find it with `lsof -nP -iTCP:8871 -sTCP:LISTEN`, or `docker ps` if it's another container. Stop
-it, or change `port` in `.wp-env.json` (stable) or `.wp-env.nightly.json` (nightly). If you change
-a port, also set `WP_STABLE_URL` / `WP_NIGHTLY_URL` so the tests follow.
+it, or change `port` in the site's config: `.wp-env.7.0.json`, `.wp-env.json` (7.1) or
+`.wp-env.nightly.json`. If you change a port, also set `WP_70_URL`, `WP_71_URL` or `WP_NIGHTLY_URL`
+so the tests follow.
 
 **A site is in a strange state**: `make destroy`, then `make up`. That rebuilds it from nothing.
 
