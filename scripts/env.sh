@@ -43,6 +43,11 @@ case "$cmd" in
 			config="$(config_for "$env")"
 			echo "==> starting $env ($config)"
 			"${WP_ENV[@]}" start --config="$config"
+			# Mapped rather than listed under "plugins" so the slug is wp-http-query,
+			# as on a real install, not the directory name. Mappings aren't activated
+			# automatically, and a pre-existing site may still have the old slug.
+			"${WP_ENV[@]}" run cli --config="$config" wp plugin deactivate plugin --quiet >/dev/null 2>&1 || true
+			"${WP_ENV[@]}" run cli --config="$config" wp plugin activate wp-http-query >/dev/null
 			# The tests use /wp-json/, which needs pretty permalinks.
 			"${WP_ENV[@]}" run cli --config="$config" wp rewrite structure '/%postname%/' --hard >/dev/null
 			"${WP_ENV[@]}" run cli --config="$config" wp core version
