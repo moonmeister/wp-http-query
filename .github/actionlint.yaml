@@ -1,0 +1,6 @@
+# actionlint 1.7.12 doesn't know concurrency's documented `queue` key yet
+# (https://github.com/rhysd/actionlint/issues/654).
+paths:
+  .github/workflows/release-on-merge.yml:
+    ignore:
+      - 'unexpected key "queue" for "concurrency" section'

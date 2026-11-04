@@ -20,12 +20,23 @@ if [ -f plugin/readme.txt ]; then
 	files+=(plugin/readme.txt)
 fi
 
-git switch -c "$branch"
-git add -- "${files[@]}"
-git -c user.name='github-actions[bot]' \
-	-c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-	commit -q -m "chore: start $next" -m "v$released is tagged and drafted as a GitHub release."
-git push origin "$branch"
+# On a re-run, skip whatever an earlier run already did: pushing the branch, opening the PR.
+if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+	echo "note: $branch is already on origin; not pushing it again" >&2
+else
+	git switch -c "$branch"
+	git add -- "${files[@]}"
+	git -c user.name='github-actions[bot]' \
+		-c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+		commit -q -m "chore: start $next" -m "v$released is tagged and drafted as a GitHub release."
+	git push origin "$branch"
+fi
+
+existing=$(gh pr list --head "$branch" --state all --json number --jq length)
+if [ "$existing" != 0 ]; then
+	echo "ok: a PR for $branch already exists; not opening another"
+	exit 0
+fi
 
 body="v$released is tagged, and its draft release is waiting under Releases: review and publish it.
 

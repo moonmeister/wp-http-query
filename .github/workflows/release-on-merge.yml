@@ -3,7 +3,7 @@ name: Release on merge
 # Every push to main: if it changed the plugin header's Version to a non -dev version that has no
 # tag yet (a merged version-bump PR), tag that commit v<Version>, build the zip, create a DRAFT
 # GitHub release, and open a PR starting the next -dev version. Any other push is a no-op.
-# See RELEASING.md.
+# If a run fails after tagging, re-run it: it picks up from the step that failed. See RELEASING.md.
 #
 # No duplicate release from release.yml: the tag is pushed with GITHUB_TOKEN, and events caused by
 # GITHUB_TOKEN don't start new workflow runs (except workflow_dispatch and repository_dispatch), so
@@ -21,9 +21,14 @@ on:
 permissions:
   contents: read
 
+# One run at a time, and every push gets its run: the default (queue: single) keeps only one
+# pending run and cancels it when another push queues, which could drop a version-bump push.
+# queue: max keeps up to 100 pending instead.
+# https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
+  queue: max
 
 jobs:
   release:
@@ -51,8 +56,9 @@ jobs:
           VERSION: ${{ steps.detect.outputs.version }}
         run: scripts/release-check.sh "v$VERSION"
 
+      # Skipped on a re-run whose tag is already in place (release-detect.sh: tagged=true).
       - name: Tag the commit
-        if: steps.detect.outputs.release == 'true'
+        if: steps.detect.outputs.release == 'true' && steps.detect.outputs.tagged != 'true'
         env:
           VERSION: ${{ steps.detect.outputs.version }}
         run: |

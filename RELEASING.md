@@ -57,7 +57,9 @@ Use `0.1.0` below as the example; substitute the version you're releasing.
    draft release, and opens the follow-up PR. Watch it in the Actions tab, or with `gh run watch`.
    If the check fails, nothing is tagged: fix `main` in another PR. Changing `Version` again (to
    `0.1.1`, say) re-triggers it; to release the same version, use the
-   [fallback](#fallback-tag-by-hand).
+   [fallback](#fallback-tag-by-hand). If a later step fails (the build, the release, the
+   follow-up PR), **re-run the workflow**: the tag already points at the merge commit, so the
+   re-run skips tagging and anything else already done, and picks up from the failed step.
 
 3. **Check and publish the draft release.** Under Releases, open the `v0.1.0` draft:
    - Read the notes. They are the `0.1.0` section of `CHANGELOG.md`, verbatim. Edit them on the
@@ -101,7 +103,8 @@ If its check fails, delete the tag (`git push origin :v0.1.0 && git tag -d v0.1.
 through a PR, and tag again. Then start the next `-dev` version yourself: `scripts/bump-dev.sh
 0.1.0` makes the same changes as the follow-up PR.
 
-If the workflow tagged and drafted but couldn't open the follow-up PR, open it from the pushed
+If the workflow failed after tagging, re-run it rather than tagging by hand (see
+[Steps](#steps), step 2). If it still can't open the follow-up PR, open it from the pushed
 `release/start-*` branch (the run's error links to it).
 
 ## After the release

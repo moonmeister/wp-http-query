@@ -5,7 +5,7 @@
 # Usage: scripts/draft-release.sh <tag>      e.g. scripts/draft-release.sh v0.1.0
 # Both release paths end here, so the release they make is the same: release-on-merge.yml (after
 # it pushes the tag) and release.yml (on a hand-pushed tag). Needs `gh` with GH_TOKEN set, and the
-# tag already on GitHub (--verify-tag refuses to create one).
+# tag already on GitHub (--verify-tag refuses to create one). If the release exists, it does nothing.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -14,6 +14,12 @@ tag=${1:?usage: scripts/draft-release.sh <tag>}
 
 scripts/release-check.sh "$tag"
 version=$(scripts/plugin-version.sh)
+
+# A re-run after the release was created (e.g. the follow-up PR step failed) has nothing to do here.
+if gh release view "$tag" >/dev/null 2>&1; then
+	echo "ok: release $tag already exists; not creating it again"
+	exit 0
+fi
 
 make dist
 
