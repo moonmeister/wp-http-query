@@ -2,7 +2,7 @@
  * Reach, the preset setting: ADR 0005, issue #1.
  *
  * The 'core-collections' preset is switched by one stored option
- * (wp_http_query_presets, Settings → General, default off), then by the
+ * (wp_http_query_presets, Settings → HTTP QUERY, default off), then by the
  * wp_http_query_presets filter, so code can override the setting.
  *
  * Runs in the serial lifecycle suite because it changes site state. The test
