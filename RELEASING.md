@@ -23,12 +23,15 @@ automatically. Nothing is published until you publish the draft release.
   3. runs `make dist` and creates a **draft** GitHub release with the zip attached and the
      CHANGELOG section as the notes (`scripts/draft-release.sh`);
   4. opens a PR starting the next development version (`scripts/open-dev-bump-pr.sh`).
-- [`.github/workflows/release.yml`](.github/workflows/release.yml):
-  - **On every pull request** it runs `make dist`, lints the PHP in the zip, and attaches the zip to
-    the run as the `wp-http-query-zip` artifact.
-  - **On a `v*` tag pushed by a person** it runs the same `scripts/draft-release.sh`. This is the
-    [manual fallback](#fallback-tag-by-hand). Tags pushed by `release-on-merge.yml` don't trigger
-    it, so there's never a second release.
+- **On every pull request**, [`pr-preview-build.yml`](.github/workflows/pr-preview-build.yml) runs
+  `make dist`, lints the PHP in the zip, and attaches it to the run (artifact
+  `wp-playground-preview-pr<N>-<SHA>`, holding `zips/wp-http-query.zip`). The PR also gets a
+  Playground preview and a public download link; see
+  [CONTRIBUTING.md](CONTRIBUTING.md#pr-previews).
+- [`.github/workflows/release.yml`](.github/workflows/release.yml) runs **on a `v*` tag pushed by a
+  person**, using the same `scripts/draft-release.sh`. This is the
+  [manual fallback](#fallback-tag-by-hand). Tags pushed by `release-on-merge.yml` don't trigger
+  it, so there's never a second release.
 
 ## Steps
 

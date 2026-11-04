@@ -26,7 +26,7 @@ then runs the tests. Expect a few minutes. Later starts take seconds.
 
 CI runs the same `make check` on every PR and on pushes to `main` ([`.github/workflows/test.yml`](.github/workflows/test.yml)).
 
-You get three WordPress sites, all with `plugin/` mounted and active:
+You get three WordPress sites, all with `plugin/` and the [example plugin](examples/query-route-example/) mounted and active:
 
 | Site | URL | Core | Why it exists |
 |---|---|---|---|
@@ -97,6 +97,8 @@ from:
 | `adr-0005-reach.test.ts` | [ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md): no route gains `QUERY` by default; the route, filter and preset opt-ins work; write handlers never gain it; a form-encoded `QUERY /wp/v2/posts` search filters a real collection |
 | `lifecycle/adr-0005-preset-setting.test.ts` | ADR 0005: the stored preset setting switches reach, and the filter overrides it |
 | `lifecycle/plugin-lifecycle.test.ts` | [#22](../../issues/22): deactivated, the site is stock; uninstall deletes the option |
+| `examples.test.ts` | Not a decision: the example plugin behind [docs/integrating.md](docs/integrating.md) works, and the guide quotes it verbatim |
+| `lifecycle/examples-feature-detection.test.ts` | Not a decision: without wp-http-query, the example answers `GET` and doesn't register `QUERY` |
 
 The tests make real HTTP requests to both sites, so they cover what a client would actually see:
 headers on the wire, CORS, and what the web server passes through.
@@ -122,6 +124,11 @@ uninstall routine or write options, so they'd break the main suite if they ran a
 (`vitest.lifecycle.config.ts`), and each restores what it changed in `afterAll`, failure or not.
 `npx vitest run` alone skips them. They take about a minute and a half: every step is a WP-CLI call.
 
+**The example plugin is tested too.** [`examples/query-route-example/`](examples/query-route-example/)
+is mounted and activated on every site, next to the plugin. The full-route samples in
+[docs/integrating.md](docs/integrating.md) are copied from it, and `examples.test.ts` fails if
+they drift. Change the example and the guide together.
+
 **`it.todo` marks a test that can't be written yet**, usually because the behavior isn't designed.
 
 ### Adding a test
@@ -131,6 +138,38 @@ uninstall routine or write options, so they'd break the main suite if they ran a
 2. Wrap it in `describe.each( sites )` so it runs against both cores.
 3. Use the helpers in [`tests/http.ts`](tests/http.ts): `rest( site, 'QUERY', route, { json } )`,
    `{ form }` for form-encoded bodies, and `tokens()` for comma-separated headers.
+
+## PR previews
+
+Every pull request gets one comment, updated on each push, with a **Preview in Playground**
+button and a public download link for that commit's plugin zip. The button boots the latest
+WordPress (PHP 8.3) in your browser via [WordPress Playground](https://playground.wordpress.net),
+logged in as admin, with the zip active, the `core-collections` preset on, the
+`/wp-http-query/v1/echo` demo route enabled, and Settings → General open. The link needs no GitHub login.
+
+Two workflows do it, using
+[`WordPress/action-wp-playground-pr-preview`](https://github.com/WordPress/action-wp-playground-pr-preview):
+
+- [`pr-preview-build.yml`](.github/workflows/pr-preview-build.yml) runs on the PR with a
+  read-only token: `make dist`, `php -l` on the zip, upload as an artifact. This is the PR's only
+  zip build.
+- [`pr-preview-publish.yml`](.github/workflows/pr-preview-publish.yml) runs on `workflow_run`
+  after a successful build. It copies the zip to the `ci-artifacts` prerelease as
+  `pr-<N>-<SHA>.zip` (keeping the latest two per PR) and posts the comment. It never checks out
+  PR code.
+
+Things to know:
+
+- **Publish-side changes only take effect once merged to `main`.** GitHub runs `workflow_run`
+  workflows from the default branch, so editing `pr-preview-publish.yml` in a PR changes nothing
+  for that PR.
+- **Fork PRs.** The build runs with a read-only token, as GitHub gives every fork PR. The publish
+  workflow runs in this repo's context, so fork PRs still get the comment, but only after a
+  maintainer approves the workflow run if GitHub asks for that. A fork's built zip is public on
+  the `ci-artifacts` release until it's pruned. Never switch either workflow to
+  `pull_request_target`.
+- **The preview is not the test suite.** It's Playground's PHP in your browser, not the wp-env
+  sites the tests use.
 
 ## Troubleshooting
 
