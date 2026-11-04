@@ -1,6 +1,6 @@
 # ADR 0005 — Should existing read routes gain QUERY, and by what mechanism?
 
-**Status:** Proposed — undecided. No lean.
+**Status:** Proposed, partly settled. **Settled 2026-11-04 for the feature plugin: no reach by default.** The plugin will not add `QUERY` to every route; reach is opt-in, with options for which routes get it. Still open: what those options are, and what core should do.
 **Date:** 2026-09-15
 **Split from:** [ADR 0002](0002-allmethods-vs-queryable.md), which closed on option B
 (`QUERYABLE`, additive) on 2026-09-15. B settles what the constants *mean*; it does not answer

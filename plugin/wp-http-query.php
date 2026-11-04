@@ -1,15 +1,14 @@
 <?php
 /**
  * Plugin Name:       WP HTTP QUERY
- * Description:       Demonstrates HTTP QUERY (RFC 10008) support on the WordPress REST API, entirely in userland — no core patch required.
+ * Description:       HTTP QUERY (RFC 10008) support for the WordPress REST API, entirely in userland. No core patch required.
  * Version:           0.1.0-dev
  * Requires PHP:      7.2
  * License:           GPL-2.0-or-later
  *
- * This plugin exists to prove the end-to-end path before proposing anything to
- * core, and to validate that the three identified core gaps can be worked around
- * from userland. Where a workaround is possible, it is annotated with the core
- * gap it stands in for.
+ * The project's deliverable: QUERY support shipped as a feature plugin on stock
+ * core, ahead of any core patch. Each workaround is annotated with the core gap
+ * it stands in for, so the plugin doubles as the spec for the eventual patch.
  *
  * See ../docs/scope.md §2.
  *
@@ -28,16 +27,21 @@ const METHOD    = 'QUERY';
 const NAMESPACE_ = 'wp-http-query/v1';
 
 /**
- * Media types this plugin accepts as query formats.
+ * Media types advertised in Accept-Query.
  *
- * ADR 0001 decided option B: JSON and form-encoded, matching what core already
- * parses for the other body-bearing methods. No new parsing is introduced —
- * closing the gap-3 lookup order is what makes the form-encoded case work.
+ * Advertising is separate from parsing. ADR 0001 (option B) settled what is
+ * *parsed*: JSON and form-encoded, matching core's other body-bearing
+ * methods, and both keep working whatever this returns. What is *advertised*
+ * is JSON only: accepting form-encoded is a bug fix, but advertising it
+ * endorses a poor structured-query format (ADR 0001 open question 2, #20).
+ *
+ * This is the current default, not a final decision. Revisit it if real use
+ * shows a need. Sites can change it with the filter.
  */
-function accepted_query_types(): array {
+function advertised_query_types(): array {
 	return (array) apply_filters(
-		'wp_http_query_accepted_types',
-		array( 'application/json', 'application/x-www-form-urlencoded' )
+		'wp_http_query_advertised_types',
+		array( 'application/json' )
 	);
 }
 
@@ -47,8 +51,8 @@ function accepted_query_types(): array {
  * rest_send_cors_headers() emits the list with a raw header() call and no hook
  * at that point, so a cross-origin QUERY preflight fails.
  *
- * Trac#46992 (wordpress-develop#13151) adds a 'rest_allowed_cors_methods'
- * filter. Where that exists, one add_filter does the whole job. Where it does
+ * Trac#46992 added a 'rest_allowed_cors_methods' filter in 7.2 (r64730).
+ * Where that exists, one add_filter does the whole job. Where it does
  * not, core's callback has to be unhooked and replaced wholesale — which this
  * plugin will keep needing for as long as it supports cores that predate the
  * filter, so the fallback is permanent rather than temporary.
@@ -57,8 +61,8 @@ function accepted_query_types(): array {
 /**
  * Whether core's CORS method list is filterable.
  *
- * Feature detection, not version sniffing: the $result and $request parameters
- * arrived in the same change as the filter, and an alpha build of the release
+ * Feature detection, not version sniffing: the $result, $request and $server
+ * parameters arrived in the same change as the filter (r64730), and an alpha build of the release
  * carrying it would fail a version comparison against '7.2'.
  */
 function core_cors_is_filterable(): bool {
@@ -161,17 +165,16 @@ add_filter(
  * Gap 2 — READABLE is 'GET', so no existing read route matches QUERY.
  *
  * ADR 0002 closed on an additive QUERYABLE constant, so core gives existing
- * read routes nothing. Whether they should get it anyway, and how, is ADR
- * 0005, which is open. This filter implements its option 3 — reach by
- * widening READABLE — because the plugin's job is to be the experiment: it
- * runs the option under test, not the option preferred, or it stops being
- * evidence about what core would do.
+ * read routes nothing. Which routes this plugin adds QUERY to is ADR 0005.
  *
- * That includes the cost. Option 3 breaks plugins that read 'GET' as a
- * synonym for "safe" — Jetpack activates modules on a QUERY to a READABLE
- * route — and this filter reproduces that on any site running both. Scoped
- * to sites that installed it deliberately, which is the whole difference
- * between measuring the hazard and shipping it. See ADR 0005 and
+ * PLACEHOLDER. Decided 2026-11-04: reach will be opt-in, with options for
+ * which routes get QUERY, and never every route by default. This filter
+ * still implements ADR 0005 option 3 (every route that accepts GET) and is
+ * to be replaced before the plugin is published.
+ *
+ * Why it has to go: option 3 breaks plugins that read 'GET' as a synonym
+ * for "safe". Jetpack activates modules on a QUERY to a READABLE route, and
+ * this filter reproduces that on any site running both. See ADR 0005 and
  * experiments/plugin-spike/.
  *
  * match_request_to_handler() is a plain array-key lookup on the normalized
@@ -242,9 +245,9 @@ function add_query_to_handler( array $handler ): array {
 	/*
 	 * Hand back a STRING, never an array. get_routes() comma-splits the string
 	 * form but not the array form, so an array entry carrying a multi-method
-	 * constant registers one unmatchable key — Trac#65905, patched in
-	 * wordpress-develop#13136 but not yet released. Writing the string form
-	 * means this plugin cannot trip that bug, on any core version.
+	 * constant registers one unmatchable key: Trac#65905, fixed in 7.2 (r63756).
+	 * Writing the string form means this plugin cannot trip that bug on any
+	 * core version, including those before 7.2.
 	 *
 	 * It also incidentally repairs the routes it touches: flattening
 	 * array( 'GET', 'POST, PUT, PATCH' ) to a string makes POST/PUT/PATCH
@@ -279,7 +282,7 @@ add_filter(
 			if ( ! empty( $handler['methods'][ METHOD ] ) ) {
 				$list = implode( ', ', array_map(
 					static fn ( string $type ): string => '"' . $type . '"',
-					accepted_query_types()
+					advertised_query_types()
 				) );
 				$response->header( 'Accept-Query', $list );
 				break;
@@ -357,7 +360,7 @@ function handle_echo( \WP_REST_Request $request ): \WP_REST_Response {
 			'body_params'     => $request->get_body_params(),
 			'query_params'    => $request->get_query_params(),
 			'merged_params'   => $request->get_params(),
-			'accepted_types'  => accepted_query_types(),
+			'advertised_types' => advertised_query_types(),
 			'via_override'    => isset( $_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'] ),
 		),
 		200

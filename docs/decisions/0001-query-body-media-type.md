@@ -221,9 +221,12 @@ runs together:
 | | |
 |---|---|
 | What core **parses** | JSON and form-encoded — both, because the alternative is silent loss |
-| What core **advertises** in `Accept-Query` | Open. Not necessarily both |
+| What core **advertises** in `Accept-Query` | **`application/json` only**, for now (adopted 2026-11-04) |
 
 Form-encoded is a poor query format and advertising it invites `filter[meta_query][0][key]=…`
 in a header we have to live with. Accepting it is a bug fix; advertising it is an endorsement.
-It is defensible to parse both and advertise only `application/json`. That call belongs to
-[#20](https://github.com/moonmeister/wp-http-query/issues/20).
+It is defensible to parse both and advertise only `application/json`, and that is what the
+feature plugin does (adopted 2026-11-04, following the lean on
+[#20](https://github.com/moonmeister/wp-http-query/issues/20)). **This is the current default,
+not a settled decision.** It can change if real use shows form-encoded should be advertised, and
+the plugin's `wp_http_query_advertised_types` filter lets a site change it today.

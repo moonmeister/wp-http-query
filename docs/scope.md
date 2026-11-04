@@ -1,6 +1,6 @@
 # Scope: HTTP QUERY support in WordPress
 
-**Status:** scoping / pre-patch
+**Status:** plugin first. The feature plugin is the deliverable; core patches are parked until it ships (decided 2026-11-04, see §8)
 **Core baseline:** `7.2-alpha-63166-src` @ `e7739d5414`
 **Trunk references verified:** 2026-08-16
 
@@ -17,6 +17,10 @@ blocker when the surrounding ecosystem finishes shipping support.
 
 This is a **readiness** project, not an adoption project. We are explicitly not waiting for
 the ecosystem, and explicitly not claiming it is ready.
+
+The vehicle is a **feature plugin** ([`plugin/`](../plugin/)). Every gap in §2 can be worked around
+from userland, so the plugin delivers the capability on stock core today. Core patches follow,
+backed by what the plugin proves in the field.
 
 ### Why QUERY
 
@@ -692,11 +696,16 @@ and its body reach PHP — was the gating unknown and is answered. What remains:
    Engagement with an open thread, not a fresh proposal.
 2. **Settle [ADRs 0001–0004](decisions/).** The only remaining blockers are decisions, and
    **none of them is blocked on anything external any more.**
-3. **Write the patch, and prove it with the feature plugin** on stock core.
-4. **Bring patch, plugin and matrix results to the existing ticket.**
+3. ~~**Write the patch, and prove it with the feature plugin** on stock core.~~ **Reordered
+   2026-11-04: plugin first.** Design the plugin's opt-in reach options
+   ([ADR 0005](decisions/0005-reach-for-existing-read-routes.md); never all routes by default), run it on a real install ([#22](../../issues/22)), and publish it
+   ([#23](../../issues/23)). The core patches are written on `feat-http-query` and parked.
+4. **Bring plugin, usage and matrix results to the existing ticket**, with the core patches.
 
-Deliberate ordering: arrive with evidence and a working demonstration rather than a patch and
-an argument. Note that the Requests track (§5.1) runs independently and ahead — core will not
+Deliberate ordering: arrive with a shipped plugin and evidence rather than a patch and
+an argument. Both core defects found on the way are already fixed for 7.2
+([r63756](https://core.trac.wordpress.org/changeset/63756),
+[r64730](https://core.trac.wordpress.org/changeset/64730)). Note that the Requests track (§5.1) runs independently and ahead — core will not
 accept patches to vendored dependencies, so anything in `Requests/` must land upstream first.
 
 ---

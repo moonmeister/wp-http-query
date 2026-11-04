@@ -2,9 +2,10 @@
 
 Making WordPress ready for the HTTP `QUERY` method ([RFC 10008](https://www.rfc-editor.org/rfc/rfc10008.html)).
 
-This is the **hub** repo: design docs, decision records, the compatibility test matrix, and
-the feature plugin. Code changes to WordPress core and to the Requests library live in forks
-of their upstream repos — see [Repos](#repos).
+**The deliverable is a feature plugin**, [`plugin/`](plugin/), that adds `QUERY` support to the
+REST API on stock WordPress, with no core patch. This repo also holds the design docs, decision
+records and compatibility test matrix behind it. Core patches come later, informed by what the
+plugin proves in the field. See [Repos](#repos).
 
 ---
 
@@ -16,6 +17,16 @@ when they finish — not to wait for them, and not to claim they are ready.
 
 Concretely: a site owner whose stack supports `QUERY` should be able to use it with WordPress
 without patching core, and a site owner whose stack does not should be unaffected.
+
+### Plugin first (decided 2026-11-04)
+
+The plugin is the vehicle, not a demo for a core patch. All three core gaps can be worked
+around from userland ([`experiments/plugin-spike/`](experiments/plugin-spike/), 6/6 on unmodified
+trunk), so a plugin can ship the whole capability now. That is the usual WordPress feature-plugin
+path: real sites, real feedback, then a core proposal backed by usage rather than argument.
+Two core defects found along the way are already fixed upstream for 7.2:
+[Trac#65905](https://core.trac.wordpress.org/ticket/65905) (r63756) and
+[Trac#46992](https://core.trac.wordpress.org/ticket/46992) (r64730).
 
 Start with **[docs/scope.md](docs/scope.md)**. To pick up work, see
 **[the issues](https://github.com/moonmeister/wp-http-query/issues)** — the contributions this
@@ -34,8 +45,8 @@ throws away everything the method system exists to communicate.
 
 | Repo | Purpose | Branch |
 |---|---|---|
-| **wp-http-query** (this) | Docs, ADRs, matrix, plugin | `main` |
-| [wordpress-develop](https://github.com/WordPress/wordpress-develop) fork | Core patches | `feat-http-query` |
+| **wp-http-query** (this) | **The feature plugin**, plus docs, ADRs, matrix | `main` |
+| [wordpress-develop](https://github.com/WordPress/wordpress-develop) fork | Core patches, parked until the plugin has shipped | `feat-http-query` (stale since 2026-09-15) |
 | [WpOrg/Requests](https://github.com/WpOrg/Requests) fork | `Requests::QUERY` constant + tests | `add-query-method` *(not yet created)* |
 
 **The forks stay pristine.** No project documentation, no scratch files, nothing that isn't a
@@ -70,11 +81,12 @@ working order and the reason for it. The table below is the same tree without th
 
 | Capability | Venue | Milestone |
 |---|---|---|
-| [#2 Request body parsing](../../issues/2) — gap 3, one line. **Do this first**: it is the only gap that fails *open* — a form-encoded `QUERY` returns an unfiltered collection with a `200` | core | Core patch v1 |
-| [#1 Method constants & route matching](../../issues/1) — gap 2, the most contested call | core | Core patch v1 |
-| [#3 CORS preflight](../../issues/3) — gap 1, independently landable; prior art is **more favorable than it looked** — [Trac#46992](https://core.trac.wordpress.org/ticket/46992) **reopened 2026-08-17** with the clobber fix ([#16](../../issues/16)), approach agreed with adamsilverstein and patched in [wordpress-develop#13151](https://github.com/WordPress/wordpress-develop/pull/13151) | core | Core patch v1 |
-| [#4 `Accept-Query`](../../issues/4) — **halved 2026-08-19**: cache safety is settled with no core work ([ADR 0003](docs/decisions/0003-cache-safety-default.md) option C), leaving only the advertisement header | core | Core patch v1 |
-| [#5 Feature plugin demo](../../issues/5) — the strongest artifact for Trac | this repo | Core patch v1 |
+| [#5 Feature plugin](../../issues/5) — **the deliverable.** Run it on a real install ([#22](../../issues/22)), then publish ([#23](../../issues/23)) | this repo | Plugin v1 |
+| [#1 Method constants & route matching](../../issues/1) — gap 2. **Reach is opt-in** (decided 2026-11-04): the plugin will offer options for which routes get `QUERY`, never everything by default. Designing those options is open ([ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md)); the current every-`GET`-route filter is a placeholder | this repo | Plugin v1 |
+| ~~[#2 Request body parsing](../../issues/2)~~ — gap 3. **In the plugin** via `rest_request_parameter_order` | this repo | ✅ |
+| ~~[#3 CORS preflight](../../issues/3)~~ — gap 1. **In the plugin**, using core's `rest_allowed_cors_methods` on 7.2+ ([r64730](https://core.trac.wordpress.org/changeset/64730)) and a replacement handler before that | this repo | ✅ |
+| ~~[#4 `Accept-Query`](../../issues/4)~~ — **in the plugin.** Cache safety needs nothing ([ADR 0003](docs/decisions/0003-cache-safety-default.md) option C) | this repo | ✅ |
+| Core patches — [#11](../../issues/11), [#14](../../issues/14), [#35](../../issues/35), [#20](../../issues/20) and the Trac write-ups [#12](../../issues/12), [#15](../../issues/15), [#21](../../issues/21). **Parked until the plugin ships** | core | Core patch v1 |
 | [#6 PHP client — `WP_Http` / Requests](../../issues/6) — review, not authorship | WpOrg/Requests | Ecosystem |
 | [#7 JS clients](../../issues/7) — `api-fetch` and browser `fetch()` | this repo | Ecosystem |
 
@@ -82,31 +94,29 @@ Plus six standalone: [#31](../../issues/31) re-file the WebKit standards positio
 [#32](../../issues/32) document the hardening-allowlist 403 **and the Varnish 8.0 – 9.0.x `501`** (fixed upstream in 9.1.0),
 [#33](../../issues/33) matrix Axis A
 leftovers, [#34](../../issues/34) `/wp/v2/search` as first adopter, [#36](../../issues/36) file the
-array-form `methods` normalization bug — **filed 2026-08-18 as
-[Trac#65905](https://core.trac.wordpress.org/ticket/65905), patched in
-[wordpress-develop#13136](https://github.com/WordPress/wordpress-develop/pull/13136)** —
+array-form `methods` normalization bug — **filed as
+[Trac#65905](https://core.trac.wordpress.org/ticket/65905), fixed for 7.2 in
+[r63756](https://core.trac.wordpress.org/changeset/63756)** —
 and [#39](../../issues/39) report two page-cache method denylists upstream — **written and
 parked** in [docs/submissions/](docs/submissions/), filed when the feature plugin publishes or
 `QUERY` ships in a core release.
 
-**Two of these land regardless of `QUERY`** — [#16](../../issues/16) (the CORS header clobber) and
-[#36](../../issues/36) (array-form `methods` never comma-split). Both are real core defects with
-failing tests, both are patched upstream as of 2026-08-18
-([#13151](https://github.com/WordPress/wordpress-develop/pull/13151),
-[#13136](https://github.com/WordPress/wordpress-develop/pull/13136)), and both survive the main
-proposal stalling in review.
+**Two of these landed regardless of `QUERY`**: [#16](../../issues/16) (the CORS header clobber) and
+[#36](../../issues/36) (array-form `methods` never comma-split). Both are real core defects, and
+**both are fixed for 7.2**: [r64730](https://core.trac.wordpress.org/changeset/64730) and
+[r63756](https://core.trac.wordpress.org/changeset/63756).
 
 They differ on disclosure, deliberately. #16 is framed with no reference to `QUERY` at all.
 Trac#65905 **does** disclose it, because there the overlap is the strongest argument available: if
 `READABLE` gains a second method the bug produces 14 failures in core's own suite, so core is one
 multi-method constant away from breaking its own routes.
 
-**Milestones.** *Core patch v1* must be done before posting anything to Trac#65616. *Ecosystem*
-runs in parallel and gates nothing. *Deferred* is named so it is not rediscovered as a gap.
+**Milestones.** *Plugin v1* is the current focus. *Core patch v1* follows it, and nothing goes to
+Trac#65616 before the plugin has shipped. *Ecosystem* runs in parallel and gates nothing.
+*Deferred* is named so it is not rediscovered as a gap.
 
-~~[#8](../../issues/8) — reading Trac#65616 in a browser — is the project's only hard blocker.~~
-**Closed 2026-08-16.** The project has no external blockers left; what remains is
-[ADRs 0001–0004](docs/decisions/) and the patch.
+The project has no external blockers. What remains is designing the plugin's opt-in reach
+options ([ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md)) and shipping it.
 
 ### Explicitly not doing
 
@@ -203,7 +213,7 @@ matrix/
   compose.yaml        The stack matrix
   run.sh              Runs everything, emits results/results.json
   results/            Machine-readable results + generated MATRIX.md
-plugin/               Feature plugin — proves the path end-to-end on stock core
+plugin/               The feature plugin: QUERY on the REST API, stock core, no patch
 ```
 
 ---
@@ -226,10 +236,10 @@ plugin/               Feature plugin — proves the path end-to-end on stock cor
 | Gap 3 behavior measured | **Done 2026-08-16**, unmodified trunk. A `QUERY` with a **JSON** body already populates and schema-validates params correctly — dispatched at the real posts controller it filters the collection and `400`s a bad `per_page`. Only **form-encoded** bodies are lost, and they return the full unfiltered collection with a `200`. Gap 3 is the only gap whose failure is a silent wrong answer, so it should be patched first. [Probes](experiments/blast-radius/) |
 | Core bug found (unrelated to `QUERY`) | `register_rest_route()` does not comma-split `methods` given in array form, so `array( READABLE, EDITABLE )` registers the bogus key `'POST, PUT, PATCH'` and `POST` 404s. Confirmed on unmodified trunk, [failing test written](experiments/blast-radius/rest-array-methods-probe.php). Latent in core — its one array-form route uses single-method constants. Measured in the plugin directory: 3 plugins / 2,000 installs hit it today, but 27 plugins / 1.19M installs would break if `READABLE` ever gained a second method. Filed as [Trac#65905](https://core.trac.wordpress.org/ticket/65905), patched in [wordpress-develop#13136](https://github.com/WordPress/wordpress-develop/pull/13136) |
 | Requests upstream PR | **In flight upstream, not ours** — [#1075](https://github.com/WordPress/Requests/pull/1075) open, milestone 2.1.0, CI-blocked on [test-server#13](https://github.com/RequestsPHP/test-server/pull/13) |
-| Feature plugin | Scaffolded |
-| CORS clobber ([#16](../../issues/16)) | **Patched 2026-08-18** as [wordpress-develop#13151](https://github.com/WordPress/wordpress-develop/pull/13151). Fix shape settled on **option C** — the conditional *and* a `rest_allowed_cors_methods` filter matching the 5.5.0 siblings — agreed in person with adamsilverstein, who closed #46992 in 2019. 10 tests / 46 assertions, 6 fail on unmodified trunk, no regressions across the REST suite (3560 / 16285 vs. a 3550 / 16239 baseline). Needs `LOCAL_PHP_XDEBUG=true` or they skip silently. Branch `fix/rest-cors-allow-methods-clobber`, `QUERY`-free |
-| Core patch (`QUERY`) | **Unblocked and much smaller than planned.** ADRs 0001, 0002 and 0003 are all decided; option B is one additive constant and breaks nothing, so the D prerequisite chain (gap 3 → Trac#65905 → cache safety → #38) no longer gates it. Gap 3 ([#2](../../issues/2)) still lands on its own merits — a form-encoded `QUERY` returning an unfiltered `200` is a bug regardless of which constant wins. What is *not* unblocked is reach: [ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md) |
-| Trac tickets | **[#46992 reopened 2026-08-17](https://core.trac.wordpress.org/ticket/46992#comment:10)** with the clobber defect — the first thing this project has filed — and **#65905 filed 2026-08-18** for the array-form bug. Both now have patches; both still need `has-patch` set and a comment pointing at the PR. Trac#65616 (the `QUERY` proposal) still untouched, gated on the ADRs |
+| Feature plugin | **The deliverable.** All three gaps worked around in userland, with `Accept-Query` and a demo route. Passed 6/6 in a phpunit harness on unmodified trunk (2026-09-15, [plugin-spike](experiments/plugin-spike/)). **Never run on a real install** ([#22](../../issues/22)); no packaging yet ([#23](../../issues/23)); opt-in reach options still to design ([ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md)) |
+| CORS clobber ([#16](../../issues/16)) | **Fixed for 7.2** in [r64730](https://core.trac.wordpress.org/changeset/64730) (2026-10-26, adamsilverstein), reworked from [wordpress-develop#13151](https://github.com/WordPress/wordpress-develop/pull/13151). Adds `rest_allowed_cors_methods`, which the plugin uses |
+| Core patch (`QUERY`) | **Parked behind the plugin.** ADRs 0001–0003 are decided and both patches (gap 3, `QUERYABLE`) are written on `feat-http-query`, but nothing goes upstream until the plugin has shipped. The branch predates 7.2 and needs a rebase |
+| Trac tickets | **Both filed tickets fixed for 7.2:** [#46992](https://core.trac.wordpress.org/ticket/46992) (r64730) and [#65905](https://core.trac.wordpress.org/ticket/65905) (r63756). Checked 2026-11-04. Trac#65616 (the `QUERY` proposal) is untouched and waits on the plugin |
 
 ## Quick start
 
@@ -244,10 +254,13 @@ Requires Docker and `jq`. Results land in `matrix/results/`. See
 
 ## Principles
 
-1. **Evidence before patches.** Arrive at Trac with matrix data and a working plugin, not an
-   argument.
+1. **Plugin before patches.** Ship the capability as a plugin, then arrive at Trac with usage,
+   matrix data and a working plugin, not an argument.
 2. **Publish negative results.** A stack that drops `QUERY` is the most useful thing this
    project can document.
 3. **Date everything time-sensitive.** The ecosystem is moving weekly. Undated claims rot
    silently.
-4. **Additive only.** No existing route changes behavior. See ADR 0002.
+4. **Additive only.** No existing route changes behavior. See ADR 0002. This applies to the plugin
+   too: reach is opt-in, never all routes by default
+   ([ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md)). The current every-`GET`-route
+   filter is a placeholder that breaks this, and it gets replaced before publishing.
