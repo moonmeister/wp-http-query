@@ -76,28 +76,37 @@ If the setting has a note saying code overrides it, a plugin or theme on your si
 
 ## Check your server
 
-Go to **Settings → HTTP QUERY** and click **Test your server**. It runs four checks and explains
-each result in plain language:
+Go to **Settings → HTTP QUERY** and click **Test your server**. It runs four checks, in two
+groups, and explains each result in plain language. A summary line comes first: **All 4 checks
+passed**, or how many problems it found and which checks they are.
 
-| Check | What it does |
+**From your browser** goes through everything in front of your site (CDN, proxy, firewall), the
+way visitors' requests do. **From your server** is WordPress calling itself, the way Site Health's
+loopback test works: it tests the web server and PHP, usually skips the CDN, and catches
+page-cache plugins.
+
+| Check | What it sends |
 |---|---|
-| From your browser: `QUERY` reaches WordPress | Your browser sends a real `QUERY`, signed in as you, to the plugin's echo route, with a random value in the body, and checks the method, the value and the `Accept-Query` header come back |
-| From your browser: caches | Your browser sends two different `QUERY` bodies to the same URL, signed out, and checks the second answer isn't the first one again. This path goes through your CDN, if you have one |
-| From the server (loopback): `QUERY` reaches WordPress | The same check, sent by your site to itself, the way Site Health's loopback test works |
-| From the server (loopback): caches | The same cache check, sent by your site to itself. It usually skips the CDN, but catches page-cache plugins |
+| `QUERY` reaches WordPress from your browser | One `QUERY`, signed in as you, to the plugin's echo route, with a random value in a JSON body. Checks the method, the value and the `Accept-Query` header come back |
+| No cache between your browser and WordPress stores `QUERY` responses | Two anonymous `QUERY`s with different bodies to the same URL. Checks the second answer isn't the first one again |
+| `QUERY` reaches WordPress from the server itself | The same echo check, sent by your site to itself |
+| No cache on the server's own path stores `QUERY` responses | The same cache check, sent by your site to itself |
+
+Each result shows the request it made (method, URL path, signed in or anonymous), the HTTP status,
+and one line saying why.
 
 **Site Health** (**Tools → Site Health**) runs the two server checks too, as **HTTP QUERY requests
-reach WordPress** and **No cache stores HTTP QUERY responses**.
+reach WordPress** and **No cache was seen storing HTTP QUERY responses**.
 
 The tests send a few small requests to your own site and change nothing. You need the
 `manage_options` capability.
 
 ### What the results mean
 
-Each result shows the HTTP status and one line saying why. Sample result, from an nginx site
-using plain permalinks:
+Sample result, from an nginx site using plain permalinks:
 
-> **From the server (loopback): QUERY reaches WordPress: failed** HTTP status 405.
+> **QUERY reaches WordPress from the server itself: failed**
+> The server sent itself: QUERY /?rest_route=/wp-http-query/v1/echo, signed in as you HTTP status 405.
 > The web server refused QUERY before WordPress saw it. nginx does this when the request goes to
 > the site root (/ or /?rest_route=…) instead of /index.php or /wp-json/: its index module answers
 > 405 first. Check the URL tested; with plain permalinks, send QUERY to /index.php?rest_route=…
