@@ -25,6 +25,7 @@ The first run installs npm dependencies, downloads three WordPress builds and th
 then runs the tests. Expect a few minutes. Later starts take seconds.
 
 CI runs the same `make check` on every PR and on pushes to `main` ([`.github/workflows/test.yml`](.github/workflows/test.yml)).
+It also runs `make lint` (WordPress Coding Standards and PHP 8.0+ compatibility for `plugin/`) on every PR and on pushes to `main` ([`.github/workflows/lint.yml`](.github/workflows/lint.yml)).
 
 You get three WordPress sites, all with `plugin/` mounted and active:
 
