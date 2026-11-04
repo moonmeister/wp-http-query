@@ -381,8 +381,11 @@ This works, with caveats ([scope.md §5.1](scope.md#51-the-requests-library--alr
   [Requests#1075](https://github.com/WordPress/Requests/pull/1075) adds one; it was open, in the
   2.1.0 milestone, when last checked on 2026-08-16. Tracked here as
   [#6](https://github.com/moonmeister/wp-http-query/issues/6).
-- **Redirects replay the `QUERY`, body included.** `WP_Http` only turns `POST` into `GET` on a
-  redirect. That suits an idempotent method, but it's untested.
+- **Some redirects turn `QUERY` into `GET`.** `WP_Http::browser_redirect_compatibility()` switches
+  **any** method to `GET` on a `302`, and Requests does the same on a `303`. The request data
+  goes with it, sent as a `GET` instead of a `QUERY` body. `301`, `307` and `308` keep the method. If the method matters, call the final URL directly, or
+  pass `'redirection' => 0` and handle the `Location` header yourself. (Read from WordPress 7.1's
+  `class-wp-http.php` and Requests 2.0.17's `Requests.php`; not tested here.)
 
 ### Fallback: the method override tunnel
 

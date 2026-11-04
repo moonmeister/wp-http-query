@@ -84,8 +84,10 @@ the JSON body:
 "merged_params":{"search":"hello"}
 ```
 
-If your site uses plain permalinks, use `https://example.com/?rest_route=/wp-http-query/v1/echo`
-instead.
+If your site uses plain permalinks, use `https://example.com/index.php?rest_route=/wp-http-query/v1/echo`
+instead. Keep the `index.php`: on nginx, `QUERY` to the bare `/` gets a `405` from nginx's index
+module before WordPress sees it, while `/index.php` reaches PHP
+([matrix notes](../matrix/README.md)).
 
 With the preset on, try a real collection:
 
@@ -124,8 +126,13 @@ way they block `PUT` or `DELETE`. Apache accepts `QUERY` as a method name, so yo
 `LimitExcept` list. nginx can't name `QUERY` in `limit_except` (as of 2026-08-10, see
 [docs/ecosystem.md](../docs/ecosystem.md#nginx--no-native-method-identifier)).
 
-**Caches and proxies in front of the site.** No shipping cache stores a `QUERY` response, so you
-won't get one visitor's results served to another. One version range blocks it outright: Varnish
+**Caches and proxies in front of the site.** By default, no shipping cache stores a `QUERY`
+response, so you won't get one visitor's results served to another. **One exception: W3 Total
+Cache Pro with REST caching enabled.** It caches `QUERY` responses keyed by URL alone, without the
+method or body, so different searches to the same URL can share one cached entry and anonymous
+visitors can get the wrong public results. It doesn't expose private data: W3TC skips logged-in
+requests, and anything in a `QUERY` body could be fetched with `GET` anyway. If you use the
+preset or opt routes in, leave W3TC's REST caching off. One version range blocks `QUERY` outright: Varnish
 8.0 – 9.0.x answers `QUERY` with `501` itself, and the request never reaches WordPress. Varnish
 9.1.0 and later pass it through. Source: the
 [cache survey](../experiments/cache-survey/README.md), from reading each cache's source and
