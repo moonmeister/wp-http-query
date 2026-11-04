@@ -23,6 +23,12 @@ SLUG=wp-http-query
 # Files copied into the zip, relative to plugin/. The build fails if one is missing.
 SHIP=(
 	wp-http-query.php
+	includes/core-gaps.php
+	includes/reach.php
+	includes/settings.php
+	includes/demo-route.php
+	includes/diagnose.php
+	includes/self-test.php
 	uninstall.php
 	README.md
 	LICENSE
