@@ -96,6 +96,7 @@ from:
 | `method-override-tunnel.test.ts` | `POST` + `X-HTTP-Method-Override: QUERY` is handled as `QUERY` |
 | `adr-0005-reach.test.ts` | [ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md): no route gains `QUERY` by default; the route, filter and preset opt-ins work; write handlers never gain it; a form-encoded `QUERY /wp/v2/posts` search filters a real collection |
 | `lifecycle/adr-0005-preset-setting.test.ts` | ADR 0005: the stored preset setting switches reach, and the filter overrides it |
+| `lifecycle/demo-route.test.ts` | The diagnostic echo route is off unless `wp_http_query_register_demo_route` returns true |
 | `lifecycle/plugin-lifecycle.test.ts` | [#22](../../issues/22): deactivated, the site is stock; uninstall deletes the option |
 
 The tests make real HTTP requests to both sites, so they cover what a client would actually see:
@@ -112,7 +113,8 @@ No test uses it today.
 **Opt-ins for the tests live in a fixture mu-plugin**,
 [`tests/fixtures/mu-plugins/`](tests/fixtures/mu-plugins/), mounted on every site. It enables the
 `core-collections` preset, opts in `/wp/v2/taxonomies` and `/wp/v2/posts/(?P<id>[\d]+)`, and
-registers two test routes. `/wp/v2/types` is deliberately left alone for the default-off tests.
+registers two test routes. It also turns on the plugin's diagnostic echo route, which is off by default.
+`/wp/v2/types` is deliberately left alone for the default-off tests.
 Global setup seeds two posts through WP-CLI, idempotently. Changing the mappings in the
 `.wp-env*.json` files needs `make up` to take effect.
 

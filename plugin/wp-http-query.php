@@ -557,11 +557,21 @@ add_filter(
 
 /*
  * -------------------------------------------------------------------------
- * Demo route.
+ * Demo route: off unless a site turns it on.
  *
- * Registrable on stock core with no patch: register_rest_route() has no method
- * allowlist, set_method() only uppercases, and match_request_to_handler() is a
- * plain array-key lookup. See scope.md §2.
+ * QUERY /wp-json/wp-http-query/v1/echo reports how the server parsed the
+ * request. It is unauthenticated and reflects its input, so it is only
+ * registered when the 'wp_http_query_register_demo_route' filter returns true:
+ *
+ *     add_filter( 'wp_http_query_register_demo_route', '__return_true' );
+ *
+ * The default is false, not WP_DEBUG: WP_DEBUG is often left on for staging
+ * sites that are publicly reachable, and a route that appears or disappears
+ * with a debugging constant is a surprise. Opting in is one line.
+ *
+ * The route is registrable on stock core with no patch: register_rest_route()
+ * has no method allowlist, set_method() only uppercases, and
+ * match_request_to_handler() is a plain array-key lookup. See scope.md §2.
  *
  * Also reachable via the core X-HTTP-Method-Override tunnel:
  *   POST /wp-json/wp-http-query/v1/echo  +  X-HTTP-Method-Override: QUERY
@@ -573,6 +583,15 @@ add_filter(
 add_action(
 	'rest_api_init',
 	static function (): void {
+		/**
+		 * Filters whether to register the diagnostic echo route.
+		 *
+		 * @param bool $register Whether to register QUERY /wp-http-query/v1/echo. Default false.
+		 */
+		if ( ! apply_filters( 'wp_http_query_register_demo_route', false ) ) {
+			return;
+		}
+
 		register_rest_route(
 			NAMESPACE_,
 			'/echo',

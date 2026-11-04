@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An `Accept-Query` response header on routes that accept `QUERY`. It advertises
   `application/json` by default, which can be changed with the `wp_http_query_advertised_types` filter.
 - A diagnostic route, `QUERY /wp-json/wp-http-query/v1/echo`, that reports how the request was parsed.
+  Off by default; the `wp_http_query_register_demo_route` filter turns it on.
 - `uninstall.php` deletes the `wp_http_query_presets` option (current site only on multisite).
   Deactivating keeps it.
 
