@@ -46,8 +46,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 /** The body key the echo check puts its random marker under. */
 const SELF_TEST_MARKER_KEY = 'wp_http_query_self_test';
 
-/** The fingerprint route's key, as the REST server lists it. */
+/** The self-test's route keys, as the REST server lists them. */
 const FINGERPRINT_ROUTE = '/' . NAMESPACE_ . '/self-test/fingerprint';
+const SERVER_ROUTE      = '/' . NAMESPACE_ . '/self-test/server';
+const CACHE_ROUTE       = '/' . NAMESPACE_ . '/self-test/cache';
+const DIAGNOSE_ROUTE    = '/' . NAMESPACE_ . '/self-test/diagnose';
 
 /** Seconds a loopback request may take. Core's loopback test uses the same. */
 const LOOPBACK_TIMEOUT = 10;
@@ -76,9 +79,8 @@ add_action(
 		 * the plugin emits nothing method-specific, and the point is to see
 		 * what the layers in front of WordPress do.
 		 */
-		register_rest_route(
-			NAMESPACE_,
-			'/self-test/fingerprint',
+		register_route(
+			FINGERPRINT_ROUTE,
 			array(
 				'methods'             => METHOD,
 				'permission_callback' => '__return_true',
@@ -86,9 +88,8 @@ add_action(
 			)
 		);
 
-		register_rest_route(
-			NAMESPACE_,
-			'/self-test/server',
+		register_route(
+			SERVER_ROUTE,
 			array(
 				'methods'             => \WP_REST_Server::READABLE,
 				'permission_callback' => __NAMESPACE__ . '\\can_run_self_test',
@@ -96,9 +97,8 @@ add_action(
 			)
 		);
 
-		register_rest_route(
-			NAMESPACE_,
-			'/self-test/cache',
+		register_route(
+			CACHE_ROUTE,
 			array(
 				'methods'             => \WP_REST_Server::READABLE,
 				'permission_callback' => __NAMESPACE__ . '\\can_run_self_test',
@@ -108,9 +108,8 @@ add_action(
 
 		// What the browser saw, in; a verdict and message, out. Pure: it
 		// sends nothing and stores nothing.
-		register_rest_route(
-			NAMESPACE_,
-			'/self-test/diagnose',
+		register_route(
+			DIAGNOSE_ROUTE,
 			array(
 				'methods'             => \WP_REST_Server::CREATABLE,
 				'permission_callback' => __NAMESPACE__ . '\\can_run_self_test',
@@ -232,7 +231,7 @@ function loopback_query( string $url, string $body, bool $as_current_user ): arr
  * @return array Verdict from diagnose_echo_response(), plus 'url'.
  */
 function run_server_check(): array {
-	$url           = rest_url( NAMESPACE_ . '/echo' );
+	$url           = rest_url( ECHO_ROUTE );
 	$marker        = wp_generate_password( 20, false );
 	$authenticated = is_user_logged_in() && ! empty( $_COOKIE );
 	$response      = loopback_query( $url, (string) wp_json_encode( array( SELF_TEST_MARKER_KEY => $marker ) ), $authenticated );
@@ -246,7 +245,7 @@ function run_server_check(): array {
  * @return array Verdict from diagnose_cache_probe(), plus 'url'.
  */
 function run_cache_check(): array {
-	$url       = rest_url( NAMESPACE_ . '/self-test/fingerprint' );
+	$url       = rest_url( FINGERPRINT_ROUTE );
 	$responses = array();
 
 	foreach ( array( 1, 2 ) as $n ) {
@@ -324,7 +323,7 @@ function health_result( string $test, array $check ): array {
 		'description' => $description,
 		'actions'     => sprintf(
 			'<p><a href="%s">%s</a></p>',
-			esc_url( admin_url( 'options-general.php?page=' . SETTINGS_PAGE ) ),
+			esc_url( settings_page_url() ),
 			esc_html__( 'Test from your browser too, on Settings → HTTP QUERY', 'wp-http-query' )
 		),
 		'test'        => $test,
@@ -338,13 +337,13 @@ add_filter(
 		// Async, like core's loopback test: each run sends requests to the site.
 		$tests['async'][ HEALTH_TEST_REACH ] = array(
 			'label'             => __( 'HTTP QUERY requests reach WordPress', 'wp-http-query' ),
-			'test'              => rest_url( NAMESPACE_ . '/self-test/server' ),
+			'test'              => rest_url( SERVER_ROUTE ),
 			'has_rest'          => true,
 			'async_direct_test' => static fn (): array => health_result( HEALTH_TEST_REACH, run_server_check() ),
 		);
 		$tests['async'][ HEALTH_TEST_CACHE ] = array(
 			'label'             => __( 'No cache stores HTTP QUERY responses', 'wp-http-query' ),
-			'test'              => rest_url( NAMESPACE_ . '/self-test/cache' ),
+			'test'              => rest_url( CACHE_ROUTE ),
 			'has_rest'          => true,
 			'async_direct_test' => static fn (): array => health_result( HEALTH_TEST_CACHE, run_cache_check() ),
 		);

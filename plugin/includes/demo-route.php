@@ -76,9 +76,8 @@ function can_call_echo(): bool {
 add_action(
 	'rest_api_init',
 	static function (): void {
-		register_rest_route(
-			NAMESPACE_,
-			'/echo',
+		register_route(
+			ECHO_ROUTE,
 			array(
 				'methods'             => METHOD,
 				'permission_callback' => __NAMESPACE__ . '\\can_call_echo',

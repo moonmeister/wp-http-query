@@ -60,6 +60,17 @@ const QUERYABLE = METHOD;
 /** This file's path, for plugin_basename() and plugins_url(). */
 const PLUGIN_FILE = __FILE__;
 
+/**
+ * Registers one of the plugin's own routes by its full route key, such as
+ * ECHO_ROUTE, so each route's path is written once.
+ *
+ * @param string $route Route key: '/' . NAMESPACE_ . '/...'.
+ * @param array  $args  register_rest_route() arguments.
+ */
+function register_route( string $route, array $args ): void {
+	register_rest_route( NAMESPACE_, substr( $route, strlen( '/' . NAMESPACE_ ) ), $args );
+}
+
 require_once __DIR__ . '/includes/core-gaps.php';
 require_once __DIR__ . '/includes/reach.php';
 require_once __DIR__ . '/includes/settings.php';

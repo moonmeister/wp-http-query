@@ -33,6 +33,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 /** Settings page slug, and the option group and page the Settings API uses. */
 const SETTINGS_PAGE = 'wp-http-query';
 
+/**
+ * Settings → HTTP QUERY's URL.
+ */
+function settings_page_url(): string {
+	return admin_url( 'options-general.php?page=' . SETTINGS_PAGE );
+}
+
 /** Where the settings page's docs link points. */
 const DOCS_URL = 'https://github.com/moonmeister/wp-http-query/blob/main/plugin/README.md';
 
@@ -105,7 +112,7 @@ add_filter(
 			$links,
 			sprintf(
 				'<a href="%s">%s</a>',
-				esc_url( admin_url( 'options-general.php?page=' . SETTINGS_PAGE ) ),
+				esc_url( settings_page_url() ),
 				esc_html__( 'Settings', 'wp-http-query' )
 			)
 		);
@@ -299,11 +306,11 @@ add_action(
  */
 function self_test_script_data(): array {
 	return array(
-		'echoUrl'        => rest_url( NAMESPACE_ . '/echo' ),
-		'fingerprintUrl' => rest_url( NAMESPACE_ . '/self-test/fingerprint' ),
-		'serverUrl'      => rest_url( NAMESPACE_ . '/self-test/server' ),
-		'cacheUrl'       => rest_url( NAMESPACE_ . '/self-test/cache' ),
-		'diagnoseUrl'    => rest_url( NAMESPACE_ . '/self-test/diagnose' ),
+		'echoUrl'        => rest_url( ECHO_ROUTE ),
+		'fingerprintUrl' => rest_url( FINGERPRINT_ROUTE ),
+		'serverUrl'      => rest_url( SERVER_ROUTE ),
+		'cacheUrl'       => rest_url( CACHE_ROUTE ),
+		'diagnoseUrl'    => rest_url( DIAGNOSE_ROUTE ),
 		'nonce'          => wp_create_nonce( 'wp_rest' ),
 		'markerKey'      => SELF_TEST_MARKER_KEY,
 		'i18n'           => array(
