@@ -21,13 +21,18 @@ export class Session {
 		private password = 'password'
 	) {}
 
+	/** This session's cookies, as a Cookie request header. */
+	cookieHeader(): string {
+		return [ ...this.cookies ].map( ( [ k, v ] ) => `${ k }=${ v }` ).join( '; ' );
+	}
+
 	async request(
 		path: string,
 		init: { method?: string; form?: URLSearchParams; json?: unknown; headers?: Record< string, string > } = {}
 	): Promise< Response > {
 		const headers: Record< string, string > = { ...FRESH, ...init.headers };
 		if ( this.cookies.size ) {
-			headers.cookie = [ ...this.cookies ].map( ( [ k, v ] ) => `${ k }=${ v }` ).join( '; ' );
+			headers.cookie = this.cookieHeader();
 		}
 		let body: string | undefined;
 		if ( init.form ) {

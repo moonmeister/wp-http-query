@@ -60,6 +60,47 @@ const HEALTH_TEST_REACH = 'wp_http_query_reaches_wordpress';
 const HEALTH_TEST_CACHE = 'wp_http_query_cache';
 
 /**
+ * The two server checks, by Site Health test key: the REST route the
+ * settings page and Site Health call, the function that runs the check, and
+ * the Site Health label for each status. The REST routes, the Site Health
+ * tests and health_result() all read this.
+ *
+ * @return array<string, array{route: string, run: callable, labels: array<string, string>}>
+ */
+function server_checks(): array {
+	return array(
+		HEALTH_TEST_REACH => array(
+			'route'  => SERVER_ROUTE,
+			'run'    => __NAMESPACE__ . '\\run_server_check',
+			'labels' => array(
+				'good'        => __( 'HTTP QUERY requests reach WordPress', 'wp-http-query' ),
+				'recommended' => __( 'Couldn’t confirm that HTTP QUERY requests reach WordPress', 'wp-http-query' ),
+				'critical'    => __( 'HTTP QUERY requests don’t reach WordPress intact', 'wp-http-query' ),
+			),
+		),
+		HEALTH_TEST_CACHE => array(
+			'route'  => CACHE_ROUTE,
+			'run'    => __NAMESPACE__ . '\\run_cache_check',
+			'labels' => array(
+				'good'        => __( 'No cache was seen storing HTTP QUERY responses', 'wp-http-query' ),
+				'recommended' => __( 'Couldn’t check whether a cache stores HTTP QUERY responses', 'wp-http-query' ),
+				'critical'    => __( 'A cache stores HTTP QUERY responses without the request body', 'wp-http-query' ),
+			),
+		),
+	);
+}
+
+/**
+ * Runs a server check and returns it as a Site Health result.
+ *
+ * @param string $test A server_checks() key.
+ * @return array
+ */
+function run_health_test( string $test ): array {
+	return health_result( $test, call_user_func( server_checks()[ $test ]['run'] ) );
+}
+
+/**
  * Who may run the self-test and read its results.
  */
 function can_run_self_test(): bool {
@@ -88,23 +129,16 @@ add_action(
 			)
 		);
 
-		register_route(
-			SERVER_ROUTE,
-			array(
-				'methods'             => \WP_REST_Server::READABLE,
-				'permission_callback' => __NAMESPACE__ . '\\can_run_self_test',
-				'callback'            => static fn (): \WP_REST_Response => rest_ensure_response( health_result( HEALTH_TEST_REACH, run_server_check() ) ),
-			)
-		);
-
-		register_route(
-			CACHE_ROUTE,
-			array(
-				'methods'             => \WP_REST_Server::READABLE,
-				'permission_callback' => __NAMESPACE__ . '\\can_run_self_test',
-				'callback'            => static fn (): \WP_REST_Response => rest_ensure_response( health_result( HEALTH_TEST_CACHE, run_cache_check() ) ),
-			)
-		);
+		foreach ( server_checks() as $test => $check ) {
+			register_route(
+				$check['route'],
+				array(
+					'methods'             => \WP_REST_Server::READABLE,
+					'permission_callback' => __NAMESPACE__ . '\\can_run_self_test',
+					'callback'            => static fn (): \WP_REST_Response => rest_ensure_response( run_health_test( $test ) ),
+				)
+			);
+		}
 
 		// What the browser saw, in; a verdict and message, out. Pure: it
 		// sends nothing and stores nothing.
@@ -150,11 +184,10 @@ function handle_fingerprint( \WP_REST_Request $request ): \WP_REST_Response {
  */
 function handle_diagnose( \WP_REST_Request $request ): array {
 	if ( 'echo' === $request->get_param( 'check' ) ) {
-		$seen = observation( $request->get_param( 'response' ) );
-		return diagnose_echo_response( $seen['status'], $seen['headers'], $seen['body'], (string) $request->get_param( 'marker' ) );
+		return diagnose_echo_response( (array) $request->get_param( 'response' ), (string) $request->get_param( 'marker' ) );
 	}
 
-	return diagnose_cache_probe( observation( $request->get_param( 'first' ) ), observation( $request->get_param( 'second' ) ) );
+	return diagnose_cache_probe( (array) $request->get_param( 'first' ), (array) $request->get_param( 'second' ) );
 }
 
 /**
@@ -228,7 +261,7 @@ function loopback_query( string $url, string $body, bool $as_current_user ): arr
  * Without a signed-in user (Site Health's scheduled run, WP-CLI) it goes
  * signed out, and a 401 from the route still shows QUERY reached WordPress.
  *
- * @return array Verdict from diagnose_echo_response(), plus 'url'.
+ * @return array Verdict from diagnose_echo_response(), plus 'url' and 'signed_in'.
  */
 function run_server_check(): array {
 	$url           = rest_url( ECHO_ROUTE );
@@ -236,13 +269,16 @@ function run_server_check(): array {
 	$authenticated = is_user_logged_in() && ! empty( $_COOKIE );
 	$response      = loopback_query( $url, (string) wp_json_encode( array( SELF_TEST_MARKER_KEY => $marker ) ), $authenticated );
 
-	return diagnose_echo_response( $response['status'], $response['headers'], $response['body'], $marker, $authenticated, $response['error'] ) + array( 'url' => $url );
+	return diagnose_echo_response( $response, $marker, $authenticated ) + array(
+		'url'       => $url,
+		'signed_in' => $authenticated,
+	);
 }
 
 /**
  * The cache check: two different signed-out QUERY loopbacks to one URL.
  *
- * @return array Verdict from diagnose_cache_probe(), plus 'url'.
+ * @return array Verdict from diagnose_cache_probe(), plus 'url' and 'signed_in'.
  */
 function run_cache_check(): array {
 	$url       = rest_url( FINGERPRINT_ROUTE );
@@ -253,41 +289,30 @@ function run_cache_check(): array {
 		$responses[] = loopback_query( $url, $sent, false ) + array( 'sent' => $sent );
 	}
 
-	return diagnose_cache_probe( $responses[0], $responses[1] ) + array( 'url' => $url );
+	return diagnose_cache_probe( $responses[0], $responses[1] ) + array(
+		'url'       => $url,
+		'signed_in' => false,
+	);
 }
 
 /**
  * A check's result as a Site Health test result, with the check attached.
  *
- * @param string $test  HEALTH_TEST_REACH or HEALTH_TEST_CACHE.
+ * @param string $test  A server_checks() key.
  * @param array  $check A verdict from run_server_check() or run_cache_check().
  * @return array
  */
 function health_result( string $test, array $check ): array {
-	$labels = array(
-		HEALTH_TEST_REACH => array(
-			'good'        => __( 'HTTP QUERY requests reach WordPress', 'wp-http-query' ),
-			'recommended' => __( 'Couldn’t confirm that HTTP QUERY requests reach WordPress', 'wp-http-query' ),
-			'critical'    => __( 'HTTP QUERY requests don’t reach WordPress intact', 'wp-http-query' ),
-		),
-		HEALTH_TEST_CACHE => array(
-			'good'        => __( 'No cache was seen storing HTTP QUERY responses', 'wp-http-query' ),
-			'recommended' => __( 'Couldn’t check whether a cache stores HTTP QUERY responses', 'wp-http-query' ),
-			'critical'    => __( 'A cache stores HTTP QUERY responses without the request body', 'wp-http-query' ),
-		),
-	);
-
 	$description = sprintf( '<p>%s</p>', esc_html( $check['message'] ) );
 
-	$statuses = $check['http_statuses'] ?? ( $check['http_status'] ? array( $check['http_status'] ) : array() );
-	if ( $statuses ) {
+	if ( $check['http_statuses'] ) {
 		$description .= sprintf(
 			'<p>%s</p>',
 			esc_html(
 				sprintf(
 					/* translators: 1: HTTP status code(s). 2: URL. */
 					__( 'HTTP status: %1$s. URL tested: %2$s', 'wp-http-query' ),
-					implode( ', ', $statuses ),
+					implode( ', ', $check['http_statuses'] ),
 					$check['url'] ?? ''
 				)
 			)
@@ -313,7 +338,7 @@ function health_result( string $test, array $check ): array {
 	}
 
 	return array(
-		'label'       => $labels[ $test ][ $check['status'] ],
+		'label'       => server_checks()[ $test ]['labels'][ $check['status'] ],
 		'status'      => $check['status'],
 		'badge'       => array(
 			/* translators: Site Health badge. QUERY is the HTTP method's name; keep it as is. */
@@ -335,18 +360,14 @@ add_filter(
 	'site_status_tests',
 	static function ( array $tests ): array {
 		// Async, like core's loopback test: each run sends requests to the site.
-		$tests['async'][ HEALTH_TEST_REACH ] = array(
-			'label'             => __( 'HTTP QUERY requests reach WordPress', 'wp-http-query' ),
-			'test'              => rest_url( SERVER_ROUTE ),
-			'has_rest'          => true,
-			'async_direct_test' => static fn (): array => health_result( HEALTH_TEST_REACH, run_server_check() ),
-		);
-		$tests['async'][ HEALTH_TEST_CACHE ] = array(
-			'label'             => __( 'No cache stores HTTP QUERY responses', 'wp-http-query' ),
-			'test'              => rest_url( CACHE_ROUTE ),
-			'has_rest'          => true,
-			'async_direct_test' => static fn (): array => health_result( HEALTH_TEST_CACHE, run_cache_check() ),
-		);
+		foreach ( server_checks() as $test => $check ) {
+			$tests['async'][ $test ] = array(
+				'label'             => $check['labels']['good'],
+				'test'              => rest_url( $check['route'] ),
+				'has_rest'          => true,
+				'async_direct_test' => static fn (): array => run_health_test( $test ),
+			);
+		}
 
 		return $tests;
 	}

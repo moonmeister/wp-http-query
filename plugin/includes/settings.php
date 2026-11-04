@@ -313,30 +313,70 @@ function self_test_script_data(): array {
 		'diagnoseUrl'    => rest_url( DIAGNOSE_ROUTE ),
 		'nonce'          => wp_create_nonce( 'wp_rest' ),
 		'markerKey'      => SELF_TEST_MARKER_KEY,
+		'statuses'       => verdict_statuses(),
 		'i18n'           => array(
-			'checks'              => array(
-				'browserEcho'  => __( 'From your browser: QUERY reaches WordPress', 'wp-http-query' ),
-				'browserCache' => __( 'From your browser: caches', 'wp-http-query' ),
-				'serverEcho'   => __( 'From the server (loopback): QUERY reaches WordPress', 'wp-http-query' ),
-				'serverCache'  => __( 'From the server (loopback): caches', 'wp-http-query' ),
+			'groups'       => array(
+				'browser' => array(
+					'title'       => __( 'From your browser', 'wp-http-query' ),
+					'description' => __( 'Goes through everything in front of the site (CDN, proxy, firewall), the way visitors’ requests do.', 'wp-http-query' ),
+				),
+				'server'  => array(
+					'title'       => __( 'From your server', 'wp-http-query' ),
+					'description' => __( 'WordPress calls itself (a loopback). Tests the web server and PHP; usually skips the CDN, but catches page-cache plugins.', 'wp-http-query' ),
+				),
 			),
-			'status'              => array(
+			'checks'       => array(
+				'browserEcho'  => __( 'QUERY reaches WordPress from your browser', 'wp-http-query' ),
+				'browserCache' => __( 'No cache between your browser and WordPress stores QUERY responses', 'wp-http-query' ),
+				'serverEcho'   => __( 'QUERY reaches WordPress from the server itself', 'wp-http-query' ),
+				'serverCache'  => __( 'No cache on the server’s own path stores QUERY responses', 'wp-http-query' ),
+			),
+			'descriptions' => array(
+				'echo'  => __( 'Sends one QUERY with a JSON body, and checks that WordPress gets the method and the body intact.', 'wp-http-query' ),
+				'cache' => __( 'Sends two anonymous QUERYs with different bodies to the same URL, and checks that the answers differ.', 'wp-http-query' ),
+			),
+			'sent'         => array(
+				/* translators: %s: URL path. */
+				'browserEcho'  => __( 'Your browser sent: QUERY %s, signed in as you', 'wp-http-query' ),
+				/* translators: %s: URL path. */
+				'browserCache' => __( 'Your browser sent: 2 × QUERY %s, anonymous', 'wp-http-query' ),
+				'serverEcho'   => array(
+					/* translators: %s: URL path. */
+					'signedIn'  => __( 'The server sent itself: QUERY %s, signed in as you', 'wp-http-query' ),
+					/* translators: %s: URL path. */
+					'anonymous' => __( 'The server sent itself: QUERY %s, anonymous', 'wp-http-query' ),
+				),
+				/* translators: %s: URL path. */
+				'serverCache'  => __( 'The server sent itself: 2 × QUERY %s, anonymous', 'wp-http-query' ),
+			),
+			'summary'      => array(
+				'passed'   => __( 'All 4 checks passed.', 'wp-http-query' ),
+				// Indexed by how many checks didn't pass.
+				'problems' => array(
+					/* translators: %d: Number of checks that didn't pass. */
+					1 => sprintf( _n( '%d problem found:', '%d problems found:', 1, 'wp-http-query' ), 1 ),
+					/* translators: %d: Number of checks that didn't pass. */
+					2 => sprintf( _n( '%d problem found:', '%d problems found:', 2, 'wp-http-query' ), 2 ),
+					/* translators: %d: Number of checks that didn't pass. */
+					3 => sprintf( _n( '%d problem found:', '%d problems found:', 3, 'wp-http-query' ), 3 ),
+					/* translators: %d: Number of checks that didn't pass. */
+					4 => sprintf( _n( '%d problem found:', '%d problems found:', 4, 'wp-http-query' ), 4 ),
+				),
+			),
+			/* translators: 1: A check's title. 2: Its result, such as "passed". */
+			'titleStatus'  => __( '%1$s: %2$s', 'wp-http-query' ),
+			'status'       => array(
 				'good'        => __( 'passed', 'wp-http-query' ),
 				'recommended' => __( 'needs a look', 'wp-http-query' ),
 				'critical'    => __( 'failed', 'wp-http-query' ),
 			),
 			/* translators: %s: HTTP status code(s). */
-			'httpStatus'          => __( 'HTTP status %s.', 'wp-http-query' ),
-			/* translators: %s: URL. */
-			'urlTested'           => __( 'URL tested: %s', 'wp-http-query' ),
-			'cacheHeaders'        => __( 'Cache-related response headers seen (hints, not proof):', 'wp-http-query' ),
-			'running'             => __( 'Testing…', 'wp-http-query' ),
+			'httpStatus'   => __( 'HTTP status %s.', 'wp-http-query' ),
+			'cacheHeaders' => __( 'Cache-related response headers seen (hints, not proof):', 'wp-http-query' ),
+			'running'      => __( 'Testing…', 'wp-http-query' ),
 			/* translators: %s: Error detail, such as an HTTP status code. */
-			'testFailed'          => __( 'The test itself failed (%s). Reload the page and try again.', 'wp-http-query' ),
-			'browserUnsupported'  => __( 'Your browser can’t send QUERY yet, so this check couldn’t run. That’s the browser, not your server: the server checks still apply.', 'wp-http-query' ),
-			'browserNetworkError' => __( 'The request didn’t complete: the browser reported a network error before any response arrived. A browser extension, proxy or firewall may have blocked it.', 'wp-http-query' ),
-			'browserRedirect'     => __( 'The server answered with a redirect. A client that follows it may switch QUERY to GET and drop the body. Check that the Site Address in Settings → General matches the address the site is served from.', 'wp-http-query' ),
-			'limits'              => self_test_limits(),
+			'testFailed'   => __( 'The test itself failed (%s). Reload the page and try again.', 'wp-http-query' ),
+			'limits'       => self_test_limits(),
 		),
 	);
 }

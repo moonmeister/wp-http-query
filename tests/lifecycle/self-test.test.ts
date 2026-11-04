@@ -18,6 +18,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { rest } from '../http';
 import { wp } from '../seed';
 import { NO_LOCAL_CLI, sites } from '../sites';
+import { clickTestButton, type StubElement } from './self-test-button';
 import { FRESH, Session } from './session';
 import { FIXTURE_DEMO_ROUTE_OFF, setOption, snapshotOption } from './site-state';
 
@@ -30,8 +31,7 @@ const FINGERPRINT = '/wp-http-query/v1/self-test/fingerprint';
 interface Check {
 	verdict: string;
 	status: string;
-	http_status: number;
-	http_statuses?: number[];
+	http_statuses: number[];
 	message: string;
 	url?: string;
 	cache_headers?: { response?: number; header: string; value: string; hint: string }[];
@@ -63,26 +63,60 @@ const MARKER = 'fabricated-marker';
 const ECHO_OK = JSON.stringify( { method: 'QUERY', body_bytes: 40, merged_params: { wp_http_query_self_test: MARKER } } );
 const AQ = { 'Accept-Query': '"application/json"' };
 
-/** Fabricated echo responses: [ name, status, headers, body, authenticated, error ] => expected verdict. */
-const ECHO_CASES: Record< string, { args: [ number, Record< string, string >, string, boolean?, string? ]; verdict: string; status: string; says?: string } > = {
-	pass: { args: [ 200, AQ, ECHO_OK ], verdict: 'pass', status: 'good' },
-	'405 nginx root': { args: [ 405, { Server: 'nginx' }, '<html>405 Not Allowed</html>' ], verdict: 'not_allowed', status: 'critical', says: '/index.php' },
-	'403 hardening rule': { args: [ 403, {}, '<html>Forbidden</html>' ], verdict: 'forbidden', status: 'critical', says: 'limit_except GET POST' },
-	'501 Varnish': { args: [ 501, { 'X-Varnish': '1234' }, '' ], verdict: 'not_implemented', status: 'critical', says: 'This response has Varnish headers.' },
-	'501 php -S': { args: [ 501, {}, '' ], verdict: 'not_implemented', status: 'critical', says: 'php -S' },
-	'302 redirect': { args: [ 302, { Location: 'https://example.com/wp-json/' }, '' ], verdict: 'redirect', status: 'critical', says: 'https://example.com/wp-json/' },
-	'301 redirect': { args: [ 301, { Location: 'https://example.com/' }, '' ], verdict: 'redirect', status: 'critical' },
-	'method arrives as GET': { args: [ 200, AQ, JSON.stringify( { method: 'GET', body_bytes: 0, merged_params: {} } ) ], verdict: 'method_changed', status: 'critical', says: 'as GET' },
-	'method changed, no route': { args: [ 404, {}, JSON.stringify( { code: 'rest_no_route', message: 'No route' } ) ], verdict: 'method_changed', status: 'critical' },
-	'body missing': { args: [ 200, AQ, JSON.stringify( { method: 'QUERY', body_bytes: 0, merged_params: {} } ) ], verdict: 'body_lost', status: 'critical', says: 'empty body' },
-	'marker lost': { args: [ 200, AQ, JSON.stringify( { method: 'QUERY', body_bytes: 12, merged_params: { other: 1 } } ) ], verdict: 'body_lost', status: 'critical', says: 'arrived changed' },
-	'Accept-Query stripped': { args: [ 200, {}, ECHO_OK ], verdict: 'no_accept_query', status: 'recommended' },
-	'network error': { args: [ 0, {}, '', true, 'cURL error 7: Failed to connect' ], verdict: 'network_error', status: 'recommended', says: 'cURL error 7' },
-	'signed-out 401 from the route': { args: [ 401, {}, JSON.stringify( { code: 'rest_forbidden', message: 'Sorry' } ), false ], verdict: 'reached', status: 'good' },
-	'signed-in 403 bad nonce': { args: [ 403, {}, JSON.stringify( { code: 'rest_cookie_invalid_nonce', message: 'Cookie check failed' } ) ], verdict: 'wordpress_error', status: 'recommended', says: 'rest_cookie_invalid_nonce' },
-	'500 from WordPress': { args: [ 500, {}, JSON.stringify( { code: 'internal_server_error', message: 'Critical error' } ) ], verdict: 'wordpress_error', status: 'recommended' },
-	'200 from something else': { args: [ 200, {}, '<html>cached page</html>' ], verdict: 'unexpected', status: 'recommended' },
-	'502 bad gateway': { args: [ 502, {}, '<html>Bad Gateway</html>' ], verdict: 'unexpected', status: 'recommended' },
+interface Observation {
+	status?: number;
+	headers?: Record< string, string >;
+	body?: string;
+	error?: string;
+	redirect?: boolean;
+	unsupported?: boolean;
+	client?: 'browser';
+}
+
+const seen = ( status: number, headers: Record< string, string > = {}, body = '' ): Observation => ( { status, headers, body } );
+
+/**
+ * Fabricated echo observations => expected verdict and HTTP statuses.
+ * authenticated: false is a signed-out request.
+ */
+const ECHO_CASES: Record<
+	string,
+	{ response: Observation; authenticated?: boolean; verdict: string; status: string; statuses?: number[]; says?: string }
+> = {
+	pass: { response: seen( 200, AQ, ECHO_OK ), verdict: 'pass', status: 'good' },
+	'405 nginx root': { response: seen( 405, { Server: 'nginx' }, '<html>405 Not Allowed</html>' ), verdict: 'not_allowed', status: 'critical', says: '/index.php' },
+	'403 hardening rule': { response: seen( 403, {}, '<html>Forbidden</html>' ), verdict: 'forbidden', status: 'critical', says: 'limit_except GET POST' },
+	'501 Varnish': { response: seen( 501, { 'X-Varnish': '1234' }, '' ), verdict: 'not_implemented', status: 'critical', says: 'This response has Varnish headers.' },
+	'501 php -S': { response: seen( 501, {}, '' ), verdict: 'not_implemented', status: 'critical', says: 'php -S' },
+	'302 redirect': { response: seen( 302, { Location: 'https://example.com/wp-json/' }, '' ), verdict: 'redirect', status: 'critical', says: 'https://example.com/wp-json/' },
+	'301 redirect': { response: seen( 301, { Location: 'https://example.com/' }, '' ), verdict: 'redirect', status: 'critical' },
+	'method arrives as GET': { response: seen( 200, AQ, JSON.stringify( { method: 'GET', body_bytes: 0, merged_params: {} } ) ), verdict: 'method_changed', status: 'critical', says: 'as GET' },
+	'method changed, no route': { response: seen( 404, {}, JSON.stringify( { code: 'rest_no_route', message: 'No route' } ) ), verdict: 'method_changed', status: 'critical' },
+	'body missing': { response: seen( 200, AQ, JSON.stringify( { method: 'QUERY', body_bytes: 0, merged_params: {} } ) ), verdict: 'body_lost', status: 'critical', says: 'empty body' },
+	'marker lost': { response: seen( 200, AQ, JSON.stringify( { method: 'QUERY', body_bytes: 12, merged_params: { other: 1 } } ) ), verdict: 'body_lost', status: 'critical', says: 'arrived changed' },
+	'Accept-Query stripped': { response: seen( 200, {}, ECHO_OK ), verdict: 'no_accept_query', status: 'recommended' },
+	'network error': { response: { status: 0, error: 'cURL error 7: Failed to connect' }, verdict: 'network_error', status: 'recommended', says: 'cURL error 7' },
+	'signed-out 401 from the route': { response: seen( 401, {}, JSON.stringify( { code: 'rest_forbidden', message: 'Sorry' } ) ), authenticated: false, verdict: 'reached', status: 'good' },
+	'signed-in 403 bad nonce': { response: seen( 403, {}, JSON.stringify( { code: 'rest_cookie_invalid_nonce', message: 'Cookie check failed' } ) ), verdict: 'wordpress_error', status: 'recommended', says: 'rest_cookie_invalid_nonce' },
+	'500 from WordPress': { response: seen( 500, {}, JSON.stringify( { code: 'internal_server_error', message: 'Critical error' } ) ), verdict: 'wordpress_error', status: 'recommended' },
+	'200 from something else': { response: seen( 200, {}, '<html>cached page</html>' ), verdict: 'unexpected', status: 'recommended' },
+	'502 bad gateway': { response: seen( 502, {}, '<html>Bad Gateway</html>' ), verdict: 'unexpected', status: 'recommended' },
+	// What only the browser reports: no HTTP response to classify.
+	'browser network error': {
+		response: { status: 0, error: 'Failed to fetch', client: 'browser' },
+		verdict: 'network_error',
+		status: 'recommended',
+		statuses: [],
+		says: 'the browser reported a network error',
+	},
+	'browser opaque redirect': { response: { redirect: true, client: 'browser' }, verdict: 'redirect', status: 'critical', statuses: [] },
+	'browser without QUERY': {
+		response: { unsupported: true, client: 'browser' },
+		verdict: 'browser_unsupported',
+		status: 'recommended',
+		statuses: [],
+		says: 'browser can’t send QUERY',
+	},
 };
 
 const fingerprint = ( sent: string, fresh: string, headers: Record< string, string > = {}, status = 200 ) => ( {
@@ -175,7 +209,9 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 			expect( data.cacheUrl ).toBe( `${ site.url }/wp-json${ CACHE }` );
 			expect( data.diagnoseUrl ).toBe( `${ site.url }/wp-json${ DIAGNOSE }` );
 			expect( data.markerKey ).toBe( 'wp_http_query_self_test' );
-			expect( data.i18n.browserUnsupported ).toContain( 'browser can’t send QUERY' );
+			expect( data.statuses[ 'test_failed' ] ).toBe( 'recommended' );
+			// Verdict messages come from PHP only, through the diagnose route.
+			expect( Object.keys( data.i18n ) ).not.toContain( 'browserUnsupported' );
 
 			// The nonce is a working wp_rest nonce for this session.
 			expect( data.nonce ).toMatch( /^[0-9a-f]{10}$/ );
@@ -194,6 +230,87 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 		} );
 	} );
 
+	describe( 'the button (the shipped self-test.js, run against this site)', () => {
+		const config = async () => JSON.parse( ( await admin.html( PAGE ) ).match( /var wpHttpQuerySelfTest = (\{.*?\});\n/ )?.[ 1 ] ?? 'null' );
+		const run = async ( intercept?: ( request: Request ) => Response | undefined ) =>
+			clickTestButton( admin, `${ site.url }${ PAGE }`, await config(), intercept );
+		const boxes = ( output: StubElement ) => output.findAll( ( el ) => el.getAttribute( 'data-check' ) !== undefined );
+		const text = ( els: StubElement[] ) => els.map( ( el ) => el.textContent );
+
+		it( 'runs four different checks and shows them in two labelled groups, in a fixed order', async () => {
+			const { output, sent } = await run();
+
+			// Four different requests behind four boxes.
+			const requests = sent.map( ( r ) => `${ r.method } ${ r.path }${ r.signedIn ? '' : ' (anonymous)' }` );
+			expect( requests.filter( ( r ) => ! r.startsWith( 'POST' ) ).sort() ).toEqual( [
+				'GET /wp-json/wp-http-query/v1/self-test/cache',
+				'GET /wp-json/wp-http-query/v1/self-test/server',
+				'QUERY /wp-json/wp-http-query/v1/echo',
+				'QUERY /wp-json/wp-http-query/v1/self-test/fingerprint (anonymous)',
+				'QUERY /wp-json/wp-http-query/v1/self-test/fingerprint (anonymous)',
+			] );
+
+			// The two "reaches WordPress" checks start together; the cache
+			// checks start after both, one after the other.
+			const at = ( path: string ) => sent.filter( ( r ) => r.path.endsWith( path ) );
+			const [ echo, server, cache ] = [ at( '/echo' )[ 0 ], at( '/self-test/server' )[ 0 ], at( '/self-test/cache' )[ 0 ] ];
+			const probes = at( '/fingerprint' );
+			expect( Math.max( echo.start, server.start ) ).toBeLessThan( Math.min( echo.end, server.end ) );
+			expect( probes[ 0 ].start ).toBeGreaterThan( Math.max( ...sent.filter( ( r ) => r.start < probes[ 0 ].start ).map( ( r ) => r.end ) ) );
+			expect( cache.start ).toBeGreaterThan( Math.max( ...probes.map( ( r ) => r.end ) ) );
+
+			expect( output.children.map( ( c ) => c.className ) ).toEqual( [
+				'wp-http-query-self-test-summary',
+				'wp-http-query-self-test-group',
+				'wp-http-query-self-test-group',
+				'description',
+			] );
+			expect( output.children[ 0 ].textContent ).toBe( 'All 4 checks passed.' );
+			expect( text( output.findAll( ( el ) => el.tagName === 'h3' ) ) ).toEqual( [ 'From your browser', 'From your server' ] );
+			expect( output.children[ 3 ].textContent ).toContain( 'sample, not a guarantee' );
+
+			const shown = boxes( output );
+			expect( shown.map( ( b ) => b.getAttribute( 'data-check' ) ) ).toEqual( [ 'browser-echo', 'browser-cache', 'server-echo', 'server-cache' ] );
+			expect( shown.map( ( b ) => b.getAttribute( 'data-verdict' ) ) ).toEqual( [ 'pass', 'clean', 'pass', 'clean' ] );
+			expect( shown.map( ( b ) => b.className ) ).toEqual( Array( 4 ).fill( 'notice inline notice-success' ) );
+
+			const titles = shown.map( ( b ) => b.findAll( ( el ) => el.tagName === 'h4' )[ 0 ].textContent );
+			expect( titles ).toEqual( [
+				'QUERY reaches WordPress from your browser: passed',
+				'No cache between your browser and WordPress stores QUERY responses: passed',
+				'QUERY reaches WordPress from the server itself: passed',
+				'No cache on the server’s own path stores QUERY responses: passed',
+			] );
+
+			// Each box says what was sent, where, and as whom.
+			const requested = shown.map( ( b ) => text( b.findAll( ( el ) => el.tagName === 'code' ) )[ 0 ] );
+			expect( requested ).toEqual( [
+				'Your browser sent: QUERY /wp-json/wp-http-query/v1/echo, signed in as you',
+				'Your browser sent: 2 × QUERY /wp-json/wp-http-query/v1/self-test/fingerprint, anonymous',
+				'The server sent itself: QUERY /wp-json/wp-http-query/v1/echo, signed in as you',
+				'The server sent itself: 2 × QUERY /wp-json/wp-http-query/v1/self-test/fingerprint, anonymous',
+			] );
+			expect( new Set( text( shown ) ).size ).toBe( 4 );
+		} );
+
+		it( 'counts and lists a failing check in the summary', async () => {
+			const { output } = await run( ( request ) =>
+				request.method === 'QUERY' && request.url.endsWith( '/echo' )
+					? new Response( '<html>405 Not Allowed</html>', { status: 405, headers: { server: 'nginx' } } )
+					: undefined
+			);
+
+			const summary = output.children[ 0 ];
+			expect( summary.findAll( ( el ) => el.tagName === 'strong' )[ 0 ].textContent ).toBe( '1 problem found:' );
+			expect( text( summary.findAll( ( el ) => el.tagName === 'li' ) ) ).toEqual( [ 'QUERY reaches WordPress from your browser: failed' ] );
+
+			const shown = boxes( output );
+			expect( shown.map( ( b ) => b.getAttribute( 'data-verdict' ) ) ).toEqual( [ 'not_allowed', 'clean', 'pass', 'clean' ] );
+			expect( shown[ 0 ].className ).toBe( 'notice inline notice-error' );
+			expect( shown[ 0 ].textContent ).toContain( 'HTTP status 405.' );
+		} );
+	} );
+
 	describe( 'the server check (loopback)', () => {
 		it( 'passes for an admin, carrying the sign-in to the admins-only echo route', async () => {
 			const res = await admin.rest( 'GET', SERVER );
@@ -202,7 +319,8 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 			expect( result.check ).toMatchObject( {
 				verdict: 'pass',
 				status: 'good',
-				http_status: 200,
+				'http_statuses': [ 200 ],
+				'signed_in': true,
 				url: `${ site.url }/wp-json/wp-http-query/v1/echo`,
 			} );
 			expect( result.check.message ).toBe( 'QUERY reached WordPress with its method and body intact, and the Accept-Query header came back.' );
@@ -291,7 +409,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 					direct: true,
 				},
 				'wp_http_query_cache': {
-					label: 'No cache stores HTTP QUERY responses',
+					label: 'No cache was seen storing HTTP QUERY responses',
 					test: `${ site.url }/wp-json${ CACHE }`,
 					'has_rest': true,
 					direct: true,
@@ -318,7 +436,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 				json: { check: 'echo', marker: MARKER, response: { status: 405, headers: { server: 'nginx' }, body: '' } },
 			} );
 			expect( res.status ).toBe( 200 );
-			expect( await res.json() ).toMatchObject( { verdict: 'not_allowed', status: 'critical', http_status: 405 } );
+			expect( await res.json() ).toMatchObject( { verdict: 'not_allowed', status: 'critical', 'http_statuses': [ 405 ] } );
 
 			const cache = await admin.rest( 'POST', DIAGNOSE, {
 				json: { check: 'cache', first: fingerprint( A, 'f1' ), second: fingerprint( B, 'f2' ) },
@@ -339,15 +457,18 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 				site,
 				`$out = array();
 				foreach ( $input['cases'] as $name => $c ) {
-					list( $status, $headers, $body ) = $c;
-					$out[ $name ] = \\WPHttpQuery\\diagnose_echo_response( $status, (array) $headers, $body, $input['marker'], $c[3] ?? true, $c[4] ?? '' );
+					$out[ $name ] = \\WPHttpQuery\\diagnose_echo_response( $c['response'], $input['marker'], $c['authenticated'] ?? true );
 				}
 				echo wp_json_encode( $out );`,
-				{ marker: MARKER, cases: Object.fromEntries( Object.entries( ECHO_CASES ).map( ( [ k, v ] ) => [ k, v.args ] ) ) }
+				{ marker: MARKER, cases: ECHO_CASES }
 			);
 
 			for ( const [ name, c ] of Object.entries( ECHO_CASES ) ) {
-				expect( out[ name ], name ).toMatchObject( { verdict: c.verdict, status: c.status, http_status: c.args[ 0 ] } );
+				expect( out[ name ], name ).toMatchObject( {
+					verdict: c.verdict,
+					status: c.status,
+					'http_statuses': c.statuses ?? ( c.response.status ? [ c.response.status ] : [] ),
+				} );
 				expect( out[ name ].message, name ).toMatch( /\S/ );
 				if ( c.says ) {
 					expect( out[ name ].message, name ).toContain( c.says );
