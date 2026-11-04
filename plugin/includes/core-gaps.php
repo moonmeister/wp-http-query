@@ -142,9 +142,31 @@ add_filter(
  * ----------------------------------------------------------------------
  */
 
+/**
+ * Whether any of a route's normalized handlers accepts QUERY.
+ *
+ * The one test for "this route answers QUERY": the Accept-Query header and
+ * the settings page's status table both use it.
+ *
+ * @param array $handlers A route's handlers, from WP_REST_Server::get_routes().
+ */
+function accepts_query( array $handlers ): bool {
+	foreach ( $handlers as $handler ) {
+		if ( ! empty( $handler['methods'][ METHOD ] ) ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 add_filter(
 	'rest_post_dispatch',
 	static function ( $response, $server ) {
+		// Per route, once per request: get_routes() rebuilds the whole route
+		// table, and an embedding request dispatches many sub-responses.
+		static $answers = array();
+
 		if ( ! $response instanceof \WP_REST_Response ) {
 			return $response;
 		}
@@ -154,19 +176,21 @@ add_filter(
 			return $response;
 		}
 
-		$routes = $server->get_routes();
-		foreach ( $routes[ $route ] ?? array() as $handler ) {
-			if ( ! empty( $handler['methods'][ METHOD ] ) ) {
-				$list = implode(
+		if ( ! isset( $answers[ $route ] ) ) {
+			$answers[ $route ] = accepts_query( $server->get_routes()[ $route ] ?? array() );
+		}
+
+		if ( $answers[ $route ] ) {
+			$response->header(
+				'Accept-Query',
+				implode(
 					', ',
 					array_map(
 						static fn ( string $type ): string => '"' . $type . '"',
 						advertised_query_types()
 					)
-				);
-				$response->header( 'Accept-Query', $list );
-				break;
-			}
+				)
+			);
 		}
 
 		return $response;

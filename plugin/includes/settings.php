@@ -78,14 +78,19 @@ add_action(
 			SETTINGS_PAGE
 		);
 
-		add_settings_field(
-			PRESETS_OPTION,
-			__( 'Core collections', 'wp-http-query' ),
-			__NAMESPACE__ . '\\render_presets_field',
-			SETTINGS_PAGE,
-			'wp_http_query_presets',
-			array( 'label_for' => PRESETS_OPTION . '-core-collections' )
-		);
+		foreach ( presets() as $name => $preset ) {
+			add_settings_field(
+				PRESETS_OPTION . '-' . $name,
+				esc_html( $preset['label'] ),
+				__NAMESPACE__ . '\\render_preset_field',
+				SETTINGS_PAGE,
+				'wp_http_query_presets',
+				array(
+					'label_for' => PRESETS_OPTION . '-' . $name,
+					'preset'    => $name,
+				)
+			);
+		}
 	}
 );
 
@@ -129,6 +134,8 @@ function render_settings_page(): void {
 		<form action="options.php" method="post">
 			<?php
 			settings_fields( SETTINGS_PAGE );
+			// So a form with every preset box unticked still posts the field.
+			printf( '<input type="hidden" name="%s[]" value="" />', esc_attr( PRESETS_OPTION ) );
 			do_settings_sections( SETTINGS_PAGE );
 			submit_button();
 			?>
@@ -142,22 +149,25 @@ function render_settings_page(): void {
 }
 
 /**
- * Renders the preset checkbox.
+ * Renders one preset's checkbox, and says so when code overrides it.
+ *
+ * @param array $args The add_settings_field() arguments: 'label_for' and 'preset'.
  */
-function render_presets_field(): void {
-	$stored    = sanitize_presets( get_option( PRESETS_OPTION, array() ) );
-	$effective = enabled_presets();
-	$id        = PRESETS_OPTION . '-core-collections';
+function render_preset_field( array $args ): void {
+	$name      = $args['preset'];
+	$stored    = in_array( $name, sanitize_presets( get_option( PRESETS_OPTION, array() ) ), true );
+	$effective = in_array( $name, enabled_presets(), true );
 
 	printf(
-		'<input type="hidden" name="%1$s[]" value="" /><label for="%2$s"><input type="checkbox" id="%2$s" name="%1$s[]" value="core-collections" %3$s /> %4$s</label>',
+		'<label for="%2$s"><input type="checkbox" id="%2$s" name="%1$s[]" value="%3$s" %4$s /> %5$s</label>',
 		esc_attr( PRESETS_OPTION ),
-		esc_attr( $id ),
-		checked( in_array( 'core-collections', $stored, true ), true, false ),
-		esc_html__( 'Accept QUERY on core’s read collections (posts, pages, media, comments, categories, tags, users, search)', 'wp-http-query' )
+		esc_attr( $args['label_for'] ),
+		esc_attr( $name ),
+		checked( $stored, true, false ),
+		esc_html( presets()[ $name ]['description'] )
 	);
 
-	if ( in_array( 'core-collections', $stored, true ) !== in_array( 'core-collections', $effective, true ) ) {
+	if ( $stored !== $effective ) {
 		printf(
 			'<p class="description">%s</p>',
 			esc_html__( 'Code on this site overrides this setting through the wp_http_query_presets filter.', 'wp-http-query' )
@@ -171,37 +181,68 @@ function render_presets_field(): void {
  * Reads the REST server's normalized route table, the same one that matches
  * requests and drives Accept-Query, so it lists what actually answers QUERY.
  * Anything there that opted_in_route_sources() doesn't account for registered
- * QUERY itself. The plugin's own echo route is 'demo:public' or 'demo:admins',
- * from demo_route_is_public(), the same check its permission_callback makes.
+ * QUERY itself: 'route', or for the plugin's own routes, 'demo-public' or
+ * 'demo-admins' (the echo route, from demo_route_is_public(), the same check
+ * its permission_callback makes) and 'self-test' (the fingerprint route).
  *
- * The self-test's fingerprint route is 'self-test'.
- *
- * @return array<string, string> Route key => 'preset:<name>', 'filter', 'route', 'demo:public', 'demo:admins' or 'self-test'.
+ * @return array<string, array{type: string, preset?: string}> Route key => source, as route_source_label() reads it.
  */
 function query_route_sources(): array {
 	$opted_in = opted_in_route_sources();
 	$sources  = array();
 
 	foreach ( rest_get_server()->get_routes() as $route => $handlers ) {
-		foreach ( $handlers as $handler ) {
-			if ( ! empty( $handler['methods'][ METHOD ] ) ) {
-				if ( isset( $opted_in[ $route ] ) ) {
-					$sources[ $route ] = $opted_in[ $route ];
-				} elseif ( ECHO_ROUTE === $route ) {
-					$sources[ $route ] = demo_route_is_public() ? 'demo:public' : 'demo:admins';
-				} elseif ( FINGERPRINT_ROUTE === $route ) {
-					$sources[ $route ] = 'self-test';
-				} else {
-					$sources[ $route ] = 'route';
-				}
-				break;
-			}
+		if ( ! accepts_query( $handlers ) ) {
+			continue;
+		}
+
+		if ( isset( $opted_in[ $route ] ) ) {
+			$sources[ $route ] = $opted_in[ $route ];
+		} elseif ( ECHO_ROUTE === $route ) {
+			$sources[ $route ] = array( 'type' => demo_route_is_public() ? 'demo-public' : 'demo-admins' );
+		} elseif ( FINGERPRINT_ROUTE === $route ) {
+			$sources[ $route ] = array( 'type' => 'self-test' );
+		} else {
+			$sources[ $route ] = array( 'type' => 'route' );
 		}
 	}
 
 	ksort( $sources );
 
 	return $sources;
+}
+
+/**
+ * The status table's "Why" for a source from query_route_sources().
+ *
+ * An unknown type is shown as is rather than guessed at.
+ *
+ * @param array $source array( 'type' => ..., 'preset' => ... ).
+ */
+function route_source_label( array $source ): string {
+	$type = (string) ( $source['type'] ?? '' );
+
+	switch ( $type ) {
+		case 'preset':
+			return sprintf(
+				/* translators: %s: Preset name, such as core-collections. */
+				__( 'Preset: %s', 'wp-http-query' ),
+				(string) ( $source['preset'] ?? '' )
+			);
+		case 'filter':
+			/* translators: wp_http_query_routes is a filter name; keep it as is. */
+			return __( 'wp_http_query_routes filter', 'wp-http-query' );
+		case 'route':
+			return __( 'Registered by the route itself (methods include QUERY)', 'wp-http-query' );
+		case 'demo-public':
+			return __( 'Demo route: public', 'wp-http-query' );
+		case 'demo-admins':
+			return __( 'Demo route: admins only (used by the self-test)', 'wp-http-query' );
+		case 'self-test':
+			return __( 'Self-test cache probe: public, answers only with a hash of the body', 'wp-http-query' );
+	}
+
+	return $type;
 }
 
 /**
@@ -223,42 +264,17 @@ function render_status(): void {
 	echo '</tr></thead><tbody>';
 
 	foreach ( $sources as $route => $source ) {
-		if ( 'filter' === $source ) {
-			/* translators: wp_http_query_routes is a filter name; keep it as is. */
-			$why = __( 'wp_http_query_routes filter', 'wp-http-query' );
-		} elseif ( 'route' === $source ) {
-			$why = __( 'Registered by the route itself (methods include QUERY)', 'wp-http-query' );
-		} elseif ( 'demo:public' === $source ) {
-			$why = __( 'Demo route: public', 'wp-http-query' );
-		} elseif ( 'demo:admins' === $source ) {
-			$why = __( 'Demo route: admins only (used by the self-test)', 'wp-http-query' );
-		} elseif ( 'self-test' === $source ) {
-			$why = __( 'Self-test cache probe: public, answers only with a hash of the body', 'wp-http-query' );
-		} else {
-			$why = sprintf(
-				/* translators: %s: Preset name, such as core-collections. */
-				__( 'Preset: %s', 'wp-http-query' ),
-				substr( $source, strlen( 'preset:' ) )
-			);
-		}
-
-		printf( '<tr><td><code>%s</code></td><td>%s</td></tr>', esc_html( $route ), esc_html( $why ) );
+		printf( '<tr><td><code>%s</code></td><td>%s</td></tr>', esc_html( $route ), esc_html( route_source_label( $source ) ) );
 	}
 
 	echo '</tbody></table>';
 }
 
-/**
- * Settings → HTTP QUERY's hook suffix, for loading the script there only.
- */
-function settings_hook_suffix(): string {
-	return 'settings_page_' . SETTINGS_PAGE;
-}
-
 add_action(
 	'admin_enqueue_scripts',
 	static function ( string $hook_suffix ): void {
-		if ( settings_hook_suffix() !== $hook_suffix ) {
+		// Settings → HTTP QUERY only.
+		if ( 'settings_page_' . SETTINGS_PAGE !== $hook_suffix ) {
 			return;
 		}
 

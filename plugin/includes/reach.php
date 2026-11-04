@@ -57,7 +57,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 const PRESETS_OPTION = 'wp_http_query_presets';
 
 /**
- * Route lists, by preset name.
+ * The presets, by name: a label for the settings page and a route list.
  *
  * 'core-collections' is core's public read collections: ADR 0005 option 2,
  * done by the plugin rather than by core. Each route's GET handler is a
@@ -68,19 +68,23 @@ const PRESETS_OPTION = 'wp_http_query_presets';
  *
  * Exact route keys, not patterns. Single-item routes are not included.
  *
- * @return array<string, string[]>
+ * @return array<string, array{label: string, description: string, routes: string[]}>
  */
 function presets(): array {
 	return array(
 		'core-collections' => array(
-			'/wp/v2/posts',
-			'/wp/v2/pages',
-			'/wp/v2/media',
-			'/wp/v2/comments',
-			'/wp/v2/categories',
-			'/wp/v2/tags',
-			'/wp/v2/users',
-			'/wp/v2/search',
+			'label'       => __( 'Core collections', 'wp-http-query' ),
+			'description' => __( 'Accept QUERY on core’s read collections (posts, pages, media, comments, categories, tags, users, search)', 'wp-http-query' ),
+			'routes'      => array(
+				'/wp/v2/posts',
+				'/wp/v2/pages',
+				'/wp/v2/media',
+				'/wp/v2/comments',
+				'/wp/v2/categories',
+				'/wp/v2/tags',
+				'/wp/v2/users',
+				'/wp/v2/search',
+			),
 		),
 	);
 }
@@ -125,48 +129,63 @@ function enabled_presets(): array {
 }
 
 /**
- * Route keys that gain QUERY on their GET handlers.
- *
- * Starts from the enabled presets' routes and passes them through the
- * 'wp_http_query_routes' filter. Add to the list rather than replacing it,
- * or the presets are dropped:
- *
- *     add_filter( 'wp_http_query_routes', function ( array $routes ) {
- *         $routes[] = '/my-plugin/v1/things';
- *         $routes[] = '/wp/v2/posts/(?P<id>[\d]+)'; // The registered regex, verbatim.
- *         return $routes;
- *     } );
- *
- * Entries match registered route keys exactly: no patterns, no prefixes.
- * The keys are listed at GET /wp-json/.
- *
- * @return string[]
- */
-function opted_in_routes(): array {
-	return array_keys( opted_in_route_sources() );
-}
-
-/**
  * Opted-in route keys, each mapped to why it is opted in.
  *
- * The one place reach is decided: opted_in_routes() is its keys, and the
- * settings page's status table reads the values. A route a preset lists is
- * 'preset:<name>' (the first enabled preset that lists it); anything the
- * 'wp_http_query_routes' filter added is 'filter'. A preset route the filter
+ * The one place reach is decided: the rest_endpoints filter below reads its
+ * keys, and the settings page's status table reads the values. A route a
+ * preset lists is array( 'type' => 'preset', 'preset' => <name> ), from the
+ * first enabled preset that lists it; anything the 'wp_http_query_routes'
+ * filter added is array( 'type' => 'filter' ). A preset route the filter
  * removed is not opted in at all.
  *
- * @return array<string, string> Route key => 'preset:<name>' or 'filter'.
+ * Worked out once per request: core rebuilds its route table, running
+ * rest_endpoints, every time get_routes() is called. Saving the preset option
+ * clears it (see the hooks below).
+ *
+ * @param bool $forget Clear the remembered result instead, and return an empty list.
+ * @return array<string, array{type: string, preset?: string}>
  */
-function opted_in_route_sources(): array {
+function opted_in_route_sources( bool $forget = false ): array {
+	static $sources = null;
+
+	if ( $forget ) {
+		$sources = null;
+		return array();
+	}
+
+	if ( null !== $sources ) {
+		return $sources;
+	}
+
 	$from_presets = array();
 	foreach ( enabled_presets() as $name ) {
-		foreach ( presets()[ $name ] as $route ) {
+		foreach ( presets()[ $name ]['routes'] as $route ) {
 			if ( ! isset( $from_presets[ $route ] ) ) {
-				$from_presets[ $route ] = 'preset:' . $name;
+				$from_presets[ $route ] = array(
+					'type'   => 'preset',
+					'preset' => $name,
+				);
 			}
 		}
 	}
 
+	/**
+	 * Filters the route keys that gain QUERY on their GET handlers.
+	 *
+	 * Starts from the enabled presets' routes. Add to the list rather than
+	 * replacing it, or the presets are dropped:
+	 *
+	 *     add_filter( 'wp_http_query_routes', function ( array $routes ) {
+	 *         $routes[] = '/my-plugin/v1/things';
+	 *         $routes[] = '/wp/v2/posts/(?P<id>[\d]+)'; // The registered regex, verbatim.
+	 *         return $routes;
+	 *     } );
+	 *
+	 * Entries match registered route keys exactly: no patterns, no prefixes.
+	 * The keys are listed at GET /wp-json/.
+	 *
+	 * @param string[] $routes Route keys. Default: the enabled presets' routes.
+	 */
 	$routes  = array_filter(
 		(array) apply_filters( 'wp_http_query_routes', array_keys( $from_presets ) ),
 		'is_string'
@@ -175,17 +194,29 @@ function opted_in_route_sources(): array {
 
 	foreach ( $routes as $route ) {
 		if ( ! isset( $sources[ $route ] ) ) {
-			$sources[ $route ] = $from_presets[ $route ] ?? 'filter';
+			$sources[ $route ] = $from_presets[ $route ] ?? array( 'type' => 'filter' );
 		}
 	}
 
 	return $sources;
 }
 
+/**
+ * Clears opted_in_route_sources()'s remembered result, when the stored
+ * presets change mid-request.
+ */
+function forget_opted_in_route_sources(): void {
+	opted_in_route_sources( true );
+}
+
+add_action( 'add_option_' . PRESETS_OPTION, __NAMESPACE__ . '\\forget_opted_in_route_sources' );
+add_action( 'update_option_' . PRESETS_OPTION, __NAMESPACE__ . '\\forget_opted_in_route_sources' );
+add_action( 'delete_option_' . PRESETS_OPTION, __NAMESPACE__ . '\\forget_opted_in_route_sources' );
+
 add_filter(
 	'rest_endpoints',
 	static function ( array $endpoints ): array {
-		foreach ( opted_in_routes() as $route ) {
+		foreach ( array_keys( opted_in_route_sources() ) as $route ) {
 			if ( ! isset( $endpoints[ $route ] ) || ! is_array( $endpoints[ $route ] ) ) {
 				continue;
 			}
