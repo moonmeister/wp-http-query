@@ -631,8 +631,3 @@ function handle_echo( \WP_REST_Request $request ): \WP_REST_Response {
 		200
 	);
 }
-
-/** Throwaway: deliberate WPCS violation to prove CI lint fails. */
-function wp_http_query_lint_canary() {
-	echo $_GET['x'];
-}
