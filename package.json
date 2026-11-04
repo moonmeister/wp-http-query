@@ -1,0 +1,18 @@
+{
+	"name": "wp-http-query",
+	"private": true,
+	"type": "module",
+	"description": "Test harness for the wp-http-query feature plugin. See Makefile.",
+	"engines": {
+		"node": ">=20"
+	},
+	"scripts": {
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"devDependencies": {
+		"@wordpress/env": "^12.1.0",
+		"structured-headers": "^2.1.1",
+		"vitest": "^5.1.0"
+	}
+}
