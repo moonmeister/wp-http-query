@@ -19,6 +19,10 @@
  *
  * /wp/v2/types is deliberately left alone: the default-off tests use it.
  *
+ * It also turns on the plugin's diagnostic echo route, which is off by
+ * default, explicitly rather than relying on wp-env's WP_DEBUG, unless the
+ * lifecycle suite has switched that off (DEMO_ROUTE_OFF below).
+ *
  * @package WPHttpQuery
  */
 
@@ -38,6 +42,20 @@ const NAMESPACE_ = 'wp-http-query-test/v1';
  * could not be seen to change anything. Never set by an HTTP request.
  */
 const PRESET_FILTER_OFF = 'wp_http_query_fixture_preset_filter_off';
+
+/**
+ * Set only by the serial lifecycle suite, through WP-CLI, to check the echo
+ * route is gone when the plugin's filter is left at its default. Never set
+ * by an HTTP request.
+ */
+const DEMO_ROUTE_OFF = 'wp_http_query_fixture_demo_route_off';
+
+add_filter(
+	'wp_http_query_register_demo_route',
+	static function ( $register ) {
+		return get_option( DEMO_ROUTE_OFF ) ? $register : true;
+	}
+);
 
 add_filter(
 	'wp_http_query_presets',

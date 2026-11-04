@@ -1,6 +1,10 @@
 import type { Site } from './sites';
 
-/** The plugin's diagnostic route. Registered with 'methods' => 'QUERY' only. */
+/**
+ * The plugin's diagnostic route. Registered with 'methods' => 'QUERY' only, and
+ * only when wp_http_query_register_demo_route returns true: the test fixture
+ * turns it on.
+ */
 export const ECHO = '/wp-http-query/v1/echo';
 
 export const ORIGIN = 'http://example.test';

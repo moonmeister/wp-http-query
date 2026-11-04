@@ -9,6 +9,9 @@ export const PRESETS_OPTION = 'wp_http_query_presets';
 /** Test fixture switch that stops its presets filter forcing the preset on. */
 export const FIXTURE_PRESET_FILTER_OFF = 'wp_http_query_fixture_preset_filter_off';
 
+/** Test fixture switch that stops it turning the plugin's echo route on. */
+export const FIXTURE_DEMO_ROUTE_OFF = 'wp_http_query_fixture_demo_route_off';
+
 /** Whether an option row exists, read from the database, ignoring registered defaults. */
 export function optionExists( site: Site, name: string ): boolean {
 	return wp( site, [ 'option', 'list', `--search=${ name }`, '--format=count' ] ).trim() !== '0';

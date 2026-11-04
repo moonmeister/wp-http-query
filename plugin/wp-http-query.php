@@ -29,7 +29,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-const METHOD    = 'QUERY';
+const METHOD     = 'QUERY';
 const NAMESPACE_ = 'wp-http-query/v1';
 
 /**
@@ -51,7 +51,8 @@ function advertised_query_types(): array {
 	);
 }
 
-/* -------------------------------------------------------------------------
+/*
+ * -------------------------------------------------------------------------
  * Gap 1 — Access-Control-Allow-Methods is a hardcoded string in core.
  *
  * rest_send_cors_headers() emits the list with a raw header() call and no hook
@@ -62,7 +63,8 @@ function advertised_query_types(): array {
  * not, core's callback has to be unhooked and replaced wholesale — which this
  * plugin will keep needing for as long as it supports cores that predate the
  * filter, so the fallback is permanent rather than temporary.
- * ---------------------------------------------------------------------- */
+ * ----------------------------------------------------------------------
+ */
 
 /**
  * Whether core's CORS method list is filterable.
@@ -128,14 +130,15 @@ function send_cors_headers( $value ) {
 		header( 'Access-Control-Allow-Methods: OPTIONS, GET, POST, PUT, PATCH, DELETE, QUERY' );
 		header( 'Access-Control-Allow-Credentials: true' );
 		header( 'Vary: Origin', false );
-	} elseif ( ! headers_sent() && 'GET' === $_SERVER['REQUEST_METHOD'] && ! is_user_logged_in() ) {
+	} elseif ( ! headers_sent() && isset( $_SERVER['REQUEST_METHOD'] ) && 'GET' === $_SERVER['REQUEST_METHOD'] && ! is_user_logged_in() ) {
 		header( 'Vary: Origin', false );
 	}
 
 	return $value;
 }
 
-/* -------------------------------------------------------------------------
+/*
+ * -------------------------------------------------------------------------
  * Gap 3 — get_parameter_order() excludes QUERY from body-data parsing.
  *
  * class-wp-rest-request.php:377-380 hardcodes POST/PUT/PATCH/DELETE, so a
@@ -144,7 +147,8 @@ function send_cors_headers( $value ) {
  *
  * Fixable from userland via the rest_request_parameter_order filter, which
  * usefully proves the one-line core fix is correct before anyone patches it.
- * ---------------------------------------------------------------------- */
+ * ----------------------------------------------------------------------
+ */
 
 add_filter(
 	'rest_request_parameter_order',
@@ -167,7 +171,8 @@ add_filter(
 	2
 );
 
-/* -------------------------------------------------------------------------
+/*
+ * -------------------------------------------------------------------------
  * Gap 2 — READABLE is 'GET', so no existing read route matches QUERY.
  *
  * ADR 0002 closed on an additive QUERYABLE constant, so core gives existing
@@ -203,7 +208,8 @@ add_filter(
  * (class-wp-rest-server.php:973, normalizer at :1007). So what this filter
  * hands back is raw registration input — a bare string, a comma-separated
  * string, or an array — not the method map.
- * ---------------------------------------------------------------------- */
+ * ----------------------------------------------------------------------
+ */
 
 /**
  * Userland stand-in for core's future WP_REST_Server::QUERYABLE (ADR 0002,
@@ -263,12 +269,17 @@ function enabled_presets(): array {
 	$known = array();
 
 	foreach ( $names as $name ) {
-		if ( isset( presets()[ $name ] ) ) {
+		if ( is_string( $name ) && isset( presets()[ $name ] ) ) {
 			$known[] = $name;
 		} else {
 			_doing_it_wrong(
 				'wp_http_query_presets',
-				sprintf( 'Unknown preset "%s". Known presets: %s.', esc_html( (string) $name ), esc_html( implode( ', ', array_keys( presets() ) ) ) ),
+				sprintf(
+					/* translators: 1: The preset name that was passed. 2: Comma-separated list of known preset names. */
+					esc_html__( 'Unknown preset "%1$s". Known presets: %2$s.', 'wp-http-query' ),
+					esc_html( is_scalar( $name ) ? (string) $name : gettype( $name ) ),
+					esc_html( implode( ', ', array_keys( presets() ) ) )
+				),
 				'0.1.0'
 			);
 		}
@@ -301,10 +312,14 @@ function opted_in_routes(): array {
 		$routes = array_merge( $routes, presets()[ $name ] );
 	}
 
-	return array_values( array_unique( array_filter(
-		(array) apply_filters( 'wp_http_query_routes', $routes ),
-		'is_string'
-	) ) );
+	return array_values(
+		array_unique(
+			array_filter(
+				(array) apply_filters( 'wp_http_query_routes', $routes ),
+				'is_string'
+			)
+		)
+	);
 }
 
 add_filter(
@@ -387,7 +402,8 @@ function add_query_to_handler( array $handler ): array {
 	return $handler;
 }
 
-/* -------------------------------------------------------------------------
+/*
+ * -------------------------------------------------------------------------
  * Preset setting — Settings → General.
  *
  * Only presets get UI. Route lists and QUERYABLE stay code-only. One option,
@@ -395,10 +411,16 @@ function add_query_to_handler( array $handler ): array {
  * single checkbox doesn't justify its own menu item, and Permalinks, the
  * closer fit, saves its own form instead of going through options.php, so the
  * Settings API can't register fields there. uninstall.php deletes the option.
- * ---------------------------------------------------------------------- */
+ * ----------------------------------------------------------------------
+ */
 
 /**
  * Keeps known preset names only.
+ *
+ * Also the option's sanitize_callback, so it gets whatever was posted to
+ * options.php: anything that isn't a list of known names reduces to the
+ * known names in it, or to an empty list. Non-string entries are dropped
+ * before comparing, so a nested array can't raise an array-to-string notice.
  *
  * @param mixed $value Raw option value.
  * @return string[]
@@ -408,7 +430,7 @@ function sanitize_presets( $value ): array {
 		return array();
 	}
 
-	return array_values( array_intersect( array_keys( presets() ), $value ) );
+	return array_values( array_intersect( array_keys( presets() ), array_filter( $value, 'is_string' ) ) );
 }
 
 add_action(
@@ -419,7 +441,7 @@ add_action(
 			PRESETS_OPTION,
 			array(
 				'type'              => 'array',
-				'description'       => 'HTTP QUERY presets enabled on this site.',
+				'description'       => __( 'HTTP QUERY presets enabled on this site.', 'wp-http-query' ),
 				'sanitize_callback' => __NAMESPACE__ . '\\sanitize_presets',
 				'default'           => array(),
 				'show_in_rest'      => false,
@@ -439,7 +461,8 @@ add_action(
 
 		add_settings_field(
 			PRESETS_OPTION,
-			'HTTP QUERY',
+			/* translators: Settings field title. QUERY is the HTTP method's name; keep it as is. */
+			esc_html__( 'HTTP QUERY', 'wp-http-query' ),
 			__NAMESPACE__ . '\\render_presets_field',
 			'general',
 			'default',
@@ -472,16 +495,18 @@ function render_presets_field(): void {
 	}
 }
 
-/* -------------------------------------------------------------------------
+/*
+ * -------------------------------------------------------------------------
  * Accept-Query advertisement (RFC 10008 §3).
  *
  * Structured Fields List syntax — NOT the legacy Accept grammar, despite the
  * surface similarity. Emitted alongside core's generic Allow header logic.
- * ---------------------------------------------------------------------- */
+ * ----------------------------------------------------------------------
+ */
 
 add_filter(
 	'rest_post_dispatch',
-	static function ( $response, $server, $request ) {
+	static function ( $response, $server ) {
 		if ( ! $response instanceof \WP_REST_Response ) {
 			return $response;
 		}
@@ -494,10 +519,13 @@ add_filter(
 		$routes = $server->get_routes();
 		foreach ( $routes[ $route ] ?? array() as $handler ) {
 			if ( ! empty( $handler['methods'][ METHOD ] ) ) {
-				$list = implode( ', ', array_map(
-					static fn ( string $type ): string => '"' . $type . '"',
-					advertised_query_types()
-				) );
+				$list = implode(
+					', ',
+					array_map(
+						static fn ( string $type ): string => '"' . $type . '"',
+						advertised_query_types()
+					)
+				);
 				$response->header( 'Accept-Query', $list );
 				break;
 			}
@@ -506,10 +534,11 @@ add_filter(
 		return $response;
 	},
 	11,
-	3
+	2
 );
 
-/* -------------------------------------------------------------------------
+/*
+ * -------------------------------------------------------------------------
  * Cache safety — deliberately nothing. ADR 0003, option C.
  *
  * An earlier version of this file sent Cache-Control: private, no-cache on
@@ -523,24 +552,46 @@ add_filter(
  *
  * Emitting a header against a risk that does not exist would teach operators
  * that QUERY is uncacheable by nature. See experiments/cache-survey/.
- * ---------------------------------------------------------------------- */
+ * ----------------------------------------------------------------------
+ */
 
-/* -------------------------------------------------------------------------
- * Demo route.
+/*
+ * -------------------------------------------------------------------------
+ * Demo route: off unless a site turns it on.
  *
- * Registrable on stock core with no patch: register_rest_route() has no method
- * allowlist, set_method() only uppercases, and match_request_to_handler() is a
- * plain array-key lookup. See scope.md §2.
+ * QUERY /wp-json/wp-http-query/v1/echo reports how the server parsed the
+ * request. It is unauthenticated and reflects its input, so it is only
+ * registered when the 'wp_http_query_register_demo_route' filter returns true:
+ *
+ *     add_filter( 'wp_http_query_register_demo_route', '__return_true' );
+ *
+ * The default is false, not WP_DEBUG: WP_DEBUG is often left on for staging
+ * sites that are publicly reachable, and a route that appears or disappears
+ * with a debugging constant is a surprise. Opting in is one line.
+ *
+ * The route is registrable on stock core with no patch: register_rest_route()
+ * has no method allowlist, set_method() only uppercases, and
+ * match_request_to_handler() is a plain array-key lookup. See scope.md §2.
  *
  * Also reachable via the core X-HTTP-Method-Override tunnel:
  *   POST /wp-json/wp-http-query/v1/echo  +  X-HTTP-Method-Override: QUERY
  * That is a tunnel, NOT the method — intermediaries see POST, so RFC 10008
  * cacheability and retry safety do not apply.
- * ---------------------------------------------------------------------- */
+ * ----------------------------------------------------------------------
+ */
 
 add_action(
 	'rest_api_init',
 	static function (): void {
+		/**
+		 * Filters whether to register the diagnostic echo route.
+		 *
+		 * @param bool $register Whether to register QUERY /wp-http-query/v1/echo. Default false.
+		 */
+		if ( ! apply_filters( 'wp_http_query_register_demo_route', false ) ) {
+			return;
+		}
+
 		register_rest_route(
 			NAMESPACE_,
 			'/echo',
@@ -567,15 +618,15 @@ function handle_echo( \WP_REST_Request $request ): \WP_REST_Response {
 
 	return new \WP_REST_Response(
 		array(
-			'method'          => $request->get_method(),
-			'content_type'    => $request->get_content_type(),
-			'body_bytes'      => strlen( $body ),
-			'json_params'     => $request->get_json_params(),
-			'body_params'     => $request->get_body_params(),
-			'query_params'    => $request->get_query_params(),
-			'merged_params'   => $request->get_params(),
+			'method'           => $request->get_method(),
+			'content_type'     => $request->get_content_type(),
+			'body_bytes'       => strlen( $body ),
+			'json_params'      => $request->get_json_params(),
+			'body_params'      => $request->get_body_params(),
+			'query_params'     => $request->get_query_params(),
+			'merged_params'    => $request->get_params(),
 			'advertised_types' => advertised_query_types(),
-			'via_override'    => isset( $_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'] ),
+			'via_override'     => isset( $_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'] ),
 		),
 		200
 	);

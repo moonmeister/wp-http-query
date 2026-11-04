@@ -206,6 +206,24 @@ Return `array()` from the same filter to force presets off.
 Only handlers that accept `GET` gain `QUERY`. A route's `POST`, `PUT`, `PATCH` and `DELETE`
 handlers never do.
 
+## Diagnostic route
+
+`QUERY /wp-json/wp-http-query/v1/echo` reports how WordPress parsed a request: method, content
+type, body, query and merged params. It needs no authentication and reflects its input, so it is
+**off by default**. Turn it on while you check a setup, then turn it off again:
+
+```php
+add_filter( 'wp_http_query_register_demo_route', '__return_true' );
+```
+
+```sh
+curl -X QUERY https://example.com/wp-json/wp-http-query/v1/echo \
+	-H 'Content-Type: application/json' -d '{"search":"needle"}'
+```
+
+It is off whatever `WP_DEBUG` says, since staging sites that anyone can reach often run with
+`WP_DEBUG` on.
+
 ## Data
 
 One option, `wp_http_query_presets`, holding the enabled preset names. Deactivating keeps it;

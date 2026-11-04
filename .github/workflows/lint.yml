@@ -1,0 +1,49 @@
+name: Lint
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: make lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      # phpcs runs on 8.4; phpcs.xml.dist's testVersion 8.0- checks compatibility down to 8.0.
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer, cs2pr
+          coverage: none
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v6
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - run: composer install --no-interaction --no-progress
+
+      # Full report (file, line, sniff) in the job log.
+      - id: lint
+        run: make lint
+
+      # On failure, re-run as checkstyle so each violation becomes an inline PR annotation.
+      - name: Annotate violations
+        if: failure() && steps.lint.outcome == 'failure'
+        run: vendor/bin/phpcs -q --no-colors --report=checkstyle | cs2pr
