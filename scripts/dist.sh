@@ -19,6 +19,7 @@ SHIP=(
 	uninstall.php
 	README.md
 	LICENSE
+	assets/self-test.js
 )
 
 # Files copied into the zip when they exist, relative to plugin/.
