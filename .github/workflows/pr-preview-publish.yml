@@ -100,7 +100,9 @@ jobs:
         run: |
           set -euo pipefail
           # Latest WordPress, PHP 8.3, logged in as admin, the built zip active with the
-          # core-collections preset on, opening on Settings > General where the preset is.
+          # core-collections preset on and the echo demo route enabled (through the
+          # wp_http_query_register_demo_route filter where the plugin has it; harmless where it
+          # doesn't), opening on Settings > General where the preset is.
           blueprint=$(jq -nc --arg url "$ZIP_URL" '{
             "$schema": "https://playground.wordpress.net/blueprint-schema.json",
             preferredVersions: { php: "8.3", wp: "latest" },
@@ -111,7 +113,10 @@ jobs:
                 pluginData: { resource: "url", url: $url },
                 options: { activate: true } },
               { step: "setSiteOptions",
-                options: { wp_http_query_presets: ["core-collections"] } }
+                options: { wp_http_query_presets: ["core-collections"] } },
+              { step: "writeFile",
+                path: "/wordpress/wp-content/mu-plugins/wp-http-query-demo-route.php",
+                data: "<?php\n// Playground preview: turn on the /wp-http-query/v1/echo demo route.\n// A no-op on builds where the route is always registered.\nadd_filter( \"wp_http_query_register_demo_route\", \"__return_true\" );\n" }
             ]
           }')
           echo "json=$blueprint" >> "$GITHUB_OUTPUT"
@@ -128,6 +133,6 @@ jobs:
 
             {{PLAYGROUND_BUTTON}}
 
-            Opens WordPress (latest, PHP 8.3) in your browser with this PR's build of the plugin active, the `core-collections` preset on, and Settings → General open.
+            Opens WordPress (latest, PHP 8.3) in your browser with this PR's build of the plugin active, the `core-collections` preset on, the `/wp-http-query/v1/echo` demo route enabled, and Settings → General open.
 
             **Download the plugin zip:** [${{ steps.expose.outputs.artifact-name }}](${{ steps.asset.outputs.url }}) (no GitHub login needed; it unzips to `wp-http-query/`). Built from ${{ github.event.workflow_run.head_sha }}.
