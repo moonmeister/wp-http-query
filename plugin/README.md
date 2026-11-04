@@ -42,7 +42,7 @@ Activating it doesn't add `QUERY` to any of your site's existing routes.
 
 ## Turn it on for core's content
 
-Go to **Settings → General** and tick **HTTP QUERY: Accept QUERY on core's read collections**.
+Go to **Settings → General**. In the **HTTP QUERY** row, tick **Accept QUERY on core’s read collections**.
 You need the `manage_options` capability. It's off by default.
 
 That enables the `core-collections` preset. These routes then accept `QUERY`, with the same
