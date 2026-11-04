@@ -214,6 +214,8 @@ matrix/
   run.sh              Runs everything, emits results/results.json
   results/            Machine-readable results + generated MATRIX.md
 plugin/               The feature plugin: QUERY on the REST API, stock core, no patch
+tests/                Decision tests (vitest, HTTP) run against both wp-env sites
+scripts/env.sh        Drives the two wp-env environments; wrapped by the Makefile
 ```
 
 ---
@@ -242,6 +244,25 @@ plugin/               The feature plugin: QUERY on the REST API, stock core, no 
 | Trac tickets | **Both filed tickets fixed for 7.2:** [#46992](https://core.trac.wordpress.org/ticket/46992) (r64730) and [#65905](https://core.trac.wordpress.org/ticket/65905) (r63756). Checked 2026-11-04. Trac#65616 (the `QUERY` proposal) is untouched and waits on the plugin |
 
 ## Quick start
+
+### Plugin tests
+
+```sh
+make check      # start both WordPress environments, then run the decision tests
+```
+
+`make up` starts two [wp-env](https://www.npmjs.com/package/@wordpress/env) sites with the
+plugin active: **7.1.4** on `:8871` (the plugin's pre-7.2 CORS fallback) and **nightly** on
+`:8872` (core's `rest_allowed_cors_methods`, r64730). `make test` runs the vitest suite in
+[`tests/`](tests/) over real HTTP against both. `make help` lists the rest. Requires Docker and
+Node 20+.
+
+**Each test file encodes a decision**, and its header names the ADR and issue. When a decision
+changes, the test changes with it, on purpose. Tests for decisions the plugin doesn't meet yet
+are marked `it.fails` (currently the opt-in reach tests, until #1 replaces the placeholder), so
+the suite stays green while keeping the gap visible.
+
+### Compatibility matrix
 
 ```sh
 cd matrix && ./run.sh

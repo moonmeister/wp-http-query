@@ -5,3 +5,7 @@
 # tracking them over time is how we notice the ecosystem moving.
 matrix/results/*.tmp
 matrix/.env
+
+node_modules/
+.wp-env.override.json
+.wp-env.nightly.override.json
