@@ -4,7 +4,7 @@
 	"type": "module",
 	"description": "Test harness for the wp-http-query feature plugin. See Makefile.",
 	"engines": {
-		"node": ">=20"
+		"node": ">=24.18"
 	},
 	"scripts": {
 		"test": "vitest run",
