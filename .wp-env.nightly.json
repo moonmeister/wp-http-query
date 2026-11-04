@@ -2,9 +2,9 @@
 	"$schema": "https://schemas.wp.org/trunk/wp-env.json",
 	"core": "https://wordpress.org/nightly-builds/wordpress-latest.zip",
 	"phpVersion": "8.4",
-	"plugins": [
-		"./plugin"
-	],
+	"mappings": {
+		"wp-content/plugins/wp-http-query": "./plugin"
+	},
 	"port": 8872,
 	"testsEnvironment": false
 }
