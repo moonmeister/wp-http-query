@@ -42,8 +42,12 @@ Activating it doesn't add `QUERY` to any of your site's existing routes.
 
 ## Turn it on for core's content
 
-Go to **Settings → General**. In the **HTTP QUERY** row, tick **Accept QUERY on core’s read collections**.
-You need the `manage_options` capability. It's off by default.
+Go to **Settings → HTTP QUERY** (or click **Settings** under the plugin on the **Plugins** screen)
+and tick **Accept QUERY on core’s read collections**. You need the `manage_options` capability.
+It's off by default.
+
+The same page lists every route that accepts `QUERY` right now and why: a preset, the
+`wp_http_query_routes` filter, or the route registering it itself.
 
 That enables the `core-collections` preset. These routes then accept `QUERY`, with the same
 parameters as `GET`:
@@ -190,7 +194,7 @@ is why nothing is on by default. See
 `/wp/v2/search`. Their `GET` handlers were checked for branching on the request method; see
 ADR 0005.
 
-Turn it on at **Settings → General → HTTP QUERY**, or in code, which overrides the setting:
+Turn it on at **Settings → HTTP QUERY**, or in code, which overrides the setting:
 
 ```php
 add_filter( 'wp_http_query_presets', function ( array $presets ) {

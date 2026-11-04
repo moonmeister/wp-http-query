@@ -166,10 +166,17 @@ too high a price for the evidence.
 |---|---|---|
 | Route registers it | Route author | `'methods' => WP_REST_Server::READABLE . ', ' . \WPHttpQuery\QUERYABLE`. Works on stock core; `QUERYABLE` is the userland stand-in for core's future `WP_REST_Server::QUERYABLE` ([ADR 0002](0002-allmethods-vs-queryable.md) option B) |
 | Route list | Site, in code | `wp_http_query_routes` filter: registered route keys, matched **exactly** (`/wp/v2/posts`, or the regex key verbatim, e.g. `/wp/v2/posts/(?P<id>[\d]+)`). No patterns in v1 |
-| Preset | Site, in Settings → General or code | One stored option (`wp_http_query_presets`, default empty), then the `wp_http_query_presets` filter so code can override it. One preset in v1, `core-collections`: this ADR's option 2, done by the plugin |
+| Preset | Site, in Settings → HTTP QUERY or code | One stored option (`wp_http_query_presets`, default empty), then the `wp_http_query_presets` filter so code can override it. One preset in v1, `core-collections`: this ADR's option 2, done by the plugin |
 
 On every opted-in route, only handlers that accept `GET` gain `QUERY`; write handlers on the same
 route never do. The plugin writes `methods` back as a string, never an array (Trac#65905).
+
+**Where the setting lives** (revised 2026-11-04, in review of #43). The checkbox first went on
+Settings → General, on the grounds that one checkbox didn't justify a menu item and Permalinks, the
+closer fit, saves its own form outside `options.php`. It was too hard to find, so it moved to its
+own **Settings → HTTP QUERY** page, linked from the plugin's row on the Plugins screen. The page
+also lists every route that accepts `QUERY` and which opt-in put it there, read from the same code
+that decides reach. The option name and sanitizer are unchanged.
 
 ### The `core-collections` preset
 
@@ -197,7 +204,8 @@ now see `QUERY` on sites that enable the preset. Option 2's residual risk, above
 
 Tests: `tests/adr-0005-reach.test.ts` (default off, each opt-in, write handlers, and a
 form-encoded `QUERY /wp/v2/posts` search returning only the matching post) and
-`tests/lifecycle/adr-0005-preset-setting.test.ts` (the stored setting and the filter override).
+`tests/lifecycle/adr-0005-preset-setting.test.ts` (the stored setting and the filter override)
+and `tests/lifecycle/settings-page.test.ts` (the settings page, saved through its real form).
 
 Still not built: the shared-callback detector (option 5) and a `readme.txt` warning for sites
 that opt in plugin routes.

@@ -263,7 +263,7 @@ add_filter( 'wp_http_query_routes', function ( array $routes ) {
   method. See [the safe-method trap](#the-safe-method-trap).
 
 Presets are named lists of routes. There's one, `core-collections`, which site owners turn on in
-**Settings → General**. Code can force it on or off with `wp_http_query_presets`, which receives
+**Settings → HTTP QUERY**. Code can force it on or off with `wp_http_query_presets`, which receives
 the stored setting and wins over it:
 
 ```php

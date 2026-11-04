@@ -18,7 +18,7 @@ https://github.com/moonmeister/wp-http-query/issues/45
 
 Adds the HTTP QUERY method to the WordPress REST API with no core patch. Nothing gains QUERY by
 default: a route registers it, a site lists routes in a filter, or a site enables a preset on
-Settings > General. See README.md in this directory for how to use it.
+Settings > HTTP QUERY. See README.md in this directory for how to use it.
 
 == Changelog ==
 

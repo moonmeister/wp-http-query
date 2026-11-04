@@ -148,7 +148,7 @@ Every pull request gets one comment, updated on each push, with a **Preview in P
 button and a public download link for that commit's plugin zip. The button boots the latest
 WordPress (PHP 8.3) in your browser via [WordPress Playground](https://playground.wordpress.net),
 logged in as admin, with the zip active, the `core-collections` preset on, the
-`/wp-http-query/v1/echo` demo route enabled, and Settings → General open. The link needs no GitHub login.
+`/wp-http-query/v1/echo` demo route enabled, and Settings → HTTP QUERY open. The link needs no GitHub login.
 
 Two workflows do it, using
 [`WordPress/action-wp-playground-pr-preview`](https://github.com/WordPress/action-wp-playground-pr-preview):

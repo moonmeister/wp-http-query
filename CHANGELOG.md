@@ -18,8 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - A site enables a preset.
 - The `core-collections` preset: `/wp/v2/posts`, `/wp/v2/pages`, `/wp/v2/media`,
   `/wp/v2/comments`, `/wp/v2/categories`, `/wp/v2/tags`, `/wp/v2/users` and `/wp/v2/search`.
-  It is turned on with a checkbox on Settings → General, stored in the `wp_http_query_presets`
+  It is turned on with a checkbox on Settings → HTTP QUERY, stored in the `wp_http_query_presets`
   option. The `wp_http_query_presets` filter overrides the setting.
+- A Settings → HTTP QUERY page, linked from the plugin's row on the Plugins screen. Besides the
+  preset checkbox, it lists every route that accepts `QUERY` and why: a preset, the
+  `wp_http_query_routes` filter, or the route registering it itself.
 - Only handlers that accept `GET` gain `QUERY`. Write handlers on the same route never do.
   The handler's `methods` is written back as a string, so Trac#65905 can't affect it on any core version.
 - CORS: `QUERY` is added to `Access-Control-Allow-Methods`. On WordPress 7.2+ this goes through
