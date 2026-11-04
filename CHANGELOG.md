@@ -32,7 +32,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An `Accept-Query` response header on routes that accept `QUERY`. It advertises
   `application/json` by default, which can be changed with the `wp_http_query_advertised_types` filter.
 - A diagnostic route, `QUERY /wp-json/wp-http-query/v1/echo`, that reports how the request was parsed.
-  Off by default; the `wp_http_query_register_demo_route` filter turns it on.
+  Admins only (`manage_options`) by default; the `wp_http_query_register_demo_route` filter makes it
+  public.
+- A self-test: **Test your server** on Settings → HTTP QUERY checks, from the browser and from the
+  server (loopback), that `QUERY` reaches WordPress with its method and body intact, and that no
+  cache returns one `QUERY` body's response for another. Each result gives the HTTP status and a
+  likely cause: nginx at the bare root (`405`), a `GET`/`POST`-only rule (`403`), Varnish 8.0 – 9.0.x
+  or `php -S` (`501`), a redirect, a changed method, a lost body, or a cache, named from its
+  response headers where possible.
+- Two Site Health tests running the server-side checks: **HTTP QUERY requests reach WordPress** and
+  **No cache stores HTTP QUERY responses**.
+- A public route for the cache check, `QUERY /wp-json/wp-http-query/v1/self-test/fingerprint`, that
+  answers with a SHA-256 of the request body and a fresh value, and echoes nothing.
 - `uninstall.php` deletes the `wp_http_query_presets` option (current site only on multisite).
   Deactivating keeps it.
 

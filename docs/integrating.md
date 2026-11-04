@@ -401,4 +401,5 @@ curl -X POST 'https://example.com/wp-json/query-route-example/v1/books' \
 
 Your handler sees `QUERY`. Everything between the client and WordPress sees `POST`, so caches and
 proxies treat it as a write and don't retry it. It's a tunnel, not the method. The test suite
-checks it against the plugin's echo route.
+checks it against the plugin's echo route, which applies the same permission check either way:
+admins only, unless a site makes it public.

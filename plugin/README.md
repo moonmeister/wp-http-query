@@ -19,8 +19,9 @@ own routes, and sending it.
   which body format to use.
 - **Adds `QUERY` to the routes you choose**, and to no others. See
   [Choosing which routes accept QUERY](#choosing-which-routes-accept-query).
-- **Registers a test route**, `/wp-json/wp-http-query/v1/echo`, that reports what the server
-  received. Use it to check your server passes `QUERY` through.
+- **Tests your server.** A button on **Settings → HTTP QUERY**, and two Site Health tests, check
+  that `QUERY` reaches WordPress intact and that no cache stores `QUERY` responses. See
+  [Check your server](#check-your-server).
 
 It stores one option and adds no tables, cron jobs or cache headers.
 
@@ -69,9 +70,59 @@ change: a `QUERY` sees exactly what a `GET` with the same parameters would.
 If the setting has a note saying code overrides it, a plugin or theme on your site uses the
 `wp_http_query_presets` filter, and that wins.
 
-## Check it works
+## Check your server
 
-Send a `QUERY` to the test route. Replace `example.com` with your site:
+Go to **Settings → HTTP QUERY** and click **Test your server**. It runs four checks and explains
+each result in plain language:
+
+| Check | What it does |
+|---|---|
+| From your browser: `QUERY` reaches WordPress | Your browser sends a real `QUERY`, signed in as you, to the plugin's echo route, with a random value in the body, and checks the method, the value and the `Accept-Query` header come back |
+| From your browser: caches | Your browser sends two different `QUERY` bodies to the same URL, signed out, and checks the second answer isn't the first one again. This path goes through your CDN, if you have one |
+| From the server (loopback): `QUERY` reaches WordPress | The same check, sent by your site to itself, the way Site Health's loopback test works |
+| From the server (loopback): caches | The same cache check, sent by your site to itself. It usually skips the CDN, but catches page-cache plugins |
+
+**Site Health** (**Tools → Site Health**) runs the two server checks too, as **HTTP QUERY requests
+reach WordPress** and **No cache stores HTTP QUERY responses**.
+
+The tests send a few small requests to your own site and change nothing. You need the
+`manage_options` capability.
+
+### What the results mean
+
+Each result shows the HTTP status and one line saying why. Sample result, from an nginx site
+using plain permalinks:
+
+> **From the server (loopback): QUERY reaches WordPress: failed** HTTP status 405.
+> The web server refused QUERY before WordPress saw it. nginx does this when the request goes to
+> the site root (/ or /?rest_route=…) instead of /index.php or /wp-json/: its index module answers
+> 405 first. Check the URL tested; with plain permalinks, send QUERY to /index.php?rest_route=…
+> instead.
+
+| Result | Likely cause |
+|---|---|
+| Passed | `QUERY` reached WordPress with its method and body intact |
+| `405` | nginx answering a `QUERY` to the site root. Use `/wp-json/…` or `/index.php?rest_route=…` ([matrix notes](../matrix/README.md)) |
+| `403` from the web server, not WordPress | A rule that allows only `GET` and `POST`, such as nginx's `limit_except GET POST` or Apache's `<LimitExcept GET POST>`, or a firewall |
+| `501` | Varnish 8.0 – 9.0.x in front of the site, or PHP's built-in server (`php -S`) |
+| `301`, `302` or another redirect | A client that follows it may switch `QUERY` to `GET` and drop the body. WordPress's HTTP API does on a `302`; browsers on a `303`. Check the Site Address in **Settings → General** |
+| Method changed | Something between the client and WordPress turned `QUERY` into another method |
+| Body lost or changed | Something between the client and WordPress dropped or rewrote the body |
+| `Accept-Query` missing | `QUERY` works, but something in front of WordPress strips the header clients use to find the body format |
+| Your browser can't send `QUERY` | The browser, not your server. The server checks still apply |
+| Network error | The request didn't complete. If Site Health's loopback test fails too, fix that first |
+| A cache is storing `QUERY` responses | Two different bodies got the same answer, so one visitor's search can get another's results. The cache-related headers seen (`Age`, `X-Cache`, `CF-Cache-Status`, `X-Varnish`, `X-LiteSpeed-Cache` and others) are listed, with a guess at the vendor. A guess, not proof |
+
+Site Health marks a failed check **critical**, and one that couldn't tell **recommended**.
+
+**A clean cache result is a sample, not a guarantee.** Some caches only store a response after
+several requests, or per region. LiteSpeed and OpenLiteSpeed haven't been tested by this project,
+so a result naming LiteSpeed is an observation from your site, not a claim about LiteSpeed.
+
+### With curl
+
+The echo route answers admins only, unless you've made it public with the
+[filter](#diagnostic-route). With it public, from anywhere:
 
 ```sh
 curl -i -X QUERY 'https://example.com/wp-json/wp-http-query/v1/echo' \
@@ -88,6 +139,9 @@ the JSON body:
 "merged_params":{"search":"hello"}
 ```
 
+Left admins only, the same request gets `401` with `"code":"rest_forbidden"`. That still shows
+`QUERY` reached WordPress: WordPress checks permission only after it matched the `QUERY` route.
+
 If your site uses plain permalinks, use `https://example.com/index.php?rest_route=/wp-http-query/v1/echo`
 instead. Keep the `index.php`: on nginx, `QUERY` to the bare `/` gets a `405` from nginx's index
 module before WordPress sees it, while `/index.php` reaches PHP
@@ -101,16 +155,10 @@ curl -X QUERY 'https://example.com/wp-json/wp/v2/posts' \
   --data '{"search":"hello","per_page":1}'
 ```
 
-### If it doesn't work
+A `404` with `"code":"rest_no_route"` on a preset route means the plugin isn't active, or the
+preset is off.
 
-| You get | Likely cause |
-|---|---|
-| `404` with `"code":"rest_no_route"` | The plugin isn't active. On a preset route, the preset is off |
-| `403` page from the web server, not JSON | A hardening rule that allows only `GET` and `POST`. See below |
-| `501 Not Implemented` | PHP's built-in server (`php -S`), or Varnish 8.0 – 9.0.x in front of the site. See below |
-| `405` | You may have sent it to `/`, not `/wp-json/...`. nginx rejects `QUERY` at the site root, which doesn't affect the REST API |
-
-## Check your server
+## Servers and caches we know about
 
 Results from the project's [compatibility matrix](../matrix/results/MATRIX.md), run 2026-08-16
 over HTTP/1.1 with request bodies up to 64 KiB:
@@ -143,8 +191,8 @@ preset or opt routes in, leave W3TC's REST caching off. One version range blocks
 default config (2026-08-19).
 
 **Not tested:** LiteSpeed and OpenLiteSpeed, HTTP/2 and HTTP/3, TLS, and CDNs, WAFs and managed
-hosts. Not tested means unknown, not broken. The `curl` check above tells you about your own
-stack.
+hosts. Not tested means unknown, not broken. [The self-test](#check-your-server) tells you about your
+own stack.
 
 ## Choosing which routes accept QUERY
 
@@ -213,20 +261,21 @@ handlers never do.
 ## Diagnostic route
 
 `QUERY /wp-json/wp-http-query/v1/echo` reports how WordPress parsed a request: method, content
-type, body, query and merged params. It needs no authentication and reflects its input, so it is
-**off by default**. Turn it on while you check a setup, then turn it off again:
+type, body, query and merged params. The self-test uses it, so it's always there, but it reflects
+its input, so by default **only admins** (`manage_options`) can call it. Anyone else gets `401`
+(signed out) or `403`. To make it public while you check a setup with `curl`, then switch it back:
 
 ```php
 add_filter( 'wp_http_query_register_demo_route', '__return_true' );
 ```
 
-```sh
-curl -X QUERY https://example.com/wp-json/wp-http-query/v1/echo \
-	-H 'Content-Type: application/json' -d '{"search":"needle"}'
-```
+The filter's name dates from when it controlled whether the route existed at all. It's admins only
+whatever `WP_DEBUG` says, since staging sites that anyone can reach often run with `WP_DEBUG` on.
 
-It is off whatever `WP_DEBUG` says, since staging sites that anyone can reach often run with
-`WP_DEBUG` on.
+The self-test's cache check uses a second route, `QUERY /wp-json/wp-http-query/v1/self-test/fingerprint`.
+It's public, because caches usually skip signed-in requests, and safe to be: it answers with a
+SHA-256 of the body it received and a value that's new on every request, and nothing else. It
+echoes nothing back and sends no cache headers of its own.
 
 ## Data
 
