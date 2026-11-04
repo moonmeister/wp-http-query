@@ -1,5 +1,7 @@
 # wp-http-query
 
+[![Decision tests](https://github.com/moonmeister/wp-http-query/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/moonmeister/wp-http-query/actions/workflows/test.yml)
+
 Making WordPress ready for the HTTP `QUERY` method ([RFC 10008](https://www.rfc-editor.org/rfc/rfc10008.html)).
 
 **The deliverable is a feature plugin**, [`plugin/`](plugin/), that adds `QUERY` support to the

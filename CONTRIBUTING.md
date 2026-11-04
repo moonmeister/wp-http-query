@@ -24,6 +24,8 @@ make check
 The first run installs npm dependencies, downloads three WordPress builds and the Docker images,
 then runs the tests. Expect a few minutes. Later starts take seconds.
 
+CI runs the same `make check` on every PR and on pushes to `main` ([`.github/workflows/test.yml`](.github/workflows/test.yml)).
+
 You get three WordPress sites, all with `plugin/` mounted and active:
 
 | Site | URL | Core | Why it exists |
