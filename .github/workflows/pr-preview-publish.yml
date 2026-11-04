@@ -102,11 +102,11 @@ jobs:
           # Latest WordPress, PHP 8.3, logged in as admin, the built zip active with the
           # core-collections preset on and the echo demo route enabled (through the
           # wp_http_query_register_demo_route filter where the plugin has it; harmless where it
-          # doesn't), opening on Settings > General where the preset is.
+          # doesn't), opening on Settings > HTTP QUERY where the preset is.
           blueprint=$(jq -nc --arg url "$ZIP_URL" '{
             "$schema": "https://playground.wordpress.net/blueprint-schema.json",
             preferredVersions: { php: "8.3", wp: "latest" },
-            landingPage: "/wp-admin/options-general.php",
+            landingPage: "/wp-admin/options-general.php?page=wp-http-query",
             steps: [
               { step: "login", username: "admin" },
               { step: "installPlugin",
@@ -133,6 +133,6 @@ jobs:
 
             {{PLAYGROUND_BUTTON}}
 
-            Opens WordPress (latest, PHP 8.3) in your browser with this PR's build of the plugin active, the `core-collections` preset on, the `/wp-http-query/v1/echo` demo route enabled, and Settings → General open.
+            Opens WordPress (latest, PHP 8.3) in your browser with this PR's build of the plugin active, the `core-collections` preset on, the `/wp-http-query/v1/echo` demo route enabled, and Settings → HTTP QUERY open.
 
             **Download the plugin zip:** [${{ steps.expose.outputs.artifact-name }}](${{ steps.asset.outputs.url }}) (no GitHub login needed; it unzips to `wp-http-query/`). Built from ${{ github.event.workflow_run.head_sha }}.
