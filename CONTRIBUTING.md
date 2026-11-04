@@ -9,7 +9,7 @@ compatibility matrix behind it. Start with the [README](README.md) for what the 
 | Tool | Why | Check |
 |---|---|---|
 | **Docker** (Desktop, OrbStack, or similar) | Runs the WordPress test sites. **It must be running** before any `make` target that touches the sites | `docker info` |
-| **Node.js 20+** and npm | Runs [wp-env](https://www.npmjs.com/package/@wordpress/env) and the [vitest](https://vitest.dev) suite | `node -v` |
+| **Node.js 24.18+** and npm (26, the current LTS, recommended; `nvm use` reads `.nvmrc`) | Runs [wp-env](https://www.npmjs.com/package/@wordpress/env) and the [vitest](https://vitest.dev) suite | `node -v` |
 | **make** | Entry point for everything below. Preinstalled on macOS and most Linux | `make -v` |
 | `jq` *(matrix only)* | Used by `matrix/run.sh` | `jq --version` |
 
@@ -23,6 +23,8 @@ make check
 
 The first run installs npm dependencies, downloads three WordPress builds and the Docker images,
 then runs the tests. Expect a few minutes. Later starts take seconds.
+
+CI runs the same `make check` on every PR and on pushes to `main` ([`.github/workflows/test.yml`](.github/workflows/test.yml)).
 
 You get three WordPress sites, all with `plugin/` mounted and active:
 
