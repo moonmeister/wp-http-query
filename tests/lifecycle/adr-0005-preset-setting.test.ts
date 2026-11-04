@@ -14,6 +14,8 @@
  *
  * Decision: docs/decisions/0005-reach-for-existing-read-routes.md   Issue: #1
  */
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CORE_COLLECTIONS, FIXTURE_OPTED_IN_ROUTE, rest } from '../http';
 import { sites } from '../sites';
@@ -25,6 +27,25 @@ import {
 	setOption,
 	snapshotOption,
 } from './site-state';
+
+const ENV_SH = fileURLToPath( new URL( '../../scripts/env.sh', import.meta.url ) );
+
+/**
+ * Stores a value through WP-CLI, which runs the registered sanitize callback,
+ * and returns what PHP wrote to stderr. The test sites run with WP_DEBUG on, so
+ * a warning or notice from the sanitizer shows up there.
+ */
+function setOptionCapturingStderr( site: ( typeof sites )[ number ], name: string, value: unknown ): string {
+	const result = spawnSync(
+		ENV_SH,
+		[ 'wp', site.key, 'option', 'update', name, JSON.stringify( value ), '--format=json' ],
+		{ encoding: 'utf8' }
+	);
+	if ( result.status !== 0 ) {
+		throw new Error( `wp option update failed: ${ result.stderr }` );
+	}
+	return result.stderr;
+}
 
 async function statuses( site: ( typeof sites )[ number ], routes: string[] ): Promise< Record< string, number > > {
 	const out: Record< string, number > = {};
@@ -78,5 +99,22 @@ describe.each( sites )( 'ADR 0005 preset setting: $label', ( site ) => {
 		setOption( site, PRESETS_OPTION, [] );
 		deleteOption( site, FIXTURE_PRESET_FILTER_OFF ); // The fixture's filter enables the preset.
 		expect( await statuses( site, CORE_COLLECTIONS ) ).toEqual( all( 200 ) );
+	} );
+
+	// Last in the block: it spends seconds in WP-CLI, and a following HTTP test could
+	// reuse a keep-alive socket Apache has already closed.
+	it( 'drops malformed entries without PHP warnings or notices', () => {
+		// A crafted options.php post can nest arrays; this once raised an
+		// "Array to string conversion" notice inside the sanitizer.
+		const stderr = setOptionCapturingStderr( site, PRESETS_OPTION, [
+			[ 'core-collections' ],
+			{ name: 'core-collections' },
+			42,
+			null,
+			'core-collections',
+		] );
+
+		expect( getOption( site, PRESETS_OPTION ) ).toEqual( [ 'core-collections' ] );
+		expect( stderr ).not.toMatch( /\b(Warning|Notice|Deprecated|Fatal error)\b/ );
 	} );
 } );
