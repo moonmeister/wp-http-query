@@ -1,0 +1,71 @@
+name: Release
+
+# Pull requests: build the plugin zip and attach it to the run, so every PR shows the package builds.
+# v* tags: check the tag against the plugin header, build the zip, and create a DRAFT GitHub
+# release with it attached. A maintainer reviews and publishes the draft by hand. See RELEASING.md.
+
+on:
+  pull_request:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  package:
+    name: make dist
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - run: make dist
+
+      - name: Lint the PHP in the zip
+        run: |
+          mkdir -p "$RUNNER_TEMP/unzipped"
+          unzip -q dist/*.zip -d "$RUNNER_TEMP/unzipped"
+          unzip -l dist/*.zip
+          find "$RUNNER_TEMP/unzipped" -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wp-http-query-zip
+          path: dist/*.zip
+          if-no-files-found: error
+
+  release:
+    name: Draft release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the tag matches the plugin header Version
+        run: scripts/release-check.sh "$GITHUB_REF_NAME"
+
+      - run: make dist
+
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(scripts/plugin-version.sh)
+          scripts/changelog-section.sh "$version" > "$RUNNER_TEMP/notes.md"
+          prerelease=()
+          case "$version" in *-*) prerelease=(--prerelease) ;; esac
+          gh release create "$GITHUB_REF_NAME" "dist/wp-http-query-$version.zip" \
+            --draft \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            "${prerelease[@]}"

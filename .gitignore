@@ -12,3 +12,6 @@ node_modules/
 
 # Claude Code agent worktrees and local settings
 .claude/
+
+# Built plugin zips (make dist).
+dist/
