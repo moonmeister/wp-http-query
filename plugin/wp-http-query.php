@@ -197,7 +197,7 @@ add_filter(
  *
  * 2. A site lists the route in the 'wp_http_query_routes' filter.
  *
- * 3. A site enables a preset: the option set on Settings → General, then
+ * 3. A site enables a preset: the option set on Settings → HTTP QUERY, then
  *    the 'wp_http_query_presets' filter, which code can use to override it.
  *
  * Only handlers that accept GET gain QUERY. Write handlers on the same route
@@ -307,19 +307,43 @@ function enabled_presets(): array {
  * @return string[]
  */
 function opted_in_routes(): array {
-	$routes = array();
+	return array_keys( opted_in_route_sources() );
+}
+
+/**
+ * Opted-in route keys, each mapped to why it is opted in.
+ *
+ * The one place reach is decided: opted_in_routes() is its keys, and the
+ * settings page's status table reads the values. A route a preset lists is
+ * 'preset:<name>' (the first enabled preset that lists it); anything the
+ * 'wp_http_query_routes' filter added is 'filter'. A preset route the filter
+ * removed is not opted in at all.
+ *
+ * @return array<string, string> Route key => 'preset:<name>' or 'filter'.
+ */
+function opted_in_route_sources(): array {
+	$from_presets = array();
 	foreach ( enabled_presets() as $name ) {
-		$routes = array_merge( $routes, presets()[ $name ] );
+		foreach ( presets()[ $name ] as $route ) {
+			if ( ! isset( $from_presets[ $route ] ) ) {
+				$from_presets[ $route ] = 'preset:' . $name;
+			}
+		}
 	}
 
-	return array_values(
-		array_unique(
-			array_filter(
-				(array) apply_filters( 'wp_http_query_routes', $routes ),
-				'is_string'
-			)
-		)
+	$routes  = array_filter(
+		(array) apply_filters( 'wp_http_query_routes', array_keys( $from_presets ) ),
+		'is_string'
 	);
+	$sources = array();
+
+	foreach ( $routes as $route ) {
+		if ( ! isset( $sources[ $route ] ) ) {
+			$sources[ $route ] = $from_presets[ $route ] ?? 'filter';
+		}
+	}
+
+	return $sources;
 }
 
 add_filter(
@@ -404,15 +428,26 @@ function add_query_to_handler( array $handler ): array {
 
 /*
  * -------------------------------------------------------------------------
- * Preset setting — Settings → General.
+ * Settings → HTTP QUERY.
  *
  * Only presets get UI. Route lists and QUERYABLE stay code-only. One option,
- * a list of enabled preset names, default empty. Settings → General because a
- * single checkbox doesn't justify its own menu item, and Permalinks, the
- * closer fit, saves its own form instead of going through options.php, so the
- * Settings API can't register fields there. uninstall.php deletes the option.
+ * a list of enabled preset names, default empty, registered in the plugin's
+ * own option group and saved through options.php. uninstall.php deletes it.
+ *
+ * The page also shows, read-only, which routes accept QUERY and why. That
+ * comes from opted_in_route_sources() and the REST server's own route table,
+ * the same two things that decide reach and Accept-Query, so it can't drift.
+ *
+ * The checkbox was on Settings → General in development builds. The option
+ * name is unchanged, so a stored setting carries over.
  * ----------------------------------------------------------------------
  */
+
+/** Settings page slug, and the option group and page the Settings API uses. */
+const SETTINGS_PAGE = 'wp-http-query';
+
+/** Where the settings page's docs link points. */
+const DOCS_URL = 'https://github.com/moonmeister/wp-http-query/blob/main/plugin/README.md';
 
 /**
  * Keeps known preset names only.
@@ -437,7 +472,7 @@ add_action(
 	'init',
 	static function (): void {
 		register_setting(
-			'general',
+			SETTINGS_PAGE,
 			PRESETS_OPTION,
 			array(
 				'type'              => 'array',
@@ -451,28 +486,92 @@ add_action(
 );
 
 add_action(
+	'admin_menu',
+	static function (): void {
+		add_options_page(
+			/* translators: Settings page title. QUERY is the HTTP method's name; keep it as is. */
+			__( 'HTTP QUERY', 'wp-http-query' ),
+			/* translators: Settings menu label. QUERY is the HTTP method's name; keep it as is. */
+			__( 'HTTP QUERY', 'wp-http-query' ),
+			'manage_options',
+			SETTINGS_PAGE,
+			__NAMESPACE__ . '\\render_settings_page'
+		);
+	}
+);
+
+add_action(
 	'admin_init',
 	static function (): void {
-		// options.php already requires manage_options for the general group;
-		// this keeps the field off the page for anyone else too.
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
+		add_settings_section(
+			'wp_http_query_presets',
+			__( 'Presets', 'wp-http-query' ),
+			'__return_false',
+			SETTINGS_PAGE
+		);
 
 		add_settings_field(
 			PRESETS_OPTION,
-			/* translators: Settings field title. QUERY is the HTTP method's name; keep it as is. */
-			esc_html__( 'HTTP QUERY', 'wp-http-query' ),
+			__( 'Core collections', 'wp-http-query' ),
 			__NAMESPACE__ . '\\render_presets_field',
-			'general',
-			'default',
+			SETTINGS_PAGE,
+			'wp_http_query_presets',
 			array( 'label_for' => PRESETS_OPTION . '-core-collections' )
 		);
 	}
 );
 
+add_filter(
+	'plugin_action_links_' . plugin_basename( __FILE__ ),
+	static function ( array $links ): array {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return $links;
+		}
+
+		array_unshift(
+			$links,
+			sprintf(
+				'<a href="%s">%s</a>',
+				esc_url( admin_url( 'options-general.php?page=' . SETTINGS_PAGE ) ),
+				esc_html__( 'Settings', 'wp-http-query' )
+			)
+		);
+
+		return $links;
+	}
+);
+
 /**
- * Renders the preset checkbox on Settings → General.
+ * Renders Settings → HTTP QUERY.
+ *
+ * Saved notices come from options-head.php, which core includes on every
+ * Settings submenu page, so this doesn't call settings_errors() itself.
+ */
+function render_settings_page(): void {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+	?>
+	<div class="wrap">
+		<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
+		<p>
+			<?php esc_html_e( 'HTTP QUERY is a safe, repeatable request with a body. QUERY is off on existing routes until a preset, code, or the route itself turns it on.', 'wp-http-query' ); ?>
+			<a href="<?php echo esc_url( DOCS_URL ); ?>"><?php esc_html_e( 'Documentation', 'wp-http-query' ); ?></a>
+		</p>
+		<form action="options.php" method="post">
+			<?php
+			settings_fields( SETTINGS_PAGE );
+			do_settings_sections( SETTINGS_PAGE );
+			submit_button();
+			?>
+		</form>
+		<?php render_status(); ?>
+	</div>
+	<?php
+}
+
+/**
+ * Renders the preset checkbox.
  */
 function render_presets_field(): void {
 	$stored    = sanitize_presets( get_option( PRESETS_OPTION, array() ) );
@@ -493,6 +592,72 @@ function render_presets_field(): void {
 			esc_html__( 'Code on this site overrides this setting through the wp_http_query_presets filter.', 'wp-http-query' )
 		);
 	}
+}
+
+/**
+ * Routes that accept QUERY right now, each with why.
+ *
+ * Reads the REST server's normalized route table, the same one that matches
+ * requests and drives Accept-Query, so it lists what actually answers QUERY.
+ * Anything there that opted_in_route_sources() doesn't account for registered
+ * QUERY itself.
+ *
+ * @return array<string, string> Route key => 'preset:<name>', 'filter' or 'route'.
+ */
+function query_route_sources(): array {
+	$opted_in = opted_in_route_sources();
+	$sources  = array();
+
+	foreach ( rest_get_server()->get_routes() as $route => $handlers ) {
+		foreach ( $handlers as $handler ) {
+			if ( ! empty( $handler['methods'][ METHOD ] ) ) {
+				$sources[ $route ] = $opted_in[ $route ] ?? 'route';
+				break;
+			}
+		}
+	}
+
+	ksort( $sources );
+
+	return $sources;
+}
+
+/**
+ * Renders the read-only status table.
+ */
+function render_status(): void {
+	$sources = query_route_sources();
+
+	printf( '<h2>%s</h2>', esc_html__( 'Routes that accept QUERY', 'wp-http-query' ) );
+
+	if ( ! $sources ) {
+		printf( '<p>%s</p>', esc_html__( 'None. No route on this site accepts QUERY.', 'wp-http-query' ) );
+		return;
+	}
+
+	echo '<table class="widefat striped" id="wp-http-query-status"><thead><tr>';
+	printf( '<th scope="col">%s</th>', esc_html__( 'Route', 'wp-http-query' ) );
+	printf( '<th scope="col">%s</th>', esc_html__( 'Why', 'wp-http-query' ) );
+	echo '</tr></thead><tbody>';
+
+	foreach ( $sources as $route => $source ) {
+		if ( 'filter' === $source ) {
+			/* translators: wp_http_query_routes is a filter name; keep it as is. */
+			$why = __( 'wp_http_query_routes filter', 'wp-http-query' );
+		} elseif ( 'route' === $source ) {
+			$why = __( 'Registered by the route itself (methods include QUERY)', 'wp-http-query' );
+		} else {
+			$why = sprintf(
+				/* translators: %s: Preset name, such as core-collections. */
+				__( 'Preset: %s', 'wp-http-query' ),
+				substr( $source, strlen( 'preset:' ) )
+			);
+		}
+
+		printf( '<tr><td><code>%s</code></td><td>%s</td></tr>', esc_html( $route ), esc_html( $why ) );
+	}
+
+	echo '</tbody></table>';
 }
 
 /*
