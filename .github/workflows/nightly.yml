@@ -75,18 +75,20 @@ jobs:
       # main's HEAD and the zip is attached, so the tag moves only after the new zip is up. Moved
       # first, a failed upload would leave the tag at HEAD over the old zip, and every later run
       # would skip until main moved again. This way any failure before the tag moves leaves it
-      # behind HEAD, and the next run rebuilds. Only a release created by the very first run
-      # tags HEAD early, and it has no zip yet, which the skip check also treats as build.
+      # behind HEAD, and the next run rebuilds. The very first run creates the release as a
+      # draft, which creates no tag and isn't public: a failure before it's published, in the
+      # last step, leaves a draft, which the skip check can't see and so treats as build.
       - name: Upload the zip to the Nightly prerelease
         if: steps.decide.outputs.result == 'build'
         env:
           SHA: ${{ steps.decide.outputs.sha }}
         run: |
           set -euo pipefail
+          # gh release view finds a draft too, so a leftover one from a failed run is reused.
           if ! gh release view nightly --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            # First run only. The notes are written once the zip is up, below.
+            # First run only. Published, with its notes, in the last step.
             gh release create nightly --repo "$GITHUB_REPOSITORY" --target "$SHA" \
-              --title Nightly --prerelease --latest=false --notes "Being built."
+              --title Nightly --draft --prerelease --latest=false --notes "Being built."
           fi
 
           # Replace the zip, then delete anything else, so exactly one asset remains.
@@ -112,7 +114,9 @@ jobs:
               -f ref=refs/tags/nightly -f sha="$SHA" >/dev/null
           fi
 
-      - name: Update the Nightly prerelease's notes and target
+      # Last, and in one call: the notes describe the new commit only once its zip is up and the
+      # tag is on it, and a first run's draft becomes public only then.
+      - name: Update the Nightly prerelease's notes and target, and publish it
         if: steps.decide.outputs.result == 'build'
         env:
           SHA: ${{ steps.decide.outputs.sha }}
@@ -132,4 +136,4 @@ jobs:
           } > "$notes"
 
           gh release edit nightly --repo "$GITHUB_REPOSITORY" --target "$SHA" \
-            --title Nightly --prerelease --latest=false --draft=false --notes-file "$notes"
+            --title Nightly --notes-file "$notes" --draft=false --prerelease --latest=false

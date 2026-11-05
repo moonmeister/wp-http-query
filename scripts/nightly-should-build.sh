@@ -6,7 +6,7 @@
 # Needs `gh` with a token that can read the repo's releases and refs.
 #
 # It skips only when everything already matches main's HEAD:
-#   - the `nightly` release exists and has the nightly zip attached, and
+#   - the `nightly` release exists, is published, and has the nightly zip attached, and
 #   - its tag, or failing that the release's target, is the HEAD commit.
 # Anything else, including a failed or unexpected lookup, means build: a needless rebuild is
 # cheap, and a skipped one leaves a stale nightly.
@@ -14,6 +14,10 @@
 # The tag is trusted as "this commit's zip is up" because the workflow moves it only after the
 # upload succeeded (see the comment above its upload step). A run that fails before then leaves
 # the tag behind HEAD, so the next run builds.
+#
+# A draft Nightly, left by a first run that failed before publishing, means build. The
+# releases/tags endpoint returns published releases only, so a draft reads as no release; the
+# .draft check below covers it should that ever change.
 set -euo pipefail
 
 repo=${1:?usage: scripts/nightly-should-build.sh <owner/repo> <head sha>}
@@ -37,7 +41,10 @@ build() {
 
 # The release, its target and its assets.
 if ! release=$(gh api "repos/$repo/releases/tags/nightly" 2>/dev/null); then
-	build "no nightly release yet (or it couldn't be read)"
+	build "no published nightly release (none yet, a draft, or it couldn't be read)"
+fi
+if [ "$(jq -r '.draft // false' <<<"$release" 2>/dev/null)" != false ]; then
+	build "the nightly release is still a draft"
 fi
 target=$(jq -r '.target_commitish // ""' <<<"$release" 2>/dev/null | lower) || target=
 if ! jq -e --arg name "$asset" 'any(.assets[]?; .name == $name and .state == "uploaded")' \
