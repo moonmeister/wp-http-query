@@ -1,50 +1,50 @@
 /**
  * CORS: the plugin respects a site that turned REST CORS off, or moved it.
  *
- * Before 7.2 core has no filter on its CORS method list, so the plugin swaps
- * core's rest_send_cors_headers() for its own copy. It decides when the
- * response is served, not on rest_api_init, so a change a site makes at any
- * rest_api_init priority counts. It swaps only while core's handler is
- * hooked, and at the priority it's hooked at:
- *
- * - A site that removed core's handler has turned REST CORS off. Adding the
- *   plugin's copy anyway would turn it back on, echoing any Origin with
- *   Access-Control-Allow-Credentials: true.
- * - A site that re-hooked core's handler at another priority would otherwise
- *   get both, and core's, running later, would overwrite QUERY out of the list.
- *   The same goes for every priority it's hooked at, if more than one.
- * - The plugin's copy takes core's place in the hook, not the end of the
- *   priority, so a callback that ran after core's handler, like a CORS plugin
- *   sending a restricted origin, still runs after it and still wins.
- *
- * From 7.2 the plugin uses core's rest_allowed_cors_methods filter, which
- * doesn't run once core's handler is gone, so nightly must behave the same.
+ * Before 7.2 the plugin wraps core's CORS handler wherever it's hooked when
+ * the response is served (see swap_cors_handler() in
+ * plugin/includes/core-gaps.php for why). This checks, on every site: core's
+ * handler removed late in rest_api_init, or while the response is served,
+ * means no CORS; re-hooked at another priority, or at two, means one list
+ * with QUERY; a restricted CORS callback after core's still wins. From 7.2 the
+ * plugin uses core's rest_allowed_cors_methods filter, so nightly must behave
+ * the same.
  *
  * Runs in the serial lifecycle suite because it changes site state: the test
- * fixture's CORS switches are fixture-only options, set over WP-CLI and put
- * back in afterAll. Every request sends Connection: close (see session.ts).
+ * fixture's CORS option, set over WP-CLI and put back in afterAll. Every
+ * request sends Connection: close (see session.ts).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { CORE_COLLECTIONS, ORIGIN, rest, tokens } from '../http';
-import { NO_LOCAL_CLI, sites } from '../sites';
+import { CORE_COLLECTIONS, CORE_CORS_METHODS, ORIGIN, rest, tokens } from '../http';
+import { wp } from '../seed';
+import { NO_LOCAL_CLI, type Site, sites } from '../sites';
 import { FRESH } from './session';
-import {
-	COMPETING_CORS_METHODS,
-	COMPETING_CORS_ORIGIN,
-	deleteOption,
-	FIXTURE_COMPETING_CORS,
-	FIXTURE_DOUBLE_CORE_CORS,
-	FIXTURE_REHOOK_CORE_CORS,
-	FIXTURE_REMOVE_CORE_CORS,
-	FIXTURE_REMOVE_CORE_CORS_LATE,
-	setOption,
-	snapshotOption,
-} from './site-state';
+import { FIXTURE_CORS, setOption, snapshotOption } from './site-state';
 
 const ROUTE = CORE_COLLECTIONS[ 0 ];
 
-/** Core's method list, plus QUERY: what the plugin's copy sends, and core's filter gives from 7.2. */
-const WITH_QUERY = [ 'OPTIONS', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'QUERY' ];
+/** What the plugin's wrapper sends before 7.2, and core's filter gives from 7.2. */
+const WITH_QUERY = [ ...CORE_CORS_METHODS, 'QUERY' ];
+
+/** Sets the fixture's CORS scenario for the length of fn, then deletes it in one WP-CLI call. */
+async function withCorsScenario< T >( site: Site, value: Record< string, unknown >, fn: () => Promise< T > ): Promise< T > {
+	setOption( site, FIXTURE_CORS, value );
+	try {
+		return await fn();
+	} finally {
+		wp( site, [ 'option', 'delete', FIXTURE_CORS ] );
+	}
+}
+
+/**
+ * The Access-Control-Allow-* headers CORS handlers send. Not Allow-Headers:
+ * WP_REST_Server::serve_request() sends it on every REST response, CORS on or off.
+ */
+function allowHeaders( res: Response ): string[] {
+	return [ ...res.headers.keys() ].filter(
+		( name ) => name.startsWith( 'access-control-allow-' ) && name !== 'access-control-allow-headers'
+	);
+}
 
 describe.each( sites )( 'CORS, as the site configured it: $label', ( site ) => {
 	if ( ! site.localCli ) {
@@ -52,31 +52,16 @@ describe.each( sites )( 'CORS, as the site configured it: $label', ( site ) => {
 		return;
 	}
 
-	let restoreRemove = () => {};
-	let restoreRehook = () => {};
-	let restoreRemoveLate = () => {};
-	let restoreDouble = () => {};
-	let restoreCompeting = () => {};
-
+	let restore = () => {};
 	beforeAll( () => {
-		restoreRemove = snapshotOption( site, FIXTURE_REMOVE_CORE_CORS );
-		restoreRehook = snapshotOption( site, FIXTURE_REHOOK_CORE_CORS );
-		restoreRemoveLate = snapshotOption( site, FIXTURE_REMOVE_CORE_CORS_LATE );
-		restoreDouble = snapshotOption( site, FIXTURE_DOUBLE_CORE_CORS );
-		restoreCompeting = snapshotOption( site, FIXTURE_COMPETING_CORS );
+		restore = snapshotOption( site, FIXTURE_CORS );
 	} );
-
-	afterAll( () => {
-		restoreCompeting();
-		restoreDouble();
-		restoreRemoveLate();
-		restoreRehook();
-		restoreRemove();
-	} );
+	afterAll( () => restore() );
 
 	const preflight = () =>
 		rest( site, 'OPTIONS', ROUTE, { headers: { ...FRESH, origin: ORIGIN, 'access-control-request-method': 'QUERY' } } );
 	const get = () => rest( site, 'GET', ROUTE, { headers: { ...FRESH, origin: ORIGIN } } );
+	const bothRequests = () => Promise.all( [ preflight(), get() ] );
 
 	it( 'adds QUERY when core’s handler is where core put it', async () => {
 		const res = await preflight();
@@ -84,67 +69,30 @@ describe.each( sites )( 'CORS, as the site configured it: $label', ( site ) => {
 		expect( tokens( res.headers.get( 'access-control-allow-methods' ) ) ).toContain( 'QUERY' );
 	} );
 
-	it( 'leaves REST CORS off when the site removed core’s handler', async () => {
-		setOption( site, FIXTURE_REMOVE_CORE_CORS, 1 );
-		try {
-			for ( const res of [ await preflight(), await get() ] ) {
-				expect( res.headers.get( 'access-control-allow-origin' ) ).toBeNull();
-				expect( res.headers.get( 'access-control-allow-methods' ) ).toBeNull();
-				expect( res.headers.get( 'access-control-allow-credentials' ) ).toBeNull();
-			}
-		} finally {
-			deleteOption( site, FIXTURE_REMOVE_CORE_CORS );
+	it.each( [
+		[ 'late in rest_api_init', { scenario: 'remove-late' } ],
+		[ 'while the response is served, before core’s priority', { scenario: 'remove-during-serve', priority: 0 } ],
+	] )( 'leaves REST CORS off when the site removed core’s handler %s', async ( _, scenario ) => {
+		for ( const res of await withCorsScenario( site, scenario, bothRequests ) ) {
+			expect( allowHeaders( res ) ).toEqual( [] );
 		}
 	} );
 
-	it( 'leaves REST CORS off when the site removed core’s handler late in rest_api_init', async () => {
-		setOption( site, FIXTURE_REMOVE_CORE_CORS_LATE, 1 );
-		try {
-			for ( const res of [ await preflight(), await get() ] ) {
-				// Allow-Headers isn't the handler's: WP_REST_Server::serve_request()
-				// sends it on every REST response, CORS on or off.
-				const allow = [ ...res.headers.keys() ].filter(
-					( name ) => name.startsWith( 'access-control-allow-' ) && name !== 'access-control-allow-headers'
-				);
-				expect( allow ).toEqual( [] );
-			}
-		} finally {
-			deleteOption( site, FIXTURE_REMOVE_CORE_CORS_LATE );
-		}
-	} );
-
-	it( 'replaces core’s handler at the priority the site moved it to, so QUERY stays in the one list', async () => {
-		setOption( site, FIXTURE_REHOOK_CORE_CORS, 1 );
-		try {
-			const res = await preflight();
-			expect( res.headers.get( 'access-control-allow-origin' ) ).toBe( ORIGIN );
-			expect( tokens( res.headers.get( 'access-control-allow-methods' ) ) ).toEqual( WITH_QUERY );
-		} finally {
-			deleteOption( site, FIXTURE_REHOOK_CORE_CORS );
-		}
-	} );
-
-	it( 'replaces core’s handler at every priority it’s hooked at, so core’s list never overwrites QUERY', async () => {
-		setOption( site, FIXTURE_DOUBLE_CORE_CORS, 1 );
-		try {
-			const res = await preflight();
-			expect( res.headers.get( 'access-control-allow-origin' ) ).toBe( ORIGIN );
-			expect( tokens( res.headers.get( 'access-control-allow-methods' ) ) ).toEqual( WITH_QUERY );
-		} finally {
-			deleteOption( site, FIXTURE_DOUBLE_CORE_CORS );
-		}
+	it.each( [
+		[ 'at the priority the site moved it to', { scenario: 'rehook', priority: 11 } ],
+		[ 'at every priority it’s hooked at', { scenario: 'double', priority: 20 } ],
+	] )( 'adds QUERY to the one list when core’s handler is hooked %s', async ( _, scenario ) => {
+		const res = await withCorsScenario( site, scenario, preflight );
+		expect( res.headers.get( 'access-control-allow-origin' ) ).toBe( ORIGIN );
+		expect( tokens( res.headers.get( 'access-control-allow-methods' ) ) ).toEqual( WITH_QUERY );
 	} );
 
 	it( 'keeps core’s place in the hook, so a CORS callback that ran after core’s still wins', async () => {
-		setOption( site, FIXTURE_COMPETING_CORS, 1 );
-		try {
-			for ( const res of [ await preflight(), await get() ] ) {
-				expect( res.headers.get( 'access-control-allow-origin' ) ).toBe( COMPETING_CORS_ORIGIN );
-				expect( res.headers.get( 'access-control-allow-methods' ) ).toBe( COMPETING_CORS_METHODS );
-				expect( res.headers.get( 'access-control-allow-credentials' ) ).toBeNull();
-			}
-		} finally {
-			deleteOption( site, FIXTURE_COMPETING_CORS );
+		const competing = { scenario: 'competing', priority: 10, origin: 'https://allowed.example', methods: 'GET, OPTIONS' };
+		for ( const res of await withCorsScenario( site, competing, bothRequests ) ) {
+			expect( res.headers.get( 'access-control-allow-origin' ) ).toBe( competing.origin );
+			expect( res.headers.get( 'access-control-allow-methods' ) ).toBe( competing.methods );
+			expect( res.headers.get( 'access-control-allow-credentials' ) ).toBeNull();
 		}
 	} );
 } );

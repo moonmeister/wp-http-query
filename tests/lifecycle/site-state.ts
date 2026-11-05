@@ -12,29 +12,8 @@ export const FIXTURE_PRESET_FILTER_OFF = 'wp_http_query_fixture_preset_filter_of
 /** Test fixture switch that stops it turning the plugin's echo route on. */
 export const FIXTURE_DEMO_ROUTE_OFF = 'wp_http_query_fixture_demo_route_off';
 
-/** Test fixture switch that removes core's REST CORS handler, as a site turning REST CORS off does. */
-export const FIXTURE_REMOVE_CORE_CORS = 'wp_http_query_fixture_remove_core_cors';
-
-/** Test fixture switch that moves core's REST CORS handler to priority 11. */
-export const FIXTURE_REHOOK_CORE_CORS = 'wp_http_query_fixture_rehook_core_cors';
-
-/** Test fixture switch that removes core's REST CORS handler late, on rest_api_init at priority 99. */
-export const FIXTURE_REMOVE_CORE_CORS_LATE = 'wp_http_query_fixture_remove_core_cors_late';
-
-/** Test fixture switch that hooks core's REST CORS handler a second time, at priority 20. */
-export const FIXTURE_DOUBLE_CORE_CORS = 'wp_http_query_fixture_double_core_cors';
-
-/**
- * Test fixture switch that adds a callback at core's CORS priority, after core's, sending
- * restricted CORS headers: COMPETING_CORS_ORIGIN, COMPETING_CORS_METHODS and no credentials.
- */
-export const FIXTURE_COMPETING_CORS = 'wp_http_query_fixture_competing_cors';
-
-/** The one origin the competing CORS callback allows (the fixture's COMPETING_CORS_ORIGIN). */
-export const COMPETING_CORS_ORIGIN = 'https://allowed.example';
-
-/** The method list the competing CORS callback sends (the fixture's COMPETING_CORS_METHODS). */
-export const COMPETING_CORS_METHODS = 'GET, OPTIONS';
+/** Test fixture option that changes how REST CORS is handled: { scenario, priority, ... }. See the fixture's CORS. */
+export const FIXTURE_CORS = 'wp_http_query_fixture_cors';
 
 /** Whether an option row exists, read from the database, ignoring registered defaults. */
 export function optionExists( site: Site, name: string ): boolean {
