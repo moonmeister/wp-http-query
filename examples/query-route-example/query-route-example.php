@@ -69,11 +69,11 @@ function is_safe_method( string $method ): bool {
 add_action(
 	'rest_api_init',
 	static function (): void {
-		$read_methods = \WP_REST_Server::READABLE;
+		$read_methods = array( \WP_REST_Server::READABLE );
 
 		$query = query_method();
 		if ( null !== $query ) {
-			$read_methods .= ', ' . $query;
+			$read_methods[] = $query;
 		}
 
 		register_rest_route(

@@ -40,11 +40,11 @@ The registration, from the example:
 add_action(
 	'rest_api_init',
 	static function (): void {
-		$read_methods = \WP_REST_Server::READABLE;
+		$read_methods = array( \WP_REST_Server::READABLE );
 
 		$query = query_method();
 		if ( null !== $query ) {
-			$read_methods .= ', ' . $query;
+			$read_methods[] = $query;
 		}
 
 		register_rest_route(
@@ -92,7 +92,7 @@ add_action(
 ```
 
 `query_method()` is the feature check; see [Feature detection](#feature-detection). When the
-plugin is active, `$read_methods` is `'GET, QUERY'`.
+plugin is active, `$read_methods` is `array( 'GET', 'QUERY' )`.
 
 The read handler. Nothing in it is specific to `QUERY`:
 

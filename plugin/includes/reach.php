@@ -275,14 +275,8 @@ function add_query_to_handler( array $handler ): array {
 		return $handler;
 	}
 
-	$names[] = METHOD;
-
-	/*
-	 * Hand back a string, the form get_routes() has always comma-split. The
-	 * array form was only split from 7.2 (Trac#65905, r63756); the string
-	 * form costs nothing.
-	 */
-	$handler['methods'] = implode( ', ', $names );
+	$names[]            = METHOD;
+	$handler['methods'] = $names;
 
 	return $handler;
 }
