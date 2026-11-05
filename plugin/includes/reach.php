@@ -278,15 +278,9 @@ function add_query_to_handler( array $handler ): array {
 	$names[] = METHOD;
 
 	/*
-	 * Hand back a STRING, never an array. get_routes() comma-splits the string
-	 * form but not the array form, so an array entry carrying a multi-method
-	 * constant registers one unmatchable key: Trac#65905, fixed in 7.2 (r63756).
-	 * Writing the string form means this plugin cannot trip that bug on any
-	 * core version, including those before 7.2.
-	 *
-	 * It also incidentally repairs the routes it touches: flattening
-	 * array( 'GET', 'POST, PUT, PATCH' ) to a string makes POST/PUT/PATCH
-	 * matchable again. Routes without GET are not touched and stay broken.
+	 * Hand back a string, the form get_routes() has always comma-split. The
+	 * array form was only split from 7.2 (Trac#65905, r63756); the string
+	 * form costs nothing.
 	 */
 	$handler['methods'] = implode( ', ', $names );
 

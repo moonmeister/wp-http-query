@@ -14,11 +14,9 @@ own routes, and sending it.
 
 - **Parses `QUERY` request bodies**, JSON and form-encoded, into the request's parameters, the
   same way core does for `POST`.
-- **Adds `QUERY` to CORS**, so browsers on other origins can send it. From WordPress 7.2 it uses
-  core's `rest_allowed_cors_methods` filter. Before 7.2 it adds `QUERY` to core's CORS handler
-  wherever that's hooked. A site that removed core's handler keeps REST CORS off, and a CORS
-  plugin that sends its own `Access-Control-Allow-Methods` after core's still wins. Before 7.2, a
-  site or CORS plugin that removed core's handler to send its own must add `QUERY` to it.
+- **Adds `QUERY` to CORS**, so browsers on other origins can send it, through core's
+  `rest_allowed_cors_methods` filter. A site that removed core's CORS handler keeps REST CORS off,
+  and a CORS plugin that sends its own `Access-Control-Allow-Methods` after core's still wins.
 - **Sends `Accept-Query: "application/json"`** on routes that accept `QUERY`, so clients can see
   which body format to use.
 - **Adds `QUERY` to the routes you choose**, and to no others. See
@@ -32,7 +30,9 @@ It stores one option and adds no tables, cron jobs or cache headers.
 ## Requirements
 
 - PHP 8.0 or later.
-- WordPress 7.0 or later. Tested on 7.0.8, 7.1.4 and nightly builds (as of 2026-11-04).
+- WordPress 7.2 or later, including its betas and release candidates. Tested on nightly builds
+  (7.2-beta4, as of 2026-11-05). On WordPress 7.0 or 7.1, use
+  [v0.1.0](https://github.com/moonmeister/wp-http-query/releases/tag/v0.1.0).
 - A web server that passes `QUERY` through to PHP. Most do. See
   [Check your server](#check-your-server).
 
@@ -265,8 +265,7 @@ register_rest_route( 'my-plugin/v1', '/things', array(
 ```
 
 `\WPHttpQuery\QUERYABLE` is `'QUERY'`, standing in for core's future `WP_REST_Server::QUERYABLE`.
-`'GET, QUERY'` is equivalent. Prefer the string form: in the array form, an entry listing more
-than one method, like `array( 'POST, PUT', 'QUERY' )`, can't be matched before 7.2 (Trac#65905).
+`'GET, QUERY'` is equivalent.
 
 A full, tested version, with feature detection and the read-only check, is in
 [docs/integrating.md](../docs/integrating.md).

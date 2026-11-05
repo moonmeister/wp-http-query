@@ -1,8 +1,8 @@
 === WP HTTP QUERY ===
 Contributors: moonmeister
 Tags: rest-api, http, query
-Requires at least: 7.0
-Tested up to: 7.1
+Requires at least: 7.2
+Tested up to: 7.2
 Requires PHP: 8.0
 Stable tag: 0.0.0-dev
 License: GPLv2 or later
