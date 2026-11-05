@@ -127,6 +127,7 @@ Sample result, from an nginx site using plain permalinks:
 | Your browser can't send `QUERY` | The browser, not your server. The server checks still apply |
 | Network error | The request didn't complete. If Site Health's loopback test fails too, fix that first |
 | No CORS headers at all | The site turned REST CORS off (core sends the headers by default), often with a security plugin. The plugin respects that and doesn't turn it back on, so Site Health marks it **recommended**, not failed. Pages on other sites can't call your REST API from a browser with any method |
+| `QUERY` allowed, but for other origins only | A CORS plugin that allows only some origins answered the test's origin with another. Pages on the origins it allows can likely send `QUERY`; the test can't confirm it, so it's **recommended** |
 | CORS headers without `QUERY` | Something overrides the method list. Before WordPress 7.2, most likely another plugin that handles CORS, or a server rule, sending its own `Access-Control-Allow-Methods`. From 7.2, also a `rest_allowed_cors_methods` callback that removes `QUERY`. Add `QUERY` back there |
 | A cache is storing `QUERY` responses | Two different bodies got the same answer, so one visitor's search can get another's results. The cache-related headers seen (`Age`, `X-Cache`, `CF-Cache-Status`, `X-Varnish`, `X-LiteSpeed-Cache` and others) are listed, with a guess at the vendor. A guess, not proof |
 
