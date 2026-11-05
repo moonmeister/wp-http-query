@@ -94,7 +94,8 @@ describe.skipIf( ! sites.includes( main ) || ! main.localCli )( 'multisite netwo
 				foreach ( $ids as $id ) {
 					update_blog_option( $id, '${ PRESETS_OPTION }', array( 'core-collections' ) );
 				}
-				$fillers = get_sites( array( 'fields' => 'ids', 'path__not_in' => array( '/', '/sub/' ), 'number' => 3 ) );
+				// Only this file's own sites: never flag a site a developer added by hand.
+				$fillers = get_sites( array( 'fields' => 'ids', 'search' => '${ FILLER }', 'search_columns' => array( 'path' ), 'number' => 3 ) );
 				foreach ( array( 'archived', 'spam', 'deleted' ) as $i => $flag ) {
 					update_blog_status( $fillers[ $i ], $flag, 1 );
 				}
