@@ -62,7 +62,7 @@ A log of the research behind the plugin, as of 2026-11-05. Each row links to its
 | CORS clobber ([#16](https://github.com/moonmeister/wp-http-query/issues/16)) | **Fixed for 7.2** in [r64730](https://core.trac.wordpress.org/changeset/64730) (2026-10-26, adamsilverstein), reworked from [wordpress-develop#13151](https://github.com/WordPress/wordpress-develop/pull/13151). Adds `rest_allowed_cors_methods`, which the plugin uses |
 | Requests upstream PR | **In flight upstream, not ours**. See [Upstream tickets](#upstream-tickets) |
 | Plugin | **Shipped as [v0.1.0](https://github.com/moonmeister/wp-http-query/releases/tag/v0.1.0)** (prerelease). All three gaps worked around in userland, with `Accept-Query`, opt-in reach, a settings page and a self-test. Tested on WordPress 7.0, 7.1 and nightly |
-| Core patch (`QUERY`) | ADRs 0001–0003 are decided and patches for gap 3 and `QUERYABLE` are written on the core fork's `feat-http-query` branch (see [Repos](#repos)). They go upstream patch by patch, per [#60](https://github.com/moonmeister/wp-http-query/issues/60) |
+| Core patch (`QUERY`) | ADRs 0001–0003 are decided, and exploratory patches for gap 3 and `QUERYABLE` exist on a `wordpress-develop` branch, `feat-http-query` (see [Repos](#repos)). Whether core gets one patch or several is undecided until the scope is known; see [#60](https://github.com/moonmeister/wp-http-query/issues/60) |
 
 ## Where the work lands
 
