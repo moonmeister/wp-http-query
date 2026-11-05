@@ -99,13 +99,13 @@ jobs:
           ZIP_URL: ${{ steps.asset.outputs.url }}
         run: |
           set -euo pipefail
-          # Latest WordPress, PHP 8.3, logged in as admin, the built zip active with the
+          # WordPress nightly (the plugin requires 7.2; switch to "latest" once 7.2 is stable), PHP 8.3, logged in as admin, the built zip active with the
           # core-collections preset on and the echo demo route public (through the
           # wp_http_query_public_demo_route filter; it's admins only by default), opening on
           # Settings > HTTP QUERY where the preset is.
           blueprint=$(jq -nc --arg url "$ZIP_URL" '{
             "$schema": "https://playground.wordpress.net/blueprint-schema.json",
-            preferredVersions: { php: "8.3", wp: "latest" },
+            preferredVersions: { php: "8.3", wp: "nightly" },
             landingPage: "/wp-admin/options-general.php?page=wp-http-query",
             steps: [
               { step: "login", username: "admin" },
@@ -133,6 +133,6 @@ jobs:
 
             {{PLAYGROUND_BUTTON}}
 
-            Opens WordPress (latest, PHP 8.3) in your browser with this PR's build of the plugin active, the `core-collections` preset on, the `/wp-http-query/v1/echo` demo route enabled, and Settings → HTTP QUERY open.
+            Opens WordPress (nightly, PHP 8.3) in your browser with this PR's build of the plugin active, the `core-collections` preset on, the `/wp-http-query/v1/echo` demo route enabled, and Settings → HTTP QUERY open.
 
             **Download the plugin zip:** [${{ steps.expose.outputs.artifact-name }}](${{ steps.asset.outputs.url }}) (no GitHub login needed; it unzips to `wp-http-query/`). Built from ${{ github.event.workflow_run.head_sha }}.
