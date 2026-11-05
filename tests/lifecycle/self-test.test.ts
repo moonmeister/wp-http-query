@@ -161,6 +161,21 @@ const CACHE_CASES: Record< string, { first: object; second: object; verdict: str
 		says: 'timed out',
 	},
 	'body altered': { first: { ...fingerprint( 'x', 'f1' ), sent: A }, second: fingerprint( B, 'f2' ), verdict: 'altered', status: 'recommended' },
+	// An intermediary that strips QUERY bodies: both hashes are the empty
+	// body's, the fresh values differ. A lost body, not a cache.
+	'both bodies stripped': {
+		first: { ...fingerprint( '', 'f1' ), sent: A },
+		second: { ...fingerprint( '', 'f2' ), sent: B },
+		verdict: 'altered',
+		status: 'recommended',
+		says: 'lost or changed on the way',
+	},
+	'stripped, but the fresh value repeats': {
+		first: { ...fingerprint( '', 'f1' ), sent: A },
+		second: { ...fingerprint( '', 'f1' ), sent: B },
+		verdict: 'stored',
+		status: 'critical',
+	},
 };
 
 /** Fabricated headers => hints expected among cache_header_hints(). */

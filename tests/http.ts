@@ -9,6 +9,9 @@ export const ECHO = '/wp-http-query/v1/echo';
 
 export const ORIGIN = 'http://example.test';
 
+/** Core's default Access-Control-Allow-Methods list, in core's order. */
+export const CORE_CORS_METHODS = [ 'OPTIONS', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE' ];
+
 /** The plugin's 'core-collections' preset, as listed in plugin/wp-http-query.php presets(). */
 export const CORE_COLLECTIONS = [
 	'/wp/v2/posts',

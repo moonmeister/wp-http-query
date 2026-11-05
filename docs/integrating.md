@@ -127,12 +127,15 @@ What the tests check against this route, on every test site:
 - `{"per_page":100}` as JSON, and `per_page=0` form-encoded, both return `400 rest_invalid_param`.
 - An anonymous `QUERY` gets the read (`200`); an anonymous `POST` to the same route gets `401`.
 
-**Use the string form of `methods`.** `'GET, QUERY'` works on every core version. In the array
-form, an entry that lists more than one method, like `array( 'POST, PUT', 'QUERY' )`, registers
-one unmatchable key on cores before 7.2
-([Trac#65905](https://core.trac.wordpress.org/ticket/65905), fixed in
-[r63756](https://core.trac.wordpress.org/changeset/63756)). `array( 'GET', 'QUERY' )`, one method
-per entry, is also safe.
+**Use the string form of `methods`.** `'GET, QUERY'` works on every core version.
+
+> **Warning:** before WordPress 7.2, an entry in the **array** form of `methods` that lists more
+> than one method breaks the route. `'methods' => array( 'GET, QUERY' )`, or
+> `array( \WP_REST_Server::READABLE . ', ' . \WPHttpQuery\QUERYABLE )`, registers one key,
+> `GET, QUERY`, that no request matches
+> ([Trac#65905](https://core.trac.wordpress.org/ticket/65905), fixed in
+> [r63756](https://core.trac.wordpress.org/changeset/63756)). One method per array entry,
+> `array( 'GET', 'QUERY' )`, is safe too.
 
 **Keep reads and writes in separate handlers.** Core's own controllers do: `get_items` for reads,
 `create_item` and friends for writes, never one callback for both. The example's `POST` handler is
@@ -233,7 +236,7 @@ plugin has.
 
 | Core | What differs | What to do |
 |---|---|---|
-| Before 7.2 | Array-form `methods` aren't comma-split (Trac#65905). CORS has no filter, so the plugin replaces core's CORS handler | Use the string form of `methods`. The plugin handles CORS |
+| Before 7.2 | Array-form `methods` aren't comma-split (Trac#65905). CORS has no filter, so the plugin replaces core's CORS handler, if it's still hooked | Use the string form of `methods`. The plugin handles CORS, unless core's handler was removed: a site or CORS plugin that replaced it needs `QUERY` added to its own method list |
 | 7.2 and later | Both fixed ([r63756](https://core.trac.wordpress.org/changeset/63756), [r64730](https://core.trac.wordpress.org/changeset/64730)). The plugin adds `QUERY` through core's `rest_allowed_cors_methods` filter | Nothing |
 | A future core with `QUERYABLE` | Not proposed yet; parked until the plugin ships ([ADR 0002](decisions/0002-allmethods-vs-queryable.md)). The constant is planned as `WP_REST_Server::QUERYABLE` | `query_method()` already checks for it first |
 

@@ -74,8 +74,9 @@ The **Nightly** prerelease (tag `nightly`) is an unreleased build of `main`, for
   always gets the newest build.
 - The plugin inside reports `Version: 0.0.0-nightly.<YYYYMMDD>+<short sha>`. The release body gives
   the build date and the full commit.
-- Days when `main` hasn't moved are skipped: if the `nightly` tag already points at `main`'s HEAD
-  and the zip is attached, the run exits without building
+- Days when `main` hasn't moved are skipped: if the attached zip's label is already `main`'s HEAD
+  commit (the upload sets it) and the release notes name it (written last), the run exits without
+  building
   ([`scripts/nightly-should-build.sh`](scripts/nightly-should-build.sh)).
 
 **Run it by hand** from the Actions tab (*Nightly* → *Run workflow*), or:

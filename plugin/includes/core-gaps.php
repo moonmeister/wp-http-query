@@ -22,9 +22,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * Trac#46992 added a 'rest_allowed_cors_methods' filter in 7.2 (r64730).
  * Where that exists, one add_filter does the whole job. Where it does
- * not, core's callback has to be unhooked and replaced wholesale — which this
- * plugin will keep needing for as long as it supports cores that predate the
- * filter, so the fallback is permanent rather than temporary.
+ * not, core's callback has to be wrapped so its list can be sent again with
+ * QUERY — which this plugin will keep needing for as long as it supports
+ * cores that predate the filter, so the fallback is permanent rather than
+ * temporary.
  * ----------------------------------------------------------------------
  */
 
@@ -67,33 +68,74 @@ add_action(
 			return;
 		}
 
-		remove_filter( 'rest_pre_serve_request', 'rest_send_cors_headers' );
-		add_filter( 'rest_pre_serve_request', __NAMESPACE__ . '\\send_cors_headers' );
+		// Before 7.2: see swap_cors_handler() for why it's decided at serve time.
+		add_filter( 'rest_pre_serve_request', __NAMESPACE__ . '\\swap_cors_handler', PHP_INT_MIN );
 	},
 	20
 );
 
 /**
- * Replacement for core's rest_send_cors_headers() that includes QUERY.
+ * Core's default CORS method list, plus QUERY. What send_cors_headers() sends
+ * in place of core's list before 7.2.
+ */
+const CORS_METHODS = array( 'OPTIONS', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', METHOD );
+
+/**
+ * Wraps core's CORS handler with send_cors_headers() wherever it's hooked.
+ * Before 7.2 only, as the first rest_pre_serve_request callback.
  *
- * Mirrors core's behavior exactly apart from the method list.
+ * Only while core's handler is hooked: a site that removed it has turned
+ * REST CORS off, and adding ours anyway would turn it back on, echoing any
+ * Origin with credentials allowed.
+ *
+ * When the response is served, not on rest_api_init: a site can remove or
+ * move core's handler at any rest_api_init priority, after the plugin's.
+ *
+ * At every priority it's hooked at: remove_filter() matches one priority, so
+ * a site that re-hooked it elsewhere, or twice, would otherwise have a copy
+ * of core's that runs after ours and overwrites the method list.
+ *
+ * In place: only the entry's 'function' changes. Its key stays
+ * 'rest_send_cors_headers', so a later remove_filter() of core's handler
+ * still matches and removes ours, and its position stays, so a callback that
+ * ran after core's at the same priority, such as a CORS plugin narrowing the
+ * allowed origin, still runs after ours and still wins.
+ *
+ * Safe while the hook is running: WP_Hook::apply_filters() reads
+ * $this->callbacks[ $priority ] afresh as it reaches each priority (checked
+ * in class-wp-hook.php on 7.0 and 7.1), and no priority is added or removed.
  *
  * @param mixed $value Passthrough value.
  * @return mixed
  */
-function send_cors_headers( $value ) {
-	$origin = get_http_origin();
+function swap_cors_handler( $value ) {
+	global $wp_filter;
 
-	if ( $origin ) {
-		if ( 'null' !== $origin ) {
-			$origin = sanitize_url( $origin );
+	$hook = $wp_filter['rest_pre_serve_request'];
+	foreach ( array_keys( $hook->callbacks ) as $priority ) {
+		if ( isset( $hook->callbacks[ $priority ]['rest_send_cors_headers'] ) ) {
+			$hook->callbacks[ $priority ]['rest_send_cors_headers']['function'] = __NAMESPACE__ . '\\send_cors_headers';
 		}
-		header( 'Access-Control-Allow-Origin: ' . $origin );
-		header( 'Access-Control-Allow-Methods: OPTIONS, GET, POST, PUT, PATCH, DELETE, QUERY' );
-		header( 'Access-Control-Allow-Credentials: true' );
-		header( 'Vary: Origin', false );
-	} elseif ( ! headers_sent() && isset( $_SERVER['REQUEST_METHOD'] ) && 'GET' === $_SERVER['REQUEST_METHOD'] && ! is_user_logged_in() ) {
-		header( 'Vary: Origin', false );
+	}
+
+	return $value;
+}
+
+/**
+ * Core's rest_send_cors_headers(), then its method list again with QUERY.
+ *
+ * The second header() call replaces core's, as header() does by default
+ * for a header of the same name. Core sends the list only for an Origin.
+ *
+ * @param mixed $value Passthrough value.
+ * @param mixed ...$args Any further arguments the hook passes, forwarded.
+ * @return mixed
+ */
+function send_cors_headers( $value, ...$args ) {
+	$value = rest_send_cors_headers( $value, ...$args );
+
+	if ( get_http_origin() && ! headers_sent() ) {
+		header( 'Access-Control-Allow-Methods: ' . implode( ', ', CORS_METHODS ) );
 	}
 
 	return $value;

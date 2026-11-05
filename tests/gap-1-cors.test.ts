@@ -4,17 +4,15 @@
  *
  * Two code paths in the plugin, one per environment:
  *   7.2+    adds QUERY through core's rest_allowed_cors_methods (r64730, Trac#46992)
- *   < 7.2   replaces rest_send_cors_headers() with a copy that includes QUERY
+ *   < 7.2   wraps rest_send_cors_headers() and resends its method list with QUERY
  *
  * Either way core's default methods must survive: the plugin adds, never replaces.
  *
  * Issue: #3   Core: https://core.trac.wordpress.org/changeset/64730
  */
 import { describe, expect, it } from 'vitest';
-import { ECHO, ORIGIN, rest, tokens } from './http';
+import { CORE_CORS_METHODS, ECHO, ORIGIN, rest, tokens } from './http';
 import { sites } from './sites';
-
-const CORE_DEFAULTS = [ 'OPTIONS', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE' ];
 
 describe.each( sites )( 'gap 1 CORS: $label', ( site ) => {
 	it( 'lists QUERY on a cross-origin QUERY response', async () => {
@@ -36,7 +34,7 @@ describe.each( sites )( 'gap 1 CORS: $label', ( site ) => {
 	it( "keeps core's default methods", async () => {
 		const res = await rest( site, 'QUERY', ECHO, { json: {}, headers: { origin: ORIGIN } } );
 		expect( tokens( res.headers.get( 'access-control-allow-methods' ) ) ).toEqual(
-			expect.arrayContaining( CORE_DEFAULTS )
+			expect.arrayContaining( CORE_CORS_METHODS )
 		);
 	} );
 

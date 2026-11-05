@@ -50,9 +50,12 @@ if [ -z "$version" ]; then
 fi
 
 # Semantic Versioning 2.0.0: MAJOR.MINOR.PATCH[-PRERELEASE][+BUILD].
+# A prerelease identifier is numeric with no leading zero, or alphanumeric with at least one
+# letter or hyphen (so 01 is out, 0a is in). Build identifiers have no leading-zero rule.
 num='(0|[1-9][0-9]*)'
-ident='[0-9A-Za-z-]+'
-semver="^$num\\.$num\\.$num(-$ident(\\.$ident)*)?(\\+$ident(\\.$ident)*)?\$"
+pre="($num|[0-9]*[A-Za-z-][0-9A-Za-z-]*)"
+meta='[0-9A-Za-z-]+'
+semver="^$num\\.$num\\.$num(-$pre(\\.$pre)*)?(\\+$meta(\\.$meta)*)?\$"
 if ! [[ $version =~ $semver ]]; then
 	echo "error: version '$version' isn't semver: x.y.z, optionally with -prerelease and/or +build" >&2
 	echo "       (e.g. 0.1.0, 0.2.0-beta.1, 0.0.0-nightly.20261105+abc1234)" >&2
