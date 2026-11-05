@@ -5,9 +5,9 @@
 # Usage: scripts/nightly-should-build.sh <owner/repo> <main HEAD commit SHA>
 # Needs `gh` with a token that can read the repo's releases.
 #
-# It skips only when the published `nightly` release has the nightly zip attached and the zip's
-# label is the HEAD commit. The workflow sets the label in the same call that uploads the zip, so
-# the label names the commit the attached zip was built from. Anything else, including a failed or
+# It skips only when the published `nightly` release has the nightly zip attached, the zip's label
+# is the HEAD commit, and the release notes name it. The workflow sets the label in the same call
+# that uploads the zip, and writes the notes in its last step. Anything else, including a failed or
 # unexpected lookup, means build: a needless rebuild is cheap, and a skipped one leaves a stale
 # nightly.
 set -euo pipefail
@@ -44,5 +44,12 @@ if [ "$label" != "$head" ]; then
 	build "$asset is labelled '$label', main is at $head"
 fi
 
-echo "skip: $asset is already built from $head" >&2
+# The notes are written last, after the tag moves, and name the commit: a run that failed after
+# the upload left them, and maybe the tag, behind, so finish it.
+if ! jq -e --arg head "$head" '(.body // "") | ascii_downcase | contains($head)' \
+	<<<"$release" >/dev/null 2>&1; then
+	build "$asset is built from $head, but the release notes don't name it yet"
+fi
+
+echo "skip: the nightly is already built and published from $head" >&2
 echo skip

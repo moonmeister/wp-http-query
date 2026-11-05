@@ -71,8 +71,8 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
-      # The upload sets the zip's label to the commit in the same call, which is what the skip check
-      # (scripts/nightly-should-build.sh) reads. The first run creates the release as a draft, which
+      # The upload sets the zip's label to the commit in the same call. The skip check
+      # (scripts/nightly-should-build.sh) reads it, along with the notes written in the last step. The first run creates the release as a draft, which
       # creates no tag and isn't public, and publishes it only in the last step, so a failed first
       # run never publishes an empty release.
       - name: Upload the zip to the Nightly prerelease
@@ -112,7 +112,8 @@ jobs:
               -f ref=refs/tags/nightly -f sha="$SHA" >/dev/null
           fi
 
-      # Last: a first run's draft becomes public only once its zip is up.
+      # Last: the notes name the commit only once its zip is up and the tag is on it, which the skip
+      # check relies on, and a first run's draft becomes public only then.
       - name: Update the Nightly prerelease's notes and target, and publish it
         if: steps.decide.outputs.result == 'build'
         env:
