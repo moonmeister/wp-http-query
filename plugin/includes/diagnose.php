@@ -478,6 +478,26 @@ function diagnose_cache_probe( array $first, array $second ): array {
 }
 
 /**
+ * A comma-separated list of HTTP tokens, as fetch parses a CORS preflight's
+ * Access-Control-Allow-Methods and -Headers: null if any entry isn't a token,
+ * which makes a browser refuse the whole preflight. Empty entries are skipped.
+ *
+ * @param string $value Header value.
+ * @return string[]|null
+ */
+function cors_token_list( string $value ): ?array {
+	$tokens = array_values( array_filter( array_map( 'trim', explode( ',', $value ) ), 'strlen' ) );
+
+	foreach ( $tokens as $token ) {
+		if ( ! preg_match( '/^[!#$%&\'*+.^_`|~0-9A-Za-z-]+$/', $token ) ) {
+			return null;
+		}
+	}
+
+	return $tokens;
+}
+
+/**
  * What the site answered a cross-origin QUERY preflight, in plain language.
  *
  * Pure: no I/O, no globals. Reads Access-Control-Allow-Methods the way a
@@ -485,7 +505,8 @@ function diagnose_cache_probe( array $first, array $second ): array {
  * fetch normalizes), with "*" a wildcard for requests sent without cookies.
  * Success also needs Access-Control-Allow-Origin to admit the probe's origin
  * and Access-Control-Allow-Headers to admit Content-Type (the preflight asks
- * for it, as a JSON QUERY needs it), or a browser refuses the preflight. Access-Control-Allow-Headers and
+ * for it, as a JSON QUERY needs it), and both lists to parse (see
+ * cors_token_list()), or a browser refuses the preflight. Access-Control-Allow-Headers and
  * -Expose-Headers don't count as CORS being on:
  * WP_REST_Server::serve_request() sends them on every REST response, CORS on
  * or off.
@@ -529,7 +550,7 @@ function diagnose_cors_preflight( array $response, string $origin, bool $filtera
 	}
 
 	$methods  = $headers['access-control-allow-methods'] ?? '';
-	$allowed  = array_map( 'trim', explode( ',', $methods ) );
+	$allowed  = cors_token_list( $methods ) ?? array();
 	$named    = in_array( METHOD, $allowed, true );
 	$wildcard = ! $named && in_array( '*', $allowed, true );
 
@@ -550,13 +571,13 @@ function diagnose_cors_preflight( array $response, string $origin, bool $filtera
 			);
 		}
 
-		$allow_headers = array_map( 'trim', explode( ',', strtolower( $headers['access-control-allow-headers'] ?? '' ) ) );
+		$allow_headers = cors_token_list( strtolower( $headers['access-control-allow-headers'] ?? '' ) ) ?? array();
 		if ( ! in_array( 'content-type', $allow_headers, true ) && ! in_array( '*', $allow_headers, true ) ) {
 			return verdict(
 				'cors_no_content_type',
 				sprintf(
 					/* translators: %s: The Access-Control-Allow-Headers header value. */
-					__( 'CORS allows QUERY, but the preflight’s Access-Control-Allow-Headers (%s) leaves out Content-Type, so browsers refuse a QUERY with a JSON body from other sites. Core’s list includes it, so something replaced it: most likely another plugin that handles CORS, or a server rule.', 'wp-http-query' ),
+					__( 'CORS allows QUERY, but the preflight’s Access-Control-Allow-Headers (%s) leaves out Content-Type, or isn’t a valid list, so browsers refuse a QUERY with a JSON body from other sites. Core’s list includes it, so something replaced it: most likely another plugin that handles CORS, or a server rule.', 'wp-http-query' ),
 					'' !== ( $headers['access-control-allow-headers'] ?? '' ) ? $headers['access-control-allow-headers'] : __( 'none', 'wp-http-query' )
 				),
 				array( $status )
@@ -578,7 +599,7 @@ function diagnose_cors_preflight( array $response, string $origin, bool $filtera
 	$found = '' !== $methods
 		? sprintf(
 			/* translators: %s: The Access-Control-Allow-Methods header value. */
-			__( 'CORS is on, but the preflight’s Access-Control-Allow-Methods (%s) leaves out QUERY, so browsers refuse to send QUERY from other sites.', 'wp-http-query' ),
+			__( 'CORS is on, but the preflight’s Access-Control-Allow-Methods (%s) leaves out QUERY, or isn’t a valid list, so browsers refuse to send QUERY from other sites.', 'wp-http-query' ),
 			$methods
 		)
 		: __( 'CORS is on, but the preflight came back without Access-Control-Allow-Methods, so browsers refuse to send QUERY from other sites.', 'wp-http-query' );

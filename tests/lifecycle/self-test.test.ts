@@ -241,6 +241,27 @@ const CORS_CASES: Record< string, { response: Observation; filterable: boolean; 
 		verdict: 'cors_no_query',
 		status: 'critical',
 	},
+	// Fetch refuses a preflight whose list doesn't parse, even if it names what's needed.
+	'malformed methods list': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': 'QUERY, GET POST' } ),
+		filterable: true,
+		verdict: 'cors_no_query',
+		status: 'critical',
+		says: [ 'isn’t a valid list' ],
+	},
+	'malformed headers list': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Headers': 'Content-Type, X Custom', 'Access-Control-Allow-Methods': 'QUERY' } ),
+		filterable: true,
+		verdict: 'cors_no_content_type',
+		status: 'critical',
+		says: [ 'isn’t a valid list' ],
+	},
+	'empty list entries are skipped': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': 'GET, , QUERY,' } ),
+		filterable: true,
+		verdict: 'cors_query',
+		status: 'good',
+	},
 	'Content-Type not among the allowed headers': {
 		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Headers': 'Authorization, X-WP-Nonce', 'Access-Control-Allow-Methods': `${ CORE_LIST }, QUERY` } ),
 		filterable: true,
