@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <ruleset name="WP HTTP QUERY">
-	<description>WordPress Coding Standards and PHP 8.0+ compatibility for the feature plugin.</description>
+	<description>WordPress Coding Standards and PHP 7.4+ compatibility for the feature plugin.</description>
 
 	<!-- The plugin only. tests/fixtures is test scaffolding, never shipped. -->
 	<file>plugin</file>
@@ -12,7 +12,7 @@
 	<rule ref="WordPress"/>
 
 	<config name="minimum_wp_version" value="7.2"/>
-	<config name="testVersion" value="8.0-"/>
+	<config name="testVersion" value="7.4-"/>
 
 	<rule ref="PHPCompatibilityWP"/>
 
