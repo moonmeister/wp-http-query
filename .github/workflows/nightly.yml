@@ -71,13 +71,10 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
-      # Order matters. The skip check (scripts/nightly-should-build.sh) skips when the tag is at
-      # main's HEAD and the zip is attached, so the tag moves only after the new zip is up. Moved
-      # first, a failed upload would leave the tag at HEAD over the old zip, and every later run
-      # would skip until main moved again. This way any failure before the tag moves leaves it
-      # behind HEAD, and the next run rebuilds. The very first run creates the release as a
-      # draft, which creates no tag and isn't public: a failure before it's published, in the
-      # last step, leaves a draft, which the skip check can't see and so treats as build.
+      # The upload sets the zip's label to the commit in the same call, which is what the skip check
+      # (scripts/nightly-should-build.sh) reads. The first run creates the release as a draft, which
+      # creates no tag and isn't public, and publishes it only in the last step, so a failed first
+      # run never publishes an empty release.
       - name: Upload the zip to the Nightly prerelease
         if: steps.decide.outputs.result == 'build'
         env:
@@ -85,20 +82,21 @@ jobs:
         run: |
           set -euo pipefail
           # gh release view finds a draft too, so a leftover one from a failed run is reused.
-          if ! gh release view nightly --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          if assets=$(gh release view nightly --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'); then
+            # Exactly one asset: delete anything that isn't the zip.
+            while IFS= read -r name; do
+              if [ -n "$name" ] && [ "$name" != "$ASSET" ]; then
+                gh release delete-asset nightly "$name" --repo "$GITHUB_REPOSITORY" --yes
+              fi
+            done <<<"$assets"
+          else
             # First run only. Published, with its notes, in the last step.
             gh release create nightly --repo "$GITHUB_REPOSITORY" --target "$SHA" \
               --title Nightly --draft --prerelease --latest=false --notes "Being built."
           fi
 
-          # Replace the zip, then delete anything else, so exactly one asset remains.
-          gh release upload nightly "dist/$ASSET" --repo "$GITHUB_REPOSITORY" --clobber
-          gh release view nightly --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' |
-            while IFS= read -r name; do
-              if [ "$name" != "$ASSET" ]; then
-                gh release delete-asset nightly "$name" --repo "$GITHUB_REPOSITORY" --yes
-              fi
-            done
+          # "file#label": the label records which commit this zip was built from.
+          gh release upload nightly "dist/$ASSET#$SHA" --repo "$GITHUB_REPOSITORY" --clobber
 
       - name: Move the nightly tag to main's HEAD
         if: steps.decide.outputs.result == 'build'
@@ -114,8 +112,7 @@ jobs:
               -f ref=refs/tags/nightly -f sha="$SHA" >/dev/null
           fi
 
-      # Last, and in one call: the notes describe the new commit only once its zip is up and the
-      # tag is on it, and a first run's draft becomes public only then.
+      # Last: a first run's draft becomes public only once its zip is up.
       - name: Update the Nightly prerelease's notes and target, and publish it
         if: steps.decide.outputs.result == 'build'
         env:
