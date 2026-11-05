@@ -31,8 +31,7 @@ It stores one option and adds no tables, cron jobs or cache headers.
 
 - PHP 8.0 or later.
 - WordPress 7.2 or later, including its betas and release candidates. Tested on nightly builds
-  (7.2-beta4, as of 2026-11-05). On WordPress 7.0 or 7.1, use
-  [v0.1.0](https://github.com/moonmeister/wp-http-query/releases/tag/v0.1.0).
+  (7.2-beta4, as of 2026-11-05).
 - A web server that passes `QUERY` through to PHP. Most do. See
   [Check your server](#check-your-server).
 
@@ -258,14 +257,14 @@ Tested on nginx 1.30.6 (2026-11-05): `GET` and `QUERY` get through, `DELETE` get
 
 ```php
 register_rest_route( 'my-plugin/v1', '/things', array(
-	'methods'             => WP_REST_Server::READABLE . ', ' . \WPHttpQuery\QUERYABLE,
+	'methods'             => array( WP_REST_Server::READABLE, \WPHttpQuery\QUERYABLE ),
 	'callback'            => 'my_plugin_list_things',
 	'permission_callback' => '__return_true',
 ) );
 ```
 
 `\WPHttpQuery\QUERYABLE` is `'QUERY'`, standing in for core's future `WP_REST_Server::QUERYABLE`.
-`'GET, QUERY'` is equivalent.
+`array( 'GET', 'QUERY' )` and `'GET, QUERY'` are equivalent.
 
 A full, tested version, with feature detection and the read-only check, is in
 [docs/integrating.md](../docs/integrating.md).
