@@ -19,10 +19,11 @@
  *
  * /wp/v2/types is deliberately left alone: the default-off tests use it.
  *
- * Three more switches, also set only by the lifecycle suite, change how core's
- * REST CORS handler is hooked, as a site might: REMOVE_CORE_CORS removes it
+ * Five more switches, also set only by the lifecycle suite, change how REST
+ * CORS is handled, as a site might: REMOVE_CORE_CORS removes core's handler
  * (REST CORS off), REMOVE_CORE_CORS_LATE removes it later in rest_api_init,
- * and REHOOK_CORE_CORS moves it to priority 11.
+ * REHOOK_CORE_CORS moves it to priority 11, DOUBLE_CORE_CORS hooks it again
+ * at 20, and COMPETING_CORS adds a restrictive CORS callback after it at 10.
  *
  * It also makes the plugin's diagnostic echo route public (it is admins only
  * by default), explicitly rather than relying on wp-env's WP_DEBUG, unless the
@@ -75,6 +76,27 @@ const REHOOK_CORE_CORS = 'wp_http_query_fixture_rehook_core_cors';
  */
 const REMOVE_CORE_CORS_LATE = 'wp_http_query_fixture_remove_core_cors_late';
 
+/**
+ * Set only by the serial lifecycle suite, through WP-CLI: hooks core's REST
+ * CORS handler a second time, at priority 20, so it runs at 10 and at 20.
+ * Never set by an HTTP request.
+ */
+const DOUBLE_CORE_CORS = 'wp_http_query_fixture_double_core_cors';
+
+/**
+ * Set only by the serial lifecycle suite, through WP-CLI: adds a callback at
+ * core's priority, 10, after core's handler, that sends restricted CORS
+ * headers the way a CORS plugin might: one fixed allowed origin, its own
+ * method list, no credentials. Never set by an HTTP request.
+ */
+const COMPETING_CORS = 'wp_http_query_fixture_competing_cors';
+
+/** The one origin COMPETING_CORS allows. */
+const COMPETING_CORS_ORIGIN = 'https://allowed.example';
+
+/** The method list COMPETING_CORS sends. */
+const COMPETING_CORS_METHODS = 'GET, OPTIONS';
+
 // Core hooks rest_send_cors_headers on rest_api_init at 10, so a site changes
 // it after that.
 add_action(
@@ -86,6 +108,23 @@ add_action(
 		if ( get_option( REHOOK_CORE_CORS ) ) {
 			remove_filter( 'rest_pre_serve_request', 'rest_send_cors_headers' );
 			add_filter( 'rest_pre_serve_request', 'rest_send_cors_headers', 11 );
+		}
+		if ( get_option( DOUBLE_CORE_CORS ) ) {
+			add_filter( 'rest_pre_serve_request', 'rest_send_cors_headers', 20 );
+		}
+		if ( get_option( COMPETING_CORS ) ) {
+			// Same priority as core's handler, added after it, so it runs after it.
+			add_filter(
+				'rest_pre_serve_request',
+				static function ( $value ) {
+					if ( get_http_origin() ) {
+						header( 'Access-Control-Allow-Origin: ' . COMPETING_CORS_ORIGIN );
+						header( 'Access-Control-Allow-Methods: ' . COMPETING_CORS_METHODS );
+						header_remove( 'Access-Control-Allow-Credentials' );
+					}
+					return $value;
+				}
+			);
 		}
 	},
 	15

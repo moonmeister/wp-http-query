@@ -68,18 +68,20 @@ add_action(
 		}
 
 		/*
-		 * Swap core's handler only while it's hooked, and at its own priority.
+		 * Swap core's handler only while it's hooked, and in its place.
 		 * A site that removed it has turned REST CORS off: adding ours anyway
 		 * would turn it back on, echoing any Origin with credentials allowed.
-		 * A site that re-hooked it at another priority would otherwise get
-		 * both, since remove_filter() only matches the priority it's given,
-		 * and core's, running second, would overwrite our method list.
+		 * A site that re-hooked it at another priority, or at more than one,
+		 * would otherwise get both, since remove_filter() only matches the
+		 * priority it's given, and core's, running later, would overwrite
+		 * our method list.
 		 *
 		 * Decided when the response is served, not here: a site can remove or
 		 * move core's handler at any rest_api_init priority, after this one.
-		 * swap_cors_handler() runs first on rest_pre_serve_request, and
-		 * WP_Hook re-sorts a running hook when a callback is added to it, so
-		 * ours still runs at core's priority later in the same pass.
+		 * swap_cors_handler() runs first on rest_pre_serve_request and
+		 * replaces core's callback in place, so ours runs exactly where
+		 * core's would have, after anything core's ran after and before
+		 * anything that ran after it.
 		 *
 		 * The filter path above needs none of this: once core's handler is
 		 * gone, rest_allowed_cors_methods never runs.
@@ -90,19 +92,56 @@ add_action(
 );
 
 /**
- * Swaps core's CORS handler for send_cors_headers(), at core's priority, if
- * it's still hooked. Before 7.2 only, as the first rest_pre_serve_request
- * callback.
+ * Swaps core's CORS handler for send_cors_headers() in place, at every
+ * priority it's hooked at. Before 7.2 only, as the first
+ * rest_pre_serve_request callback.
+ *
+ * In place, not remove_filter() plus add_filter(): add_filter() appends to
+ * the end of a priority, so a callback added after core's at the same
+ * priority, such as a CORS plugin narrowing the allowed origin, would run
+ * before ours and be overwritten. Rebuilding the priority's array with ours
+ * under core's position keeps the order.
+ *
+ * Safe while the hook is running: WP_Hook::apply_filters() reads
+ * $this->callbacks[ $priority ] afresh as it reaches each priority (checked
+ * in class-wp-hook.php on 7.0 and 7.1), so a priority after this callback's
+ * PHP_INT_MIN runs the replaced array. The set of priorities doesn't change,
+ * so no running iteration needs re-sorting.
  *
  * @param mixed $value Passthrough value.
  * @return mixed
  */
 function swap_cors_handler( $value ) {
-	$priority = has_filter( 'rest_pre_serve_request', 'rest_send_cors_headers' );
+	global $wp_filter;
 
-	if ( false !== $priority ) {
-		remove_filter( 'rest_pre_serve_request', 'rest_send_cors_headers', $priority );
-		add_filter( 'rest_pre_serve_request', __NAMESPACE__ . '\\send_cors_headers', $priority );
+	$hook = $wp_filter['rest_pre_serve_request'] ?? null;
+	if ( ! $hook instanceof \WP_Hook ) {
+		return $value;
+	}
+
+	// WP_Hook keys a function-name callback by the name itself.
+	$core = 'rest_send_cors_headers';
+	$ours = __NAMESPACE__ . '\\send_cors_headers';
+
+	foreach ( $hook->callbacks as $priority => $callbacks ) {
+		// The priority running now has already been read; it can only be ours.
+		if ( PHP_INT_MIN === $priority || ! isset( $callbacks[ $core ] ) ) {
+			continue;
+		}
+
+		$replaced = array();
+		foreach ( $callbacks as $id => $callback ) {
+			if ( $id === $core ) {
+				$replaced[ $ours ] = array(
+					'function'      => $ours,
+					'accepted_args' => 1,
+				);
+			} else {
+				$replaced[ $id ] = $callback;
+			}
+		}
+
+		$hook->callbacks[ $priority ] = $replaced;
 	}
 
 	return $value;

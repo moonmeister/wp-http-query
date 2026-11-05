@@ -12,6 +12,10 @@
  *   Access-Control-Allow-Credentials: true.
  * - A site that re-hooked core's handler at another priority would otherwise
  *   get both, and core's, running later, would overwrite QUERY out of the list.
+ *   The same goes for every priority it's hooked at, if more than one.
+ * - The plugin's copy takes core's place in the hook, not the end of the
+ *   priority, so a callback that ran after core's handler, like a CORS plugin
+ *   sending a restricted origin, still runs after it and still wins.
  *
  * From 7.2 the plugin uses core's rest_allowed_cors_methods filter, which
  * doesn't run once core's handler is gone, so nightly must behave the same.
@@ -25,7 +29,11 @@ import { CORE_COLLECTIONS, ORIGIN, rest, tokens } from '../http';
 import { NO_LOCAL_CLI, sites } from '../sites';
 import { FRESH } from './session';
 import {
+	COMPETING_CORS_METHODS,
+	COMPETING_CORS_ORIGIN,
 	deleteOption,
+	FIXTURE_COMPETING_CORS,
+	FIXTURE_DOUBLE_CORE_CORS,
 	FIXTURE_REHOOK_CORE_CORS,
 	FIXTURE_REMOVE_CORE_CORS,
 	FIXTURE_REMOVE_CORE_CORS_LATE,
@@ -34,6 +42,9 @@ import {
 } from './site-state';
 
 const ROUTE = CORE_COLLECTIONS[ 0 ];
+
+/** Core's method list, plus QUERY: what the plugin's copy sends, and core's filter gives from 7.2. */
+const WITH_QUERY = [ 'OPTIONS', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'QUERY' ];
 
 describe.each( sites )( 'CORS, as the site configured it: $label', ( site ) => {
 	if ( ! site.localCli ) {
@@ -44,14 +55,20 @@ describe.each( sites )( 'CORS, as the site configured it: $label', ( site ) => {
 	let restoreRemove = () => {};
 	let restoreRehook = () => {};
 	let restoreRemoveLate = () => {};
+	let restoreDouble = () => {};
+	let restoreCompeting = () => {};
 
 	beforeAll( () => {
 		restoreRemove = snapshotOption( site, FIXTURE_REMOVE_CORE_CORS );
 		restoreRehook = snapshotOption( site, FIXTURE_REHOOK_CORE_CORS );
 		restoreRemoveLate = snapshotOption( site, FIXTURE_REMOVE_CORE_CORS_LATE );
+		restoreDouble = snapshotOption( site, FIXTURE_DOUBLE_CORE_CORS );
+		restoreCompeting = snapshotOption( site, FIXTURE_COMPETING_CORS );
 	} );
 
 	afterAll( () => {
+		restoreCompeting();
+		restoreDouble();
 		restoreRemoveLate();
 		restoreRehook();
 		restoreRemove();
@@ -101,12 +118,33 @@ describe.each( sites )( 'CORS, as the site configured it: $label', ( site ) => {
 		try {
 			const res = await preflight();
 			expect( res.headers.get( 'access-control-allow-origin' ) ).toBe( ORIGIN );
-			const methods = tokens( res.headers.get( 'access-control-allow-methods' ) );
-			expect( methods ).toContain( 'QUERY' );
-			expect( methods ).toContain( 'GET' );
-			expect( methods.filter( ( m ) => m === 'GET' ) ).toHaveLength( 1 );
+			expect( tokens( res.headers.get( 'access-control-allow-methods' ) ) ).toEqual( WITH_QUERY );
 		} finally {
 			deleteOption( site, FIXTURE_REHOOK_CORE_CORS );
+		}
+	} );
+
+	it( 'replaces core’s handler at every priority it’s hooked at, so core’s list never overwrites QUERY', async () => {
+		setOption( site, FIXTURE_DOUBLE_CORE_CORS, 1 );
+		try {
+			const res = await preflight();
+			expect( res.headers.get( 'access-control-allow-origin' ) ).toBe( ORIGIN );
+			expect( tokens( res.headers.get( 'access-control-allow-methods' ) ) ).toEqual( WITH_QUERY );
+		} finally {
+			deleteOption( site, FIXTURE_DOUBLE_CORE_CORS );
+		}
+	} );
+
+	it( 'keeps core’s place in the hook, so a CORS callback that ran after core’s still wins', async () => {
+		setOption( site, FIXTURE_COMPETING_CORS, 1 );
+		try {
+			for ( const res of [ await preflight(), await get() ] ) {
+				expect( res.headers.get( 'access-control-allow-origin' ) ).toBe( COMPETING_CORS_ORIGIN );
+				expect( res.headers.get( 'access-control-allow-methods' ) ).toBe( COMPETING_CORS_METHODS );
+				expect( res.headers.get( 'access-control-allow-credentials' ) ).toBeNull();
+			}
+		} finally {
+			deleteOption( site, FIXTURE_COMPETING_CORS );
 		}
 	} );
 } );
