@@ -11,7 +11,7 @@ Every full route below comes from the example plugin,
 [`examples/query-route-example/`](../examples/query-route-example/query-route-example.php). Its
 tests, [`tests/examples.test.ts`](../tests/examples.test.ts) and
 [`tests/lifecycle/examples-feature-detection.test.ts`](../tests/lifecycle/examples-feature-detection.test.ts),
-run it over HTTP on WordPress 7.0, 7.1 and nightly. Copy from the example rather than from this
+run it over HTTP on a WordPress nightly build. Copy from the example rather than from this
 page if they ever differ, and report the difference.
 
 ## Contents
@@ -40,12 +40,11 @@ The registration, from the example:
 add_action(
 	'rest_api_init',
 	static function (): void {
-		$read_methods = \WP_REST_Server::READABLE;
+		$read_methods = array( \WP_REST_Server::READABLE );
 
 		$query = query_method();
 		if ( null !== $query ) {
-			// String form, so cores before 7.2 can't trip Trac#65905.
-			$read_methods .= ', ' . $query;
+			$read_methods[] = $query;
 		}
 
 		register_rest_route(
@@ -93,7 +92,7 @@ add_action(
 ```
 
 `query_method()` is the feature check; see [Feature detection](#feature-detection). When the
-plugin is active, `$read_methods` is `'GET, QUERY'`.
+plugin is active, `$read_methods` is `array( 'GET', 'QUERY' )`.
 
 The read handler. Nothing in it is specific to `QUERY`:
 
@@ -126,16 +125,6 @@ What the tests check against this route, on every test site:
 - `QUERY` with a body and `GET` with the same query string return the same JSON.
 - `{"per_page":100}` as JSON, and `per_page=0` form-encoded, both return `400 rest_invalid_param`.
 - An anonymous `QUERY` gets the read (`200`); an anonymous `POST` to the same route gets `401`.
-
-**Use the string form of `methods`.** `'GET, QUERY'` works on every core version.
-
-> **Warning:** before WordPress 7.2, an entry in the **array** form of `methods` that lists more
-> than one method breaks the route. `'methods' => array( 'GET, QUERY' )`, or
-> `array( \WP_REST_Server::READABLE . ', ' . \WPHttpQuery\QUERYABLE )`, registers one key,
-> `GET, QUERY`, that no request matches
-> ([Trac#65905](https://core.trac.wordpress.org/ticket/65905), fixed in
-> [r63756](https://core.trac.wordpress.org/changeset/63756)). One method per array entry,
-> `array( 'GET', 'QUERY' )`, is safe too.
 
 **Keep reads and writes in separate handlers.** Core's own controllers do: `get_items` for reads,
 `create_item` and friends for writes, never one callback for both. The example's `POST` handler is
@@ -232,16 +221,11 @@ The silent wrong answer is the reason to check.
 order, so wp-http-query may not have loaded yet when your file runs. By `rest_api_init` every
 plugin has.
 
-**Core versions.** Nothing changes for your route at 7.2:
-
-| Core | What differs | What to do |
-|---|---|---|
-| Before 7.2 | Array-form `methods` aren't comma-split (Trac#65905). CORS has no filter, so the plugin replaces core's CORS handler, if it's still hooked | Use the string form of `methods`. The plugin handles CORS, unless core's handler was removed: a site or CORS plugin that replaced it needs `QUERY` added to its own method list |
-| 7.2 and later | Both fixed ([r63756](https://core.trac.wordpress.org/changeset/63756), [r64730](https://core.trac.wordpress.org/changeset/64730)). The plugin adds `QUERY` through core's `rest_allowed_cors_methods` filter | Nothing |
-| A future core with `QUERYABLE` | Not proposed yet; parked until the plugin ships ([ADR 0002](decisions/0002-allmethods-vs-queryable.md)). The constant is planned as `WP_REST_Server::QUERYABLE` | `query_method()` already checks for it first |
-
-Don't compare version numbers. Alpha and beta builds of a release compare lower than the release.
-Check for the constant.
+**Core versions.** wp-http-query needs WordPress 7.2 or later. A future core may add
+`WP_REST_Server::QUERYABLE` itself: not proposed yet, and parked until the plugin ships
+([ADR 0002](decisions/0002-allmethods-vs-queryable.md)). `query_method()` already checks for it
+first. Don't compare version numbers. Alpha and beta builds of a release compare lower than the
+release. Check for the constant.
 
 ## Opting in routes you don't own
 

@@ -56,22 +56,16 @@ const DEMO_ROUTE_OFF = 'wp_http_query_fixture_demo_route_off';
 /**
  * Set only by the serial lifecycle suite, through WP-CLI, to change how REST
  * CORS is handled the way a site might. Never set by an HTTP request. Its value
- * is an array: 'scenario' picks one, 'priority' is the rest_pre_serve_request
- * priority it acts at, and 'competing' also takes 'origin' and 'methods'.
+ * is an array: 'scenario' picks one, and 'competing' also takes 'origin' and
+ * 'methods'.
  *
  * - remove-late: removes core's handler, turning REST CORS off.
- * - rehook: moves core's handler to 'priority'.
- * - double: hooks core's handler again at 'priority', so it runs twice.
- * - competing: adds a callback at 'priority' that sends restricted CORS
+ * - competing: adds a callback after core's handler that sends restricted CORS
  *   headers, as a CORS plugin might: 'origin', 'methods', no credentials.
- * - remove-during-serve: adds a callback at 'priority' that removes core's
- *   handler from priority 10 while the response is being served.
  */
 const CORS = 'wp_http_query_fixture_cors';
 
-// Late in rest_api_init, after core hooks its handler (10) and after the
-// plugin decides its CORS path (20), so a change here is one no
-// rest_api_init-time check could have seen.
+// Late in rest_api_init, after core hooks its handler (10).
 add_action(
 	'rest_api_init',
 	static function (): void {
@@ -79,18 +73,10 @@ add_action(
 		if ( ! is_array( $cors ) ) {
 			return;
 		}
-		$priority = (int) ( $cors['priority'] ?? 10 );
 
 		switch ( $cors['scenario'] ?? '' ) {
 			case 'remove-late':
 				remove_filter( 'rest_pre_serve_request', 'rest_send_cors_headers' );
-				break;
-			case 'rehook':
-				remove_filter( 'rest_pre_serve_request', 'rest_send_cors_headers' );
-				add_filter( 'rest_pre_serve_request', 'rest_send_cors_headers', $priority );
-				break;
-			case 'double':
-				add_filter( 'rest_pre_serve_request', 'rest_send_cors_headers', $priority );
 				break;
 			case 'competing':
 				// Added after core's handler, so at its priority it runs after it.
@@ -104,17 +90,7 @@ add_action(
 						}
 						return $value;
 					},
-					$priority
-				);
-				break;
-			case 'remove-during-serve':
-				add_filter(
-					'rest_pre_serve_request',
-					static function ( $value ) {
-						remove_filter( 'rest_pre_serve_request', 'rest_send_cors_headers', 10 );
-						return $value;
-					},
-					$priority
+					10
 				);
 				break;
 		}

@@ -37,8 +37,6 @@ jobs:
         if: failure()
         run: |
           docker ps -a || true
-          for config in .wp-env.7.0.json .wp-env.json .wp-env.nightly.json; do
-            echo "::group::wp-env logs ($config)"
-            npx --no-install wp-env logs all --no-watch --config="$config" || true
-            echo "::endgroup::"
-          done
+          echo "::group::wp-env logs"
+          npx --no-install wp-env logs all --no-watch --config=.wp-env.nightly.json || true
+          echo "::endgroup::"

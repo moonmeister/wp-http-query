@@ -2,11 +2,9 @@
  * Gap 1: CORS. Access-Control-Allow-Methods must include QUERY, or browsers
  * block cross-origin QUERY at the preflight.
  *
- * Two code paths in the plugin, one per environment:
- *   7.2+    adds QUERY through core's rest_allowed_cors_methods (r64730, Trac#46992)
- *   < 7.2   wraps rest_send_cors_headers() and resends its method list with QUERY
- *
- * Either way core's default methods must survive: the plugin adds, never replaces.
+ * The plugin adds QUERY through core's rest_allowed_cors_methods filter
+ * (r64730, Trac#46992). Core's default methods must survive: the plugin adds,
+ * never replaces.
  *
  * Issue: #3   Core: https://core.trac.wordpress.org/changeset/64730
  */

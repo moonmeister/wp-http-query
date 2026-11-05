@@ -1,13 +1,13 @@
 # Test environment and decision tests for the feature plugin.
 #
-#   make up        start all three WordPress sites (7.0, 7.1, nightly)
-#   make test      run the decision tests against all three (SITES=7.0,nightly for some)
+#   make up        start the WordPress test site (nightly: the plugin needs 7.2+)
+#   make test      run the decision tests against it
 #   make check     up + test
 #   make dist      build dist/wp-http-query-<version>.zip (VERSION=0.1.0 stamps that version in)
 #   make lint      PHPCS (WordPress standard + PHPCompatibility) on plugin/
-#   make open      open wp-admin for all three (ENV=7.0, ENV=7.1 or ENV=nightly for one)
-#   make down      stop all three
-#   make destroy   remove all three and their data (asks first)
+#   make open      open wp-admin
+#   make down      stop it
+#   make destroy   remove it and its data (asks first)
 #
 #   make demo          a separate site for trying the plugin by hand: nightly, :8873, plugin only,
 #                      default settings, no test fixtures. Opens Settings → HTTP QUERY
@@ -28,22 +28,22 @@ node_modules: package.json
 
 install: node_modules ## Install wp-env, vitest and test deps
 
-up: install ## Start all sites (7.0 :8870, 7.1 :8871, nightly :8872)
+up: install ## Start the test site (nightly :8872)
 	scripts/env.sh start
 
-down: install ## Stop all sites
+down: install ## Stop the test site
 	scripts/env.sh stop
 
-destroy: install ## Remove all sites and their data (asks first)
+destroy: install ## Remove the test site and its data (asks first)
 	scripts/env.sh destroy
 
-status: install ## Show all sites
+status: install ## Show the test site
 	scripts/env.sh status
 
-open: ## Open wp-admin in a browser (all, or ENV=7.0 / ENV=7.1 / ENV=nightly)
+open: ## Open wp-admin in a browser
 	scripts/env.sh open $(ENV)
 
-test: install ## Run the decision tests (all sites, or SITES=7.0,nightly)
+test: install ## Run the decision tests
 	SITES=$(SITES) npx vitest run
 	@# Then the tests that change site state, serially, never alongside the above.
 	SITES=$(SITES) npx vitest run --config vitest.lifecycle.config.ts
