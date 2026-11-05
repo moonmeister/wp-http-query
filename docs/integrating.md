@@ -134,8 +134,8 @@ What the tests check against this route, on every test site:
 > `array( \WP_REST_Server::READABLE . ', ' . \WPHttpQuery\QUERYABLE )`, registers one key,
 > `GET, QUERY`, that no request matches
 > ([Trac#65905](https://core.trac.wordpress.org/ticket/65905), fixed in
-> [r63756](https://core.trac.wordpress.org/changeset/63756)). The string form is safe, and so is
-> one method per array entry, `array( 'GET', 'QUERY' )`.
+> [r63756](https://core.trac.wordpress.org/changeset/63756)). One method per array entry,
+> `array( 'GET', 'QUERY' )`, is safe too.
 
 **Keep reads and writes in separate handlers.** Core's own controllers do: `get_items` for reads,
 `create_item` and friends for writes, never one callback for both. The example's `POST` handler is
