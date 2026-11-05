@@ -1,6 +1,6 @@
 # Scope: HTTP QUERY support in WordPress
 
-**Status:** plugin first. The feature plugin is the deliverable; core patches are parked until it ships (decided 2026-11-04, see §8)
+**Status:** plugin first (decided 2026-11-04). The plugin shipped as v0.1.0; the route to core is a likely direct core patch on [Trac#65616](https://core.trac.wordpress.org/ticket/65616), scope still to be decided, per [#60](https://github.com/moonmeister/wp-http-query/issues/60)
 **Core baseline:** `7.2-alpha-63166-src` @ `e7739d5414`
 **Trunk references verified:** 2026-08-16
 
@@ -336,7 +336,7 @@ One real cost, and it is not BC:
 > versioning, is the reason to defer first-adopter work to its own ticket."* The survey in
 > §4.1 shows no CDN will cache a `QUERY` response at all, so a first-adopter core endpoint
 > carries no extra caching risk. **First-adopter work stays deferred on effort and reviewer
-> scope, not on safety** — [#34](../../issues/34).
+> scope, not on safety** — [#34](https://github.com/moonmeister/wp-http-query/issues/34).
 
 ### Anticipated objection
 
@@ -408,7 +408,7 @@ have reached that layer at all. It decides in PHP on the write path and honors
 See [ADR 0003](decisions/0003-cache-safety-default.md) for the decision and the reasoning error
 behind the original text. The stray availability finding — Varnish's `501`, in
 8.0 – 9.0.x only — is a **deployment** problem, not a caching one; it belongs with the hardening-allowlist 403 in
-[#32](../../issues/32).
+[#32](https://github.com/moonmeister/wp-http-query/issues/32).
 
 ### 4.2 The `Location` indirection — ours, if adopted
 
@@ -474,7 +474,7 @@ The gaps are contract and ergonomics, not capability:
    for an idempotent method, but untested and undocumented.
 
 > **Process constraint:** `src/wp-includes/Requests/` is a vendored copy of the external
-> [WpOrg/Requests](https://github.com/WpOrg/Requests) library. WordPress core does **not**
+> [WordPress/Requests](https://github.com/WordPress/Requests) library. WordPress core does **not**
 > accept direct patches to vendored dependencies — the `QUERY` constant and any transport
 > changes must land upstream first and be pulled in on the next Requests sync.
 >
@@ -652,7 +652,7 @@ on **option B**, additive `QUERYABLE`, nothing migrates. The defaults half is st
 [ADR 0005](decisions/0005-reach-for-existing-read-routes.md) — does core grant existing read routes
 `QUERY`, and by what mechanism?
 
-What changed: [#38](../../issues/38)'s sweep supplied the missing number and then some. Handlers
+What changed: [#38](https://github.com/moonmeister/wp-http-query/issues/38)'s sweep supplied the missing number and then some. Handlers
 that branch on `$request->get_method()` do break — 28–65 plugins / 0.82M–11.96M installs carry the
 shape, and Jetpack (3M) performs a write on a `QUERY` to a `READABLE` route. That killed the D
 lean. **It does not settle Q4**, because option B's cost is that `QUERY` arrives route by route,
@@ -683,30 +683,9 @@ from its current behavior of leaving it alone?
 
 ## 8. Sequencing
 
-**Task breakdown: [GitHub issues](https://github.com/moonmeister/wp-http-query/issues)**, mapped
-in the README under [Where the work lands](../README.md#where-the-work-lands). They track who
-does what and where — the work lands in six places, only one of which we control. This section
-states the ordering principle; it deliberately does not duplicate the task list.
-
-The critical path is short, and **no part of it is empirical any more**. Q2 — whether `QUERY`
-and its body reach PHP — was the gating unknown and is answered. What remains:
-
-1. ~~**Read [Trac#65616](https://core.trac.wordpress.org/ticket/65616) and finish Q3.**~~
-   **Done 2026-08-16.** The ticket is real, uncontested, comment-free and tagged `2nd-opinion`.
-   Engagement with an open thread, not a fresh proposal.
-2. **Settle [ADRs 0001–0004](decisions/).** The only remaining blockers are decisions, and
-   **none of them is blocked on anything external any more.**
-3. ~~**Write the patch, and prove it with the feature plugin** on stock core.~~ **Reordered
-   2026-11-04: plugin first.** Design the plugin's opt-in reach options
-   ([ADR 0005](decisions/0005-reach-for-existing-read-routes.md); never all routes by default), run it on a real install ([#22](../../issues/22)), and publish it
-   ([#23](../../issues/23)). The core patches are written on `feat-http-query` and parked.
-4. **Bring plugin, usage and matrix results to the existing ticket**, with the core patches.
-
-Deliberate ordering: arrive with a shipped plugin and evidence rather than a patch and
-an argument. Both core defects found on the way are already fixed for 7.2
-([r63756](https://core.trac.wordpress.org/changeset/63756),
-[r64730](https://core.trac.wordpress.org/changeset/64730)). Note that the Requests track (§5.1) runs independently and ahead — core will not
-accept patches to vendored dependencies, so anything in `Requests/` must land upstream first.
+Planning lives on the [project board](https://github.com/users/moonmeister/projects/1) and the
+[milestones](https://github.com/moonmeister/wp-http-query/milestones); the route to core is
+tracked in [#60](https://github.com/moonmeister/wp-http-query/issues/60).
 
 ---
 

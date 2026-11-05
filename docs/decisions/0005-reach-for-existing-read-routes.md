@@ -1,6 +1,6 @@
 # ADR 0005 — Should existing read routes gain QUERY, and by what mechanism?
 
-**Status:** Proposed, partly settled. **Settled 2026-11-04 for the feature plugin: no reach by default, opt-in per route, per site, or by preset — implemented in [#1](../../issues/1)** (see [What the plugin implements](#what-the-plugin-implements)). Still open: what core should do.
+**Status:** Proposed, partly settled. **Settled 2026-11-04 for the feature plugin: no reach by default, opt-in per route, per site, or by preset — implemented in [#1](https://github.com/moonmeister/wp-http-query/issues/1)** (see [What the plugin implements](#what-the-plugin-implements)). Still open: what core should do.
 **Date:** 2026-09-15
 **Split from:** [ADR 0002](0002-allmethods-vs-queryable.md), which closed on option B
 (`QUERYABLE`, additive) on 2026-09-15. B settles what the constants *mean*; it does not answer
@@ -157,7 +157,7 @@ because it makes `QUERY` a lie at the application layer: a handler that cannot t
 
 ## What the plugin implements
 
-Decided and built 2026-11-04 ([#1](../../issues/1)). **Off by default.** No existing route gains
+Decided and built 2026-11-04 ([#1](https://github.com/moonmeister/wp-http-query/issues/1)). **Off by default.** No existing route gains
 `QUERY` unless one of three opt-ins names it. This supersedes the earlier position that the plugin
 should implement option 3 as an instrument: reproducing the Jetpack break on real sites was judged
 too high a price for the evidence.

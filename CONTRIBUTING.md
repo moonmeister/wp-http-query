@@ -2,7 +2,7 @@
 
 This repo holds the **feature plugin** ([`plugin/`](plugin/)) plus the docs, decision records and
 compatibility matrix behind it. Start with the [README](README.md) for what the project is, and
-[#37](../../issues/37) for the current working order.
+the [project board](https://github.com/users/moonmeister/projects/1) for the current working order.
 
 ## Prerequisites
 
@@ -52,10 +52,20 @@ The test sites above aren't what a real install looks like: they mount a test fi
 (`tests/fixtures/mu-plugins/`) that opts routes in, turns the preset on and makes the echo route
 public, plus the example plugin. `make demo` starts a separate site with none of that: the latest
 nightly on <http://localhost:8873> (`admin` / `password`), only `plugin/` mounted and active,
-pretty permalinks, and default settings. It opens **Settings → HTTP QUERY**, where
-**Test your server** runs the self-test. No route accepts `QUERY` until you tick
-**Core collections**, and the echo route is admins only. The README's
-[Try the plugin](README.md#try-the-plugin) walks through it.
+pretty permalinks, and default settings. The echo route is admins only. It opens
+**Settings → HTTP QUERY**:
+
+1. On **Settings → HTTP QUERY**, the "Routes that accept QUERY" table lists only the plugin's own
+   two routes: no core route accepts `QUERY` yet, so a `QUERY` to `/wp-json/wp/v2/posts` gets `404`.
+2. Tick **Core collections** and click **Save Changes**.
+3. Send a `QUERY`. It returns `200` and the matching posts (the sample "Hello world!" post):
+
+   ```sh
+   curl -X QUERY http://localhost:8873/wp-json/wp/v2/posts -H 'Content-Type: application/json' -d '{"search":"hello"}'
+   ```
+
+4. Click **Test your server**. It runs four checks, from your browser and from the server, and
+   explains each result.
 
 `make demo-down` stops it (data kept), `make demo-destroy` removes it (asks first). The test-site
 targets never touch it. WP-CLI works as for the others (`scripts/env.sh wp demo plugin list`). For
@@ -163,6 +173,43 @@ they drift. Change the example and the guide together.
 3. Use the helpers in [`tests/http.ts`](tests/http.ts): `rest( site, 'QUERY', route, { json } )`,
    `{ form }` for form-encoded bodies, and `tokens()` for comma-separated headers.
 
+## Compatibility matrix
+
+```sh
+cd matrix && ./run.sh
+```
+
+Tests whether `QUERY` and its body reach PHP through each web server and SAPI, with no WordPress
+involved. Requires Docker and `jq`. Results land in `matrix/results/`. See
+[matrix/README.md](matrix/README.md).
+
+## Repository layout
+
+```
+plugin/               The plugin: QUERY on the REST API, stock core, no patch
+examples/             Example plugin behind docs/integrating.md, tested on every site
+tests/                Decision tests (vitest, HTTP) run against the wp-env sites
+scripts/env.sh        Drives the wp-env sites; wrapped by the Makefile
+docs/
+  integrating.md      Developer guide: adding QUERY to routes, and sending it
+  scope.md            Project scope, current state of trunk, open questions
+  ecosystem.md        Ecosystem support status: time-sensitive, dated, re-verified
+  background.md       Project history: research log, decisions in context, upstream tickets
+  decisions/          ADRs for contested design calls
+matrix/
+  probe/              Bare SAPI probe (no WordPress): the make-or-break test
+  stacks/             Per-web-server configs
+  compose.yaml        The stack matrix
+  run.sh              Runs everything, emits results/results.json
+  results/            Machine-readable results + generated MATRIX.md
+experiments/          One-off research: blast radius, cache survey, plugin spike
+```
+
+Everything above needs only this repo. One experiment, the ADR 0002 blast-radius run, also needs
+a checkout of [WordPress/wordpress-develop](https://github.com/WordPress/wordpress-develop)
+(upstream or your own fork), plus a scratch worktree, a running Docker stack and a separate test
+database: see [experiments/blast-radius/README.md](experiments/blast-radius/README.md#reproducing).
+
 ## PR previews
 
 Every pull request gets one comment, updated on each push, with a **Preview in Playground**
@@ -241,14 +288,29 @@ build, run `npx wp-env start --update --config=.wp-env.nightly.json`.
 
 ## Conventions
 
-- **Branch, then open a draft PR.** A maintainer marks it ready.
+- **Open a draft PR while you're working,** and mark it ready for review when it's done: CI green
+  and review comments addressed. Copilot reviews drafts, so you get feedback early.
 - **Verify claims before writing them down.** Cite file and line, date anything time-sensitive,
-  and say how you measured it. The README's [Principles](README.md#principles) explain why.
+  and say how you measured it. [Principles](#principles) explains why.
 - **Text for other trackers is drafted, not sent.** Issues, Trac comments and PRs for other
   projects are drafted for a maintainer to review and file. Filing is a human step.
 - **Use a conventional PR title** (`feat: ...`, `fix: ...`); see
   [Pull request titles](#pull-request-titles).
 - **Releases follow [RELEASING.md](RELEASING.md).** Release-drafter keeps a draft GitHub release
   up to date from merged PRs; a maintainer publishes it, and the zip is built and attached then.
-- **Keep the core fork clean.** Core patches live in the `wordpress-develop` fork. Project notes,
-  scratch files and experiments belong here, not there.
+- **Changes to WordPress core or Requests go to those projects,** from your own checkout or fork of
+  them, not this repo. This repo holds the plugin, its tests, docs and research. Keep project notes
+  and scratch files out of core checkouts: a stray file has to be cleaned out before a Trac patch.
+
+## Principles
+
+1. **Plugin before patches.** Ship the capability as a plugin, then arrive at Trac with usage,
+   matrix data and a working plugin, not an argument.
+2. **Publish negative results.** A stack that drops `QUERY` is the most useful thing this
+   project can document.
+3. **Date everything time-sensitive.** The ecosystem is moving weekly. Undated claims rot
+   silently.
+4. **Additive only.** No existing route changes behavior. See
+   [ADR 0002](docs/decisions/0002-allmethods-vs-queryable.md). This applies to the plugin too:
+   reach is opt-in, never all routes by default
+   ([ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md)).
