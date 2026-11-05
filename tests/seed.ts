@@ -5,6 +5,14 @@ import type { Site } from './sites';
 const ENV_SH = fileURLToPath( new URL( '../scripts/env.sh', import.meta.url ) );
 
 /**
+ * scripts/env.sh arguments that run WP-CLI on a site. A network's sites share
+ * one env, so --url picks the site.
+ */
+export function wpArgs( site: Site, args: string[] ): string[] {
+	return site.network ? [ 'wp', 'multisite', `--url=${ site.url }/`, ...args ] : [ 'wp', site.key, ...args ];
+}
+
+/**
  * Runs WP-CLI on a test site through scripts/env.sh and returns stdout.
  *
  * Needs the wp-env sites: it won't work against a WP_*_URL override that
@@ -16,7 +24,7 @@ export function wp( site: Site, args: string[] ): string {
 		// overridden URL would read or change the wrong install.
 		throw new Error( `WP-CLI is unavailable for ${ site.key }: its URL is overridden (${ site.url }).` );
 	}
-	return execFileSync( ENV_SH, [ 'wp', site.key, ...args ], {
+	return execFileSync( ENV_SH, wpArgs( site, args ), {
 		encoding: 'utf8',
 		stdio: [ 'ignore', 'pipe', 'pipe' ],
 	} );

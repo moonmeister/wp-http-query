@@ -1,0 +1,13 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/wp-env.json",
+	"core": "https://wordpress.org/nightly-builds/wordpress-latest.zip",
+	"phpVersion": "8.4",
+	"multisite": true,
+	"mappings": {
+		"wp-content/plugins/wp-http-query": "./plugin",
+		"wp-content/plugins/query-route-example": "./examples/query-route-example",
+		"wp-content/mu-plugins": "./tests/fixtures/mu-plugins"
+	},
+	"port": 8876,
+	"testsEnvironment": false
+}

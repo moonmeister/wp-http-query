@@ -321,6 +321,8 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 	}
 
 	const admin = new Session( site );
+	/** The REST prefix as a path: /wp-json, or /sub/wp-json on a network subsite. */
+	const REST = `${ new URL( site.url ).pathname.replace( /\/$/, '' ) }/wp-json`;
 	let restoreDemoSwitch = () => {};
 
 	beforeAll( async () => {
@@ -383,12 +385,12 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 			// Five different requests behind five boxes.
 			const requests = sent.map( ( r ) => `${ r.method } ${ r.path }${ r.signedIn ? '' : ' (anonymous)' }` );
 			expect( requests.filter( ( r ) => ! r.startsWith( 'POST' ) ).sort() ).toEqual( [
-				'GET /wp-json/wp-http-query/v1/self-test/cache',
-				'GET /wp-json/wp-http-query/v1/self-test/cors',
-				'GET /wp-json/wp-http-query/v1/self-test/server',
-				'QUERY /wp-json/wp-http-query/v1/echo',
-				'QUERY /wp-json/wp-http-query/v1/self-test/fingerprint (anonymous)',
-				'QUERY /wp-json/wp-http-query/v1/self-test/fingerprint (anonymous)',
+				`GET ${ REST }/wp-http-query/v1/self-test/cache`,
+				`GET ${ REST }/wp-http-query/v1/self-test/cors`,
+				`GET ${ REST }/wp-http-query/v1/self-test/server`,
+				`QUERY ${ REST }/wp-http-query/v1/echo`,
+				`QUERY ${ REST }/wp-http-query/v1/self-test/fingerprint (anonymous)`,
+				`QUERY ${ REST }/wp-http-query/v1/self-test/fingerprint (anonymous)`,
 			] );
 
 			// The two "reaches WordPress" checks and the CORS check start
@@ -428,11 +430,11 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 			// Each box says what was sent, where, and as whom.
 			const requested = shown.map( ( b ) => text( b.findAll( ( el ) => el.tagName === 'code' ) )[ 0 ] );
 			expect( requested ).toEqual( [
-				'Your browser sent: QUERY /wp-json/wp-http-query/v1/echo, signed in as you',
-				'Your browser sent: 2 × QUERY /wp-json/wp-http-query/v1/self-test/fingerprint, anonymous',
-				'The server sent itself: QUERY /wp-json/wp-http-query/v1/echo, signed in as you',
-				'The server sent itself: 2 × QUERY /wp-json/wp-http-query/v1/self-test/fingerprint, anonymous',
-				`The server sent itself: OPTIONS /wp-json/wp-http-query/v1/self-test/fingerprint, Origin: ${ CORS_ORIGIN }, Access-Control-Request-Method: QUERY, anonymous`,
+				`Your browser sent: QUERY ${ REST }/wp-http-query/v1/echo, signed in as you`,
+				`Your browser sent: 2 × QUERY ${ REST }/wp-http-query/v1/self-test/fingerprint, anonymous`,
+				`The server sent itself: QUERY ${ REST }/wp-http-query/v1/echo, signed in as you`,
+				`The server sent itself: 2 × QUERY ${ REST }/wp-http-query/v1/self-test/fingerprint, anonymous`,
+				`The server sent itself: OPTIONS ${ REST }/wp-http-query/v1/self-test/fingerprint, Origin: ${ CORS_ORIGIN }, Access-Control-Request-Method: QUERY, anonymous`,
 			] );
 			expect( new Set( text( shown ) ).size ).toBe( 5 );
 			expect( shown[ 4 ].textContent ).toContain( 'Sends the preflight a browser sends before a QUERY from another site' );

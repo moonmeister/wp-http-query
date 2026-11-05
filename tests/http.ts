@@ -42,7 +42,11 @@ export function rest(
 	route: string,
 	opts: { json?: unknown; form?: Record< string, string >; headers?: Record< string, string > } = {}
 ): Promise< Response > {
-	const headers: Record< string, string > = { ...opts.headers };
+	// No keep-alive. The lifecycle suite spends seconds in WP-CLI between requests,
+	// and a pooled socket Apache closed meanwhile fails the next fetch with "other
+	// side closed". A network's sites share one origin, hence one pool, so there
+	// it bites on the first request to the second site.
+	const headers: Record< string, string > = { connection: 'close', ...opts.headers };
 	let body: string | undefined;
 
 	if ( opts.json !== undefined ) {

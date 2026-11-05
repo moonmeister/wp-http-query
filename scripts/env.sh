@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Drive the wp-env sites the plugin is tested against.
 #
-#   nightly  .wp-env.nightly.json  nightly build  :8872  the test site: the plugin needs 7.2+
-#   demo     .wp-env.demo.json     nightly build  :8873  for trying by hand: plugin only, defaults,
-#                                                        no test fixtures. Never part of "all"
+#   nightly    .wp-env.nightly.json    nightly build  :8872  the test site: the plugin needs 7.2+
+#   demo       .wp-env.demo.json       nightly build  :8873  for trying by hand: plugin only, defaults,
+#                                                            no test fixtures. Never part of "all"
+#   multisite  .wp-env.multisite.json  nightly build  :8876  subdirectory network, plugin network-active,
+#                                                            subsite at /sub/. Never part of "all"
 #
 # Usage: scripts/env.sh <start|stop|destroy|status|open|wp> [env] [args...]
-#   env defaults to "all" (the test sites, not demo) for start/stop/destroy/status/open.
+#   env defaults to "all" (the test sites, not demo or multisite) for start/stop/destroy/status/open.
 #   wp requires an env: scripts/env.sh wp nightly plugin list
 set -euo pipefail
 
@@ -18,6 +20,7 @@ url_for() {
 	case "$1" in
 		nightly) echo "http://localhost:8872" ;;
 		demo) echo "http://localhost:8873" ;;
+		multisite) echo "http://localhost:8876" ;;
 	esac
 }
 
@@ -25,7 +28,8 @@ config_for() {
 	case "$1" in
 		nightly) echo ".wp-env.nightly.json" ;;
 		demo) echo ".wp-env.demo.json" ;;
-		*) echo "unknown env: $1 (expected nightly or demo)" >&2; exit 2 ;;
+		multisite) echo ".wp-env.multisite.json" ;;
+		*) echo "unknown env: $1 (expected nightly, demo or multisite)" >&2; exit 2 ;;
 	esac
 }
 
@@ -48,6 +52,19 @@ case "$cmd" in
 				"${WP_ENV[@]}" run cli --config="$config" wp plugin activate wp-http-query >/dev/null
 				"${WP_ENV[@]}" run cli --config="$config" wp rewrite structure '/%postname%/' --hard >/dev/null
 				"${WP_ENV[@]}" run cli --config="$config" wp core version
+				continue
+			fi
+			if [[ "$env" == "multisite" ]]; then
+				# Network-activated, as a network admin would, plus a subsite so REST is
+				# tested under a site path (/sub/wp-json/). Each site has its own
+				# permalink setting; the tests need pretty permalinks on both.
+				wp=("${WP_ENV[@]}" run cli --config="$config" wp)
+				"${wp[@]}" plugin activate wp-http-query query-route-example --network >/dev/null
+				"${wp[@]}" site list --field=path | grep -x '/sub/' >/dev/null || "${wp[@]}" site create --slug=sub --title=Sub >/dev/null
+				for path in / /sub/; do
+					"${wp[@]}" rewrite structure '/%postname%/' --url="$(url_for multisite)$path" >/dev/null
+				done
+				"${wp[@]}" core version
 				continue
 			fi
 			# Mapped rather than listed under "plugins" so the slug is wp-http-query,
@@ -85,11 +102,11 @@ case "$cmd" in
 		done
 		;;
 	wp)
-		env="${1:?usage: scripts/env.sh wp <nightly|demo> <wp-cli args...>}"; shift
+		env="${1:?usage: scripts/env.sh wp <nightly|demo|multisite> <wp-cli args...>}"; shift
 		"${WP_ENV[@]}" run cli --config="$(config_for "$env")" wp "$@"
 		;;
 	*)
-		sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
+		sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
 		exit 2
 		;;
 esac

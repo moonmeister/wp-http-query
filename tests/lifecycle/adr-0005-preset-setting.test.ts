@@ -18,6 +18,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CORE_COLLECTIONS, FIXTURE_OPTED_IN_ROUTE, rest } from '../http';
+import { wpArgs } from '../seed';
 import { NO_LOCAL_CLI, sites } from '../sites';
 import {
 	deleteOption,
@@ -38,7 +39,7 @@ const ENV_SH = fileURLToPath( new URL( '../../scripts/env.sh', import.meta.url )
 function setOptionCapturingStderr( site: ( typeof sites )[ number ], name: string, value: unknown ): string {
 	const result = spawnSync(
 		ENV_SH,
-		[ 'wp', site.key, 'option', 'update', name, JSON.stringify( value ), '--format=json' ],
+		wpArgs( site, [ 'option', 'update', name, JSON.stringify( value ), '--format=json' ] ),
 		{ encoding: 'utf8' }
 	);
 	if ( result.status !== 0 ) {

@@ -18,7 +18,8 @@ import { NO_LOCAL_CLI, sites } from '../sites';
 import { FRESH, Session } from './session';
 import { deleteOption, FIXTURE_DEMO_ROUTE_OFF, setOption, snapshotOption } from './site-state';
 
-const SUBSCRIBER = 'wphq-demo-subscriber';
+// Letters only: multisite rejects usernames with anything else.
+const SUBSCRIBER = 'wphqdemosubscriber';
 const SUBSCRIBER_PASSWORD = 'wphq-demo-subscriber-password';
 
 describe.each( sites )( 'demo route: $label', ( site ) => {
@@ -31,9 +32,11 @@ describe.each( sites )( 'demo route: $label', ( site ) => {
 	const subscriber = new Session( site, SUBSCRIBER, SUBSCRIBER_PASSWORD );
 	let restoreSwitch = () => {};
 
+	// On a network, users belong to the network: a site-level delete only removes them from the site.
+	const network = site.network ? [ '--network' ] : [];
 	const deleteSubscriber = () => {
-		if ( wp( site, [ 'user', 'list', `--login=${ SUBSCRIBER }`, '--format=count' ] ).trim() !== '0' ) {
-			wp( site, [ 'user', 'delete', SUBSCRIBER, '--yes' ] );
+		if ( wp( site, [ 'user', 'list', `--login=${ SUBSCRIBER }`, '--format=count', ...network ] ).trim() !== '0' ) {
+			wp( site, [ 'user', 'delete', SUBSCRIBER, '--yes', ...network ] );
 		}
 	};
 

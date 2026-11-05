@@ -51,12 +51,15 @@ export function snapshotOption( site: Site, name: string ): () => void {
 	};
 }
 
+/** On a network, the plugin is network-activated, so (de)activation is network-wide too. */
+const scope = ( site: Site ): string[] => ( site.network ? [ '--network' ] : [] );
+
 export function activatePlugin( site: Site ): void {
-	wp( site, [ 'plugin', 'activate', PLUGIN ] );
+	wp( site, [ 'plugin', 'activate', PLUGIN, ...scope( site ) ] );
 }
 
 export function deactivatePlugin( site: Site ): void {
-	wp( site, [ 'plugin', 'deactivate', PLUGIN ] );
+	wp( site, [ 'plugin', 'deactivate', PLUGIN, ...scope( site ) ] );
 }
 
 /**
@@ -69,5 +72,11 @@ export function deactivatePlugin( site: Site ): void {
  * uninstall.php.
  */
 export function uninstallPluginKeepingFiles( site: Site ): void {
+	// --deactivate doesn't network-deactivate: WP-CLI warns, leaves the plugin
+	// network-active, and uninstalls it anyway. Deactivate it as the network
+	// admin screen requires first.
+	if ( site.network ) {
+		deactivatePlugin( site );
+	}
 	wp( site, [ 'plugin', 'uninstall', PLUGIN, '--deactivate', '--skip-delete' ] );
 }
