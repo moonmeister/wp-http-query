@@ -68,5 +68,5 @@ vendor: composer.json composer.lock
 	composer install
 	@touch vendor
 
-lint: vendor ## Check plugin/ against WordPress Coding Standards and PHP 8.0+ (needs PHP + Composer)
+lint: vendor ## Check plugin/ against WordPress Coding Standards and PHP 7.4+ (needs PHP + Composer)
 	vendor/bin/phpcs
