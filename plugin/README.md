@@ -207,8 +207,10 @@ own stack.
 
 ### Fixing a 403 from a hardening rule
 
-**Check the web server's access log, not PHP's.** These rules answer before PHP runs, so a `403`
-with nothing in the PHP or WordPress log came from the web server.
+**First, check who sent it.** A `403` from WordPress has a JSON body with a `code` such as
+`rest_forbidden`, and the self-test reports it as a WordPress error, not a server rule. A `403`
+without that, and with nothing in the PHP or WordPress log, points to a rule that answered before
+PHP ran: check the web server's access log, not PHP's.
 
 **Widening the rule is your call.** Someone added it to shrink what the site accepts, so letting
 `QUERY` through is a security decision for whoever runs the server.
@@ -232,10 +234,20 @@ this trap ([matrix notes](../matrix/README.md#two-traps-this-harness-fell-into-b
 
 **nginx.** There's no clean fix. `limit_except` can't name `QUERY`: nginx has no method identifier
 for it as of 2026-08-10, so `limit_except GET POST QUERY` is a config error and nginx won't start
-([docs/ecosystem.md](../docs/ecosystem.md#nginx--no-native-method-identifier)). The only way to let
-`QUERY` through is to remove `limit_except` from every location a REST request passes through
-(usually `location /` and `location ~ \.php$`), which drops the restriction for every other
-method too.
+([docs/ecosystem.md](../docs/ecosystem.md#nginx--no-native-method-identifier)). nginx does keep
+the method's name in `$request_method`, which is how `QUERY` reaches PHP intact, so you can replace
+`limit_except` in each location a REST request passes through (usually `location /` and
+`location ~ \.php$`) with a check on that name:
+
+```nginx
+if ($request_method !~ ^(GET|HEAD|POST|QUERY)$) {
+    return 403;
+}
+```
+
+This project's matrix hasn't tested this rule, so send `QUERY` and `DELETE` to confirm it lets the
+first through and still refuses the second. The other way is to remove `limit_except` from those
+locations, which drops the restriction for every method.
 
 ## Choosing which routes accept QUERY
 
