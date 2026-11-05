@@ -18,9 +18,9 @@
  * Access-Control-Request-Method: QUERY. Server only: this page's own requests
  * are same-origin, so the browser never preflights them.
  *
- * The two "reaches WordPress" checks and the CORS check run at the same
- * time; the two cache checks run after them, one after the other, because
- * their probe pairs go to the same URL and must not interleave. Results always render in the same
+ * The checks run at the same time, except the two cache checks (serial):
+ * they run after the others, one after the other, because their probe
+ * pairs go to the same URL and must not interleave. Results always render in the same
  * order.
  *
  * What a response means is decided in PHP, once (diagnose_echo_response(),
@@ -223,7 +223,7 @@
 		if ( 'string' !== typeof requested ) {
 			requested = result.signed_in ? requested.signedIn : requested.anonymous;
 		}
-		sent.appendChild( el( 'code', '', format( requested, path( url ), config.corsOrigin ) ) );
+		sent.appendChild( el( 'code', '', format( requested, path( url ) ) ) );
 		if ( result.http_statuses && result.http_statuses.length ) {
 			sent.appendChild( document.createTextNode( ' ' + format( i18n.httpStatus, result.http_statuses.join( ', ' ) ) ) );
 		}
@@ -255,7 +255,7 @@
 			description: i18n.groups.browser.description,
 			checks: [
 				{ id: 'browser-echo', key: 'browserEcho', check: 'echo', url: config.echoUrl, sent: i18n.sent.browserEcho, run: browserEcho },
-				{ id: 'browser-cache', key: 'browserCache', check: 'cache', url: config.fingerprintUrl, sent: i18n.sent.browserCache, run: browserCache },
+				{ id: 'browser-cache', key: 'browserCache', check: 'cache', serial: true, url: config.fingerprintUrl, sent: i18n.sent.browserCache, run: browserCache },
 			],
 		},
 		{
@@ -277,6 +277,7 @@
 					id: 'server-cache',
 					key: 'serverCache',
 					check: 'cache',
+					serial: true,
 					url: config.fingerprintUrl,
 					sent: i18n.sent.serverCache,
 					run: function () {
@@ -297,18 +298,19 @@
 		},
 	];
 
-	GROUPS.forEach( function ( group ) {
-		group.checks.forEach( function ( check ) {
-			check.title = i18n.checks[ check.key ];
-			check.description = i18n.descriptions[ check.check ];
-		} );
+	/** Every check, in display order. */
+	var CHECKS = GROUPS.reduce( function ( all, group ) {
+		return all.concat( group.checks );
+	}, [] );
+
+	CHECKS.forEach( function ( check ) {
+		check.title = i18n.checks[ check.key ];
+		check.description = i18n.descriptions[ check.check ];
 	} );
 
-	var browserEchoCheck = GROUPS[ 0 ].checks[ 0 ];
-	var browserCacheCheck = GROUPS[ 0 ].checks[ 1 ];
-	var serverEchoCheck = GROUPS[ 1 ].checks[ 0 ];
-	var serverCacheCheck = GROUPS[ 1 ].checks[ 1 ];
-	var serverCorsCheck = GROUPS[ 1 ].checks[ 2 ];
+	async function run( check ) {
+		check.result = await attempt( check );
+	}
 
 	function summary( checks ) {
 		var problems = checks.filter( function ( check ) {
@@ -335,15 +337,20 @@
 		output.textContent = '';
 		output.appendChild( el( 'p', '', i18n.running ) );
 
-		var first = await Promise.all( [ attempt( browserEchoCheck ), attempt( serverEchoCheck ), attempt( serverCorsCheck ) ] );
-		browserEchoCheck.result = first[ 0 ];
-		serverEchoCheck.result = first[ 1 ];
-		serverCorsCheck.result = first[ 2 ];
-		browserCacheCheck.result = await attempt( browserCacheCheck );
-		serverCacheCheck.result = await attempt( serverCacheCheck );
+		await Promise.all(
+			CHECKS.filter( function ( check ) {
+				return ! check.serial;
+			} ).map( run )
+		);
+		var serial = CHECKS.filter( function ( check ) {
+			return check.serial;
+		} );
+		for ( var i = 0; i < serial.length; i++ ) {
+			await run( serial[ i ] );
+		}
 
 		output.textContent = '';
-		output.appendChild( summary( [ browserEchoCheck, browserCacheCheck, serverEchoCheck, serverCacheCheck, serverCorsCheck ] ) );
+		output.appendChild( summary( CHECKS ) );
 		GROUPS.forEach( function ( group ) {
 			var section = el( 'div', 'wp-http-query-self-test-group' );
 			section.setAttribute( 'data-group', group.id );

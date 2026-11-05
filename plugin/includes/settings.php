@@ -302,13 +302,21 @@ add_action(
  * @return array
  */
 function self_test_script_data(): array {
+	// One title per check the button runs.
+	$checks = array(
+		'browserEcho'  => __( 'QUERY reaches WordPress from your browser', 'wp-http-query' ),
+		'browserCache' => __( 'No cache between your browser and WordPress stores QUERY responses', 'wp-http-query' ),
+		'serverEcho'   => __( 'QUERY reaches WordPress from the server itself', 'wp-http-query' ),
+		'serverCache'  => __( 'No cache on the server’s own path stores QUERY responses', 'wp-http-query' ),
+		'serverCors'   => __( 'Pages on other sites may send QUERY (CORS)', 'wp-http-query' ),
+	);
+
 	return array(
 		'echoUrl'        => rest_url( ECHO_ROUTE ),
 		'fingerprintUrl' => rest_url( FINGERPRINT_ROUTE ),
 		'serverUrl'      => rest_url( SERVER_ROUTE ),
 		'cacheUrl'       => rest_url( CACHE_ROUTE ),
 		'corsUrl'        => rest_url( CORS_ROUTE ),
-		'corsOrigin'     => CORS_TEST_ORIGIN,
 		'diagnoseUrl'    => rest_url( DIAGNOSE_ROUTE ),
 		'nonce'          => wp_create_nonce( 'wp_rest' ),
 		'markerKey'      => SELF_TEST_MARKER_KEY,
@@ -324,13 +332,7 @@ function self_test_script_data(): array {
 					'description' => __( 'WordPress calls itself (a loopback). Tests the web server and PHP; usually skips the CDN, but catches page-cache plugins.', 'wp-http-query' ),
 				),
 			),
-			'checks'       => array(
-				'browserEcho'  => __( 'QUERY reaches WordPress from your browser', 'wp-http-query' ),
-				'browserCache' => __( 'No cache between your browser and WordPress stores QUERY responses', 'wp-http-query' ),
-				'serverEcho'   => __( 'QUERY reaches WordPress from the server itself', 'wp-http-query' ),
-				'serverCache'  => __( 'No cache on the server’s own path stores QUERY responses', 'wp-http-query' ),
-				'serverCors'   => __( 'Pages on other sites may send QUERY (CORS)', 'wp-http-query' ),
-			),
+			'checks'       => $checks,
 			'descriptions' => array(
 				'echo'  => __( 'Sends one QUERY with a JSON body, and checks that WordPress gets the method and the body intact.', 'wp-http-query' ),
 				'cache' => __( 'Sends two anonymous QUERYs with different bodies to the same URL, and checks that the answers differ.', 'wp-http-query' ),
@@ -349,10 +351,15 @@ function self_test_script_data(): array {
 				),
 				/* translators: %s: URL path. */
 				'serverCache'  => __( 'The server sent itself: 2 × QUERY %s, anonymous', 'wp-http-query' ),
-				/* translators: 1: URL path. 2: An origin, such as https://example.com. */
-				'serverCors'   => __( 'The server sent itself: OPTIONS %1$s, Origin: %2$s, Access-Control-Request-Method: QUERY, anonymous', 'wp-http-query' ),
+				// The origin filled in here; the path, %1$s, by the script.
+				'serverCors'   => sprintf(
+					/* translators: 1: URL path. 2: An origin, such as https://example.com. */
+					__( 'The server sent itself: OPTIONS %1$s, Origin: %2$s, Access-Control-Request-Method: QUERY, anonymous', 'wp-http-query' ),
+					'%1$s',
+					CORS_TEST_ORIGIN
+				),
 			),
-			'summary'      => self_test_summary_strings( 2 + count( server_checks() ) ), // The two browser checks, and the server's.
+			'summary'      => self_test_summary_strings( count( $checks ) ),
 			/* translators: 1: A check's title. 2: Its result, such as "passed". */
 			'titleStatus'  => __( '%1$s: %2$s', 'wp-http-query' ),
 			'status'       => array(
