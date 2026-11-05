@@ -21,8 +21,9 @@ own routes, and sending it.
   which body format to use.
 - **Adds `QUERY` to the routes you choose**, and to no others. See
   [Choosing which routes accept QUERY](#choosing-which-routes-accept-query).
-- **Tests your server.** A button on **Settings → HTTP QUERY**, and two Site Health tests, check
-  that `QUERY` reaches WordPress intact and that no cache stores `QUERY` responses. See
+- **Tests your server.** A button on **Settings → HTTP QUERY**, and three Site Health tests, check
+  that `QUERY` reaches WordPress intact, that no cache stores `QUERY` responses, and that CORS
+  lets pages on other sites send `QUERY`. See
   [Check your server](#check-your-server).
 
 It stores one option and adds no tables, cron jobs or cache headers.
@@ -75,8 +76,8 @@ If the setting has a note saying code overrides it, a plugin or theme on your si
 
 ## Check your server
 
-Go to **Settings → HTTP QUERY** and click **Test your server**. It runs four checks, in two
-groups, and explains each result in plain language. A summary line comes first: **All 4 checks
+Go to **Settings → HTTP QUERY** and click **Test your server**. It runs five checks, in two
+groups, and explains each result in plain language. A summary line comes first: **All 5 checks
 passed**, or how many problems it found and which checks they are.
 
 **From your browser** goes through everything in front of your site (CDN, proxy, firewall), the
@@ -90,12 +91,14 @@ page-cache plugins.
 | No cache between your browser and WordPress stores `QUERY` responses | Two anonymous `QUERY`s with different bodies to the same URL. Checks the second answer isn't the first one again |
 | `QUERY` reaches WordPress from the server itself | The same echo check, sent by your site to itself |
 | No cache on the server's own path stores `QUERY` responses | The same cache check, sent by your site to itself |
+| Pages on other sites may send `QUERY` (CORS) | The preflight a browser on another site sends before a `QUERY`: an anonymous `OPTIONS` to the cache check's route, with `Origin: https://cross-origin.example` and `Access-Control-Request-Method: QUERY`. Checks that `Access-Control-Allow-Methods` includes `QUERY`. Server only: the browser checks run on your own site, so the browser never sends a preflight |
 
 Each result shows the request it made (method, URL path, signed in or anonymous), the HTTP status,
 and one line saying why.
 
-**Site Health** (**Tools → Site Health**) runs the two server checks too, as **HTTP QUERY requests
-reach WordPress** and **No cache was seen storing HTTP QUERY responses**.
+**Site Health** (**Tools → Site Health**) runs the three server checks too, as **HTTP QUERY requests
+reach WordPress**, **No cache was seen storing HTTP QUERY responses** and **CORS allows HTTP QUERY
+requests from other sites**.
 
 The tests send a few small requests to your own site and change nothing. You need the
 `manage_options` capability.
@@ -123,6 +126,8 @@ Sample result, from an nginx site using plain permalinks:
 | `Accept-Query` missing | `QUERY` works, but something in front of WordPress strips the header clients use to find the body format |
 | Your browser can't send `QUERY` | The browser, not your server. The server checks still apply |
 | Network error | The request didn't complete. If Site Health's loopback test fails too, fix that first |
+| No CORS headers at all | The site turned REST CORS off (core sends the headers by default), often with a security plugin. The plugin respects that and doesn't turn it back on, so Site Health marks it **recommended**, not failed. Pages on other sites can't call your REST API from a browser with any method |
+| CORS headers without `QUERY` | Something overrides the method list. Before WordPress 7.2, most likely another plugin that handles CORS, or a server rule, sending its own `Access-Control-Allow-Methods`. From 7.2, also a `rest_allowed_cors_methods` callback that removes `QUERY`. Add `QUERY` back there |
 | A cache is storing `QUERY` responses | Two different bodies got the same answer, so one visitor's search can get another's results. The cache-related headers seen (`Age`, `X-Cache`, `CF-Cache-Status`, `X-Varnish`, `X-LiteSpeed-Cache` and others) are listed, with a guess at the vendor. A guess, not proof |
 
 Site Health marks a failed check **critical**, and one that couldn't tell **recommended**.
@@ -327,7 +332,8 @@ It's admins only whatever `WP_DEBUG` says, since staging sites that anyone can r
 The self-test's cache check uses a second route, `QUERY /wp-json/wp-http-query/v1/self-test/fingerprint`.
 It's public, because caches usually skip signed-in requests, and safe to be: it answers with a
 SHA-256 of the body it received and a value that's new on every request, and nothing else. It
-echoes nothing back and sends no cache headers of its own.
+echoes nothing back and sends no cache headers of its own. The CORS check sends its preflight
+there too, since the plugin always registers it for `QUERY`.
 
 ## Data
 
