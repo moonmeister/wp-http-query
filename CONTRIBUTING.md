@@ -206,8 +206,10 @@ experiments/          One-off research: blast radius, cache survey, plugin spike
 ```
 
 The forks are sibling checkouts, deliberately not submodules: they track upstream on upstream's
-schedule and get rebased independently. `experiments/blast-radius/run.sh` expects
-`../wordpress-develop`.
+schedule and get rebased independently. Only the ADR 0002 blast-radius experiment uses the core
+fork, and it needs more than the sibling checkout (a scratch worktree at a pinned commit, a running
+`wordpress-develop` Docker stack, and a separate test database): see
+[experiments/blast-radius/README.md](experiments/blast-radius/README.md#reproducing).
 
 ```
 ~/code/moonmeister/
