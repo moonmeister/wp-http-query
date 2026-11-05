@@ -29,8 +29,9 @@ make demo
 ```
 
 This starts WordPress at <http://localhost:8873> with the plugin active. Log in as `admin` /
-`password`. No route accepts `QUERY` until you tick **Core collections** on
-**Settings → HTTP QUERY**. [CONTRIBUTING.md](CONTRIBUTING.md#try-it-by-hand) has a walkthrough and the other
+`password`. The plugin's own routes and the **Test your server** button work straight away;
+WordPress's own routes (posts, pages, search…) accept `QUERY` once you tick **Core collections**
+on **Settings → HTTP QUERY**. [CONTRIBUTING.md](CONTRIBUTING.md#try-it-by-hand) has a walkthrough and the other
 commands.
 
 ## Status

@@ -695,13 +695,17 @@ and its body reach PHP — was the gating unknown and is answered. What remains:
 1. ~~**Read [Trac#65616](https://core.trac.wordpress.org/ticket/65616) and finish Q3.**~~
    **Done 2026-08-16.** The ticket is real, uncontested, comment-free and tagged `2nd-opinion`.
    Engagement with an open thread, not a fresh proposal.
-2. **Settle [ADRs 0001–0004](decisions/).** The only remaining blockers are decisions, and
-   **none of them is blocked on anything external any more.**
-3. ~~**Write the patch, and prove it with the feature plugin** on stock core.~~ **Reordered
-   2026-11-04: plugin first.** Design the plugin's opt-in reach options
-   ([ADR 0005](decisions/0005-reach-for-existing-read-routes.md); never all routes by default), run it on a real install ([#22](https://github.com/moonmeister/wp-http-query/issues/22)), and publish it
-   ([#23](https://github.com/moonmeister/wp-http-query/issues/23)). The core patches are written on `feat-http-query` and parked.
-4. **Bring plugin, usage and matrix results to the existing ticket**, with the core patches.
+2. ~~**Settle [ADRs 0001–0004](decisions/).**~~ **Done for the plugin.** ADRs 0001–0003 are
+   decided and ADR 0005 is settled for the plugin (opt-in reach). ADR 0004 (`Location`
+   indirection) is planned as a plugin feature in
+   [#19](https://github.com/moonmeister/wp-http-query/issues/19).
+3. ~~**Ship the plugin.**~~ **Done: [v0.1.0](https://github.com/moonmeister/wp-http-query/releases/tag/v0.1.0),
+   2026-11-05.** Opt-in reach, tested on real installs
+   ([#22](https://github.com/moonmeister/wp-http-query/issues/22)), and published
+   ([#23](https://github.com/moonmeister/wp-http-query/issues/23)).
+4. **Next: small core patches to [Trac#65616](https://core.trac.wordpress.org/ticket/65616)**, one
+   at a time, each arguing from what the plugin has proven. The order and status are tracked in
+   [#60](https://github.com/moonmeister/wp-http-query/issues/60).
 
 Deliberate ordering: arrive with a shipped plugin and evidence rather than a patch and
 an argument. Both core defects found on the way are already fixed for 7.2
