@@ -232,12 +232,12 @@ one context, so an unscoped `Require all granted` next to `<LimitExcept GET POST
 `curl -i -X DELETE` the site; Apache should answer `403`. This project's own test config fell into
 this trap ([matrix notes](../matrix/README.md#two-traps-this-harness-fell-into-both-now-guarded)).
 
-**nginx.** There's no clean fix. `limit_except` can't name `QUERY`: nginx has no method identifier
-for it as of 2026-08-10, so `limit_except GET POST QUERY` is a config error and nginx won't start
-([docs/ecosystem.md](../docs/ecosystem.md#nginx--no-native-method-identifier)). nginx does keep
-the method's name in `$request_method`, which is how `QUERY` reaches PHP intact, so you can replace
-`limit_except` in each location a REST request passes through (usually `location /` and
-`location ~ \.php$`) with a check on that name:
+**nginx.** `limit_except` can't name `QUERY`: nginx has no method identifier for it, so
+`limit_except GET POST QUERY` is a config error (`invalid method "QUERY"`) and nginx won't start
+([docs/ecosystem.md](../docs/ecosystem.md#nginx--no-native-method-identifier)). A plain
+`limit_except GET POST` refuses `QUERY` with a `403`. Instead, write the allowlist as a check on
+`$request_method`, which keeps the method's name, in each location a REST request passes through
+(usually `location /` and `location ~ \.php$`):
 
 ```nginx
 if ($request_method !~ ^(GET|HEAD|POST|QUERY)$) {
@@ -245,9 +245,8 @@ if ($request_method !~ ^(GET|HEAD|POST|QUERY)$) {
 }
 ```
 
-This project's matrix hasn't tested this rule, so send `QUERY` and `DELETE` to confirm it lets the
-first through and still refuses the second. The other way is to remove `limit_except` from those
-locations, which drops the restriction for every method.
+Tested on nginx 1.30.6 (2026-11-05): `GET` and `QUERY` get through, `DELETE` gets a `403`. Send
+`QUERY` and `DELETE` to your own site to confirm the same.
 
 ## Choosing which routes accept QUERY
 
