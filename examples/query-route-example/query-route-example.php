@@ -73,7 +73,6 @@ add_action(
 
 		$query = query_method();
 		if ( null !== $query ) {
-			// String form, so cores before 7.2 can't trip Trac#65905.
 			$read_methods .= ', ' . $query;
 		}
 

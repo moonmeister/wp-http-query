@@ -5,7 +5,7 @@
 
 A WordPress plugin that adds the HTTP `QUERY` method
 ([RFC 10008](https://www.rfc-editor.org/rfc/rfc10008.html)) to the REST API. It works on stock
-WordPress 7.0 and later, with no core patch. `QUERY` is a read request that carries a body, for
+WordPress 7.2 and later, with no core patch. `QUERY` is a read request that carries a body, for
 searches and filters too large or too structured for a URL. The plugin is for site owners who want
 their REST API to accept it, and for plugin developers who want their routes to.
 
@@ -36,9 +36,10 @@ commands.
 
 ## Status
 
-[v0.1.0](https://github.com/moonmeister/wp-http-query/releases/tag/v0.1.0) prerelease ·
-WordPress 7.0+ · PHP 8.0+ · next release: the
-[v0.2.0 milestone](https://github.com/moonmeister/wp-http-query/milestone/5) · route to core:
+[v0.1.0](https://github.com/moonmeister/wp-http-query/releases/tag/v0.1.0) prerelease
+(WordPress 7.0+) · PHP 8.0+ · next release: the
+[v0.2.0 milestone](https://github.com/moonmeister/wp-http-query/milestone/5), which needs
+WordPress 7.2+ · route to core:
 [#60](https://github.com/moonmeister/wp-http-query/issues/60), likely a direct core patch on
 [Trac#65616](https://core.trac.wordpress.org/ticket/65616) rather than a feature plugin.
 
