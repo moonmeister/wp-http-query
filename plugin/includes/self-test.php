@@ -107,7 +107,7 @@ function server_checks(): array {
 			'labels' => array(
 				'good'        => __( 'CORS allows HTTP QUERY requests from other sites', 'wp-http-query' ),
 				'recommended' => __( 'Couldn’t confirm that CORS allows HTTP QUERY requests from other sites', 'wp-http-query' ),
-				'critical'    => __( 'CORS leaves HTTP QUERY out of the methods it allows', 'wp-http-query' ),
+				'critical'    => __( 'CORS blocks HTTP QUERY requests from other sites', 'wp-http-query' ),
 			),
 		),
 	);

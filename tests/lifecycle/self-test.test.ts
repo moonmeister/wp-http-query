@@ -181,9 +181,9 @@ const CACHE_CASES: Record< string, { first: object; second: object; verdict: str
 };
 
 const CORE_LIST = CORE_CORS_METHODS.join( ', ' );
-const CORS_ON = { 'Access-Control-Allow-Origin': CORS_ORIGIN, 'Access-Control-Allow-Credentials': 'true', Vary: 'Origin' };
 // Sent on every REST response, CORS on or off: not a sign CORS is on.
 const ALWAYS = { 'Access-Control-Allow-Headers': 'Authorization, X-WP-Nonce, Content-Type', 'Access-Control-Expose-Headers': 'X-WP-Total' };
+const CORS_ON = { ...ALWAYS, 'Access-Control-Allow-Origin': CORS_ORIGIN, 'Access-Control-Allow-Credentials': 'true', Vary: 'Origin' };
 
 /**
  * Fabricated preflight responses => expected verdict. filterable: false is
@@ -191,7 +191,7 @@ const ALWAYS = { 'Access-Control-Allow-Headers': 'Authorization, X-WP-Nonce, Con
  */
 const CORS_CASES: Record< string, { response: Observation; filterable: boolean; verdict: string; status: string; says?: string[]; never?: string } > = {
 	'QUERY in the list': {
-		response: seen( 200, { ...ALWAYS, ...CORS_ON, 'Access-Control-Allow-Methods': `${ CORE_LIST }, QUERY` } ),
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': `${ CORE_LIST }, QUERY` } ),
 		filterable: false,
 		verdict: 'cors_query',
 		status: 'good',
@@ -204,7 +204,7 @@ const CORS_CASES: Record< string, { response: Observation; filterable: boolean; 
 		status: 'good',
 	},
 	'wildcard origin and methods': {
-		response: seen( 200, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': '*' } ),
+		response: seen( 200, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': '*', 'Access-Control-Allow-Headers': '*' } ),
 		filterable: true,
 		verdict: 'cors_query',
 		status: 'good',
@@ -240,6 +240,27 @@ const CORS_CASES: Record< string, { response: Observation; filterable: boolean; 
 		filterable: true,
 		verdict: 'cors_no_query',
 		status: 'critical',
+	},
+	'Content-Type not among the allowed headers': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Headers': 'Authorization, X-WP-Nonce', 'Access-Control-Allow-Methods': `${ CORE_LIST }, QUERY` } ),
+		filterable: true,
+		verdict: 'cors_no_content_type',
+		status: 'critical',
+		says: [ '(Authorization, X-WP-Nonce) leaves out Content-Type' ],
+	},
+	'no Access-Control-Allow-Headers': {
+		response: seen( 200, { 'Access-Control-Allow-Origin': CORS_ORIGIN, 'Access-Control-Allow-Methods': 'QUERY' } ),
+		filterable: false,
+		verdict: 'cors_no_content_type',
+		status: 'critical',
+		says: [ '(none)' ],
+	},
+	// Header names are case-insensitive.
+	'lower-case content-type allowed': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Allow-Methods': 'QUERY' } ),
+		filterable: true,
+		verdict: 'cors_query',
+		status: 'good',
 	},
 	'CORS off: only the headers sent on every response': {
 		response: seen( 200, ALWAYS ),
