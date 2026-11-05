@@ -62,6 +62,8 @@ const DEMO_ROUTE_OFF = 'wp_http_query_fixture_demo_route_off';
  * - remove-late: removes core's handler, turning REST CORS off.
  * - competing: adds a callback after core's handler that sends restricted CORS
  *   headers, as a CORS plugin might: 'origin', 'methods', no credentials.
+ * - filter-removes-query: adds a rest_allowed_cors_methods callback, after
+ *   the plugin's, that takes QUERY out of the list.
  */
 const CORS = 'wp_http_query_fixture_cors';
 
@@ -91,6 +93,13 @@ add_action(
 						return $value;
 					},
 					10
+				);
+				break;
+			case 'filter-removes-query':
+				add_filter(
+					'rest_allowed_cors_methods',
+					static fn ( array $methods ): array => array_values( array_diff( $methods, array( 'QUERY' ) ) ),
+					20
 				);
 				break;
 		}
