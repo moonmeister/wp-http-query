@@ -89,7 +89,8 @@ Standalone issues from the same period:
 position (done);
 [#32](https://github.com/moonmeister/wp-http-query/issues/32) documents the hardening-allowlist 403
 and the Varnish 8.0 – 9.0.x `501`, fixed upstream in 9.1.0 (v0.2.0);
-[#33](https://github.com/moonmeister/wp-http-query/issues/33) matrix Axis A leftovers (done);
+[#33](https://github.com/moonmeister/wp-http-query/issues/33) matrix Axis A leftovers (HTTP/2, HTTP/3, TLS, OpenLiteSpeed), closed as not planned: the plugin's
+self-test and Site Health checks gather that evidence from real hosts instead of a bigger lab matrix;
 [#36](https://github.com/moonmeister/wp-http-query/issues/36) filed the array-form `methods` bug
 (see below); and
 [#39](https://github.com/moonmeister/wp-http-query/issues/39) proposed reporting two page-cache

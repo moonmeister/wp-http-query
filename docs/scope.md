@@ -1,6 +1,6 @@
 # Scope: HTTP QUERY support in WordPress
 
-**Status:** plugin first. The feature plugin is the deliverable; core patches are parked until it ships (decided 2026-11-04, see §8)
+**Status:** plugin first (decided 2026-11-04, see §8). The plugin shipped as v0.1.0; core gets small, separate patches on [Trac#65616](https://core.trac.wordpress.org/ticket/65616), per [#60](https://github.com/moonmeister/wp-http-query/issues/60)
 **Core baseline:** `7.2-alpha-63166-src` @ `e7739d5414`
 **Trunk references verified:** 2026-08-16
 
