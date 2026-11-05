@@ -4,7 +4,7 @@
  * All come from scripts/env.sh (`make up`): the last two releases, pinned, and
  * nightly. The plugin has two CORS code paths: 7.2 added the
  * `rest_allowed_cors_methods` filter (r64730), so nightly uses it and 7.0/7.1
- * use the plugin's replacement handler.
+ * wrap core's handler.
  *
  * Limit with SITES, e.g. SITES=7.0,nightly. Override a URL with WP_70_URL,
  * WP_71_URL or WP_NIGHTLY_URL to point the suite at another install.
