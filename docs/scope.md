@@ -336,7 +336,7 @@ One real cost, and it is not BC:
 > versioning, is the reason to defer first-adopter work to its own ticket."* The survey in
 > §4.1 shows no CDN will cache a `QUERY` response at all, so a first-adopter core endpoint
 > carries no extra caching risk. **First-adopter work stays deferred on effort and reviewer
-> scope, not on safety** — [#34](../../issues/34).
+> scope, not on safety** — [#34](https://github.com/moonmeister/wp-http-query/issues/34).
 
 ### Anticipated objection
 
@@ -408,7 +408,7 @@ have reached that layer at all. It decides in PHP on the write path and honors
 See [ADR 0003](decisions/0003-cache-safety-default.md) for the decision and the reasoning error
 behind the original text. The stray availability finding — Varnish's `501`, in
 8.0 – 9.0.x only — is a **deployment** problem, not a caching one; it belongs with the hardening-allowlist 403 in
-[#32](../../issues/32).
+[#32](https://github.com/moonmeister/wp-http-query/issues/32).
 
 ### 4.2 The `Location` indirection — ours, if adopted
 
@@ -474,7 +474,7 @@ The gaps are contract and ergonomics, not capability:
    for an idempotent method, but untested and undocumented.
 
 > **Process constraint:** `src/wp-includes/Requests/` is a vendored copy of the external
-> [WpOrg/Requests](https://github.com/WpOrg/Requests) library. WordPress core does **not**
+> [WordPress/Requests](https://github.com/WordPress/Requests) library. WordPress core does **not**
 > accept direct patches to vendored dependencies — the `QUERY` constant and any transport
 > changes must land upstream first and be pulled in on the next Requests sync.
 >
@@ -652,7 +652,7 @@ on **option B**, additive `QUERYABLE`, nothing migrates. The defaults half is st
 [ADR 0005](decisions/0005-reach-for-existing-read-routes.md) — does core grant existing read routes
 `QUERY`, and by what mechanism?
 
-What changed: [#38](../../issues/38)'s sweep supplied the missing number and then some. Handlers
+What changed: [#38](https://github.com/moonmeister/wp-http-query/issues/38)'s sweep supplied the missing number and then some. Handlers
 that branch on `$request->get_method()` do break — 28–65 plugins / 0.82M–11.96M installs carry the
 shape, and Jetpack (3M) performs a write on a `QUERY` to a `READABLE` route. That killed the D
 lean. **It does not settle Q4**, because option B's cost is that `QUERY` arrives route by route,
@@ -684,7 +684,8 @@ from its current behavior of leaving it alone?
 ## 8. Sequencing
 
 **Task breakdown: [GitHub issues](https://github.com/moonmeister/wp-http-query/issues)**, mapped
-in the README under [Where the work lands](../README.md#where-the-work-lands). They track who
+in [background.md](background.md#where-the-work-lands) and ordered on the
+[project board](https://github.com/users/moonmeister/projects/1). They track who
 does what and where — the work lands in six places, only one of which we control. This section
 states the ordering principle; it deliberately does not duplicate the task list.
 
@@ -698,8 +699,8 @@ and its body reach PHP — was the gating unknown and is answered. What remains:
    **none of them is blocked on anything external any more.**
 3. ~~**Write the patch, and prove it with the feature plugin** on stock core.~~ **Reordered
    2026-11-04: plugin first.** Design the plugin's opt-in reach options
-   ([ADR 0005](decisions/0005-reach-for-existing-read-routes.md); never all routes by default), run it on a real install ([#22](../../issues/22)), and publish it
-   ([#23](../../issues/23)). The core patches are written on `feat-http-query` and parked.
+   ([ADR 0005](decisions/0005-reach-for-existing-read-routes.md); never all routes by default), run it on a real install ([#22](https://github.com/moonmeister/wp-http-query/issues/22)), and publish it
+   ([#23](https://github.com/moonmeister/wp-http-query/issues/23)). The core patches are written on `feat-http-query` and parked.
 4. **Bring plugin, usage and matrix results to the existing ticket**, with the core patches.
 
 Deliberate ordering: arrive with a shipped plugin and evidence rather than a patch and
