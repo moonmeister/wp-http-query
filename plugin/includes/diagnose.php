@@ -91,8 +91,9 @@ function rest_error_in( string $body ): ?array {
 /**
  * Site Health status for each verdict.
  *
- * Critical when QUERY doesn't reach WordPress intact, or a cache serves one
- * body's answer to another; recommended when the test couldn't tell.
+ * Critical when QUERY doesn't reach WordPress intact, a cache serves one
+ * body's answer to another, or CORS is on but leaves QUERY out; recommended
+ * when the test couldn't tell, or the site turned REST CORS off.
  *
  * @return array<string, string>
  */
@@ -114,6 +115,9 @@ function verdict_statuses(): array {
 		'method_changed'      => 'critical',
 		'body_lost'           => 'critical',
 		'stored'              => 'critical',
+		'cors_query'          => 'good',
+		'cors_off'            => 'recommended',
+		'cors_no_query'       => 'critical',
 		'browser_unsupported' => 'recommended',
 		// Made by the script, not here: the test itself couldn't run.
 		'test_failed'         => 'recommended',
@@ -469,6 +473,84 @@ function diagnose_cache_probe( array $first, array $second ): array {
 	}
 
 	return $result( 'clean', __( 'No caching detected: two different QUERY bodies sent to the same URL got two different, fresh answers.', 'wp-http-query' ) );
+}
+
+/**
+ * What the site answered a cross-origin QUERY preflight, in plain language.
+ *
+ * Pure: no I/O, no globals. Reads Access-Control-Allow-Methods the way a
+ * browser does: exact, case-sensitive tokens (QUERY isn't one of the methods
+ * fetch normalizes), and "*" only as a wildcard when credentials aren't
+ * allowed. Access-Control-Allow-Headers and -Expose-Headers don't count as
+ * CORS being on: WP_REST_Server::serve_request() sends them on every REST
+ * response, CORS on or off.
+ *
+ * @param array $response   An observation (see observation()) of the OPTIONS response.
+ * @param bool  $filterable Whether core's method list is filterable (7.2+, core_cors_is_filterable()).
+ * @return array{verdict: string, status: string, http_statuses: int[], message: string}
+ */
+function diagnose_cors_preflight( array $response, bool $filterable ): array {
+	$seen    = observation( $response );
+	$status  = $seen['status'];
+	$headers = $seen['headers'];
+
+	if ( '' !== $seen['error'] || 0 === $status ) {
+		return verdict(
+			'inconclusive',
+			sprintf(
+				/* translators: %s: The error message from the HTTP request. */
+				__( 'Couldn’t check CORS: the preflight didn’t complete (%s).', 'wp-http-query' ),
+				'' !== $seen['error'] ? $seen['error'] : __( 'no response', 'wp-http-query' )
+			),
+			array()
+		);
+	}
+
+	if ( $status < 200 || $status >= 300 ) {
+		return verdict(
+			'inconclusive',
+			sprintf(
+				/* translators: %d: HTTP status code. */
+				__( 'Couldn’t check CORS: the preflight got HTTP %d instead of WordPress’s answer. Browsers treat a preflight that doesn’t succeed as a refusal, so if something in front of WordPress refuses OPTIONS requests, other sites can’t send QUERY.', 'wp-http-query' ),
+				$status
+			),
+			array( $status )
+		);
+	}
+
+	if ( ! isset( $headers['access-control-allow-origin'] ) && ! isset( $headers['access-control-allow-methods'] ) ) {
+		return verdict( 'cors_off', __( 'This site sends no CORS headers on REST API responses, so pages on other sites can’t call its REST API from a browser, with QUERY or any other method. Core sends them by default, so the site, or a security plugin, turned REST CORS off; the plugin respects that rather than turning it back on. Nothing to fix unless you want other sites to call the API. A CORS plugin that allows only some origins may also send nothing to the test’s origin.', 'wp-http-query' ), array( $status ) );
+	}
+
+	$methods  = $headers['access-control-allow-methods'] ?? '';
+	$allowed  = array_map( 'trim', explode( ',', $methods ) );
+	$wildcard = in_array( '*', $allowed, true ) && 'true' !== strtolower( $headers['access-control-allow-credentials'] ?? '' );
+
+	if ( $wildcard || in_array( METHOD, $allowed, true ) ) {
+		return verdict(
+			'cors_query',
+			sprintf(
+				/* translators: %s: The Access-Control-Allow-Methods header value. */
+				__( 'Pages on other sites can send QUERY: the preflight’s Access-Control-Allow-Methods is %s.', 'wp-http-query' ),
+				$methods
+			),
+			array( $status )
+		);
+	}
+
+	$found = '' !== $methods
+		? sprintf(
+			/* translators: %s: The Access-Control-Allow-Methods header value. */
+			__( 'CORS is on, but the preflight’s Access-Control-Allow-Methods (%s) leaves out QUERY, so browsers refuse to send QUERY from other sites.', 'wp-http-query' ),
+			$methods
+		)
+		: __( 'CORS is on, but the preflight came back without Access-Control-Allow-Methods, so browsers refuse to send QUERY from other sites.', 'wp-http-query' );
+
+	$cause = $filterable
+		? __( 'Something removes it from the list the plugin adds it to: most likely a rest_allowed_cors_methods callback, or another plugin or a server rule that sends its own Access-Control-Allow-Methods after WordPress’s. Add QUERY back there.', 'wp-http-query' )
+		: __( 'Something sends its own Access-Control-Allow-Methods after the plugin’s: most likely another plugin that handles CORS, or a server rule. Add QUERY to its list.', 'wp-http-query' );
+
+	return verdict( 'cors_no_query', $found . ' ' . $cause, array( $status ) );
 }
 
 /**
