@@ -52,11 +52,8 @@ The test sites above aren't what a real install looks like: they mount a test fi
 (`tests/fixtures/mu-plugins/`) that opts routes in, turns the preset on and makes the echo route
 public, plus the example plugin. `make demo` starts a separate site with none of that: the latest
 nightly on <http://localhost:8873> (`admin` / `password`), only `plugin/` mounted and active,
-pretty permalinks, and default settings. It opens **Settings → HTTP QUERY**, where
-**Test your server** runs the self-test. No route accepts `QUERY` until you tick
-**Core collections**, and the echo route is admins only.
-
-A first look:
+pretty permalinks, and default settings. The echo route is admins only. It opens
+**Settings → HTTP QUERY**:
 
 1. On **Settings → HTTP QUERY**, the "Routes that accept QUERY" table lists only the plugin's own
    two routes: no core route accepts `QUERY` yet, so a `QUERY` to `/wp-json/wp/v2/posts` gets `404`.
@@ -208,6 +205,17 @@ matrix/
 experiments/          One-off research: blast radius, cache survey, plugin spike
 ```
 
+The forks are sibling checkouts, deliberately not submodules: they track upstream on upstream's
+schedule and get rebased independently. `experiments/blast-radius/run.sh` expects
+`../wordpress-develop`.
+
+```
+~/code/moonmeister/
+├── wp-http-query/        # this repo
+├── wordpress-develop/    # core fork
+└── Requests/             # Requests fork
+```
+
 ## PR previews
 
 Every pull request gets one comment, updated on each push, with a **Preview in Playground**
@@ -295,8 +303,10 @@ build, run `npx wp-env start --update --config=.wp-env.nightly.json`.
   [Pull request titles](#pull-request-titles).
 - **Releases follow [RELEASING.md](RELEASING.md).** Release-drafter keeps a draft GitHub release
   up to date from merged PRs; a maintainer publishes it, and the zip is built and attached then.
-- **Keep the core fork clean.** Core patches live in the `wordpress-develop` fork. Project notes,
-  scratch files and experiments belong here, not there.
+- **Keep the forks clean.** Core patches live in the `wordpress-develop` fork, Requests changes in
+  the Requests fork. Nothing goes there that isn't meant for upstream: project notes, scratch files
+  and experiments belong here. A stray file in a core checkout has to be cleaned out before a Trac
+  patch.
 
 ## Principles
 

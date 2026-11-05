@@ -15,7 +15,7 @@ their REST API to accept it, and for plugin developers who want their routes to.
 |---|---|
 | Use the plugin on my site | [plugin/README.md](plugin/README.md) |
 | Add `QUERY` to my own plugin's routes | [docs/integrating.md](docs/integrating.md) |
-| Try it locally | [Try it locally](#try-it-locally), below |
+| Try it locally | [Try it locally](#try-it-locally) |
 | Contribute or run the tests | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | See what's planned | The [project board](https://github.com/users/moonmeister/projects/1) and [milestones](https://github.com/moonmeister/wp-http-query/milestones) |
 | Understand the decisions | [docs/decisions/](docs/decisions/) and [docs/background.md](docs/background.md) |
@@ -29,7 +29,8 @@ make demo
 ```
 
 This starts WordPress at <http://localhost:8873> with the plugin active. Log in as `admin` /
-`password`. [CONTRIBUTING.md](CONTRIBUTING.md#try-it-by-hand) has a walkthrough and the other
+`password`. No route accepts `QUERY` until you tick **Core collections** on
+**Settings → HTTP QUERY**. [CONTRIBUTING.md](CONTRIBUTING.md#try-it-by-hand) has a walkthrough and the other
 commands.
 
 ## Status
