@@ -307,6 +307,8 @@ function self_test_script_data(): array {
 		'fingerprintUrl' => rest_url( FINGERPRINT_ROUTE ),
 		'serverUrl'      => rest_url( SERVER_ROUTE ),
 		'cacheUrl'       => rest_url( CACHE_ROUTE ),
+		'corsUrl'        => rest_url( CORS_ROUTE ),
+		'corsOrigin'     => CORS_TEST_ORIGIN,
 		'diagnoseUrl'    => rest_url( DIAGNOSE_ROUTE ),
 		'nonce'          => wp_create_nonce( 'wp_rest' ),
 		'markerKey'      => SELF_TEST_MARKER_KEY,
@@ -327,10 +329,12 @@ function self_test_script_data(): array {
 				'browserCache' => __( 'No cache between your browser and WordPress stores QUERY responses', 'wp-http-query' ),
 				'serverEcho'   => __( 'QUERY reaches WordPress from the server itself', 'wp-http-query' ),
 				'serverCache'  => __( 'No cache on the server’s own path stores QUERY responses', 'wp-http-query' ),
+				'serverCors'   => __( 'Pages on other sites may send QUERY (CORS)', 'wp-http-query' ),
 			),
 			'descriptions' => array(
 				'echo'  => __( 'Sends one QUERY with a JSON body, and checks that WordPress gets the method and the body intact.', 'wp-http-query' ),
 				'cache' => __( 'Sends two anonymous QUERYs with different bodies to the same URL, and checks that the answers differ.', 'wp-http-query' ),
+				'cors'  => __( 'Sends the preflight a browser sends before a QUERY from another site, and checks that the methods the answer allows include QUERY.', 'wp-http-query' ),
 			),
 			'sent'         => array(
 				/* translators: %s: URL path. */
@@ -345,21 +349,10 @@ function self_test_script_data(): array {
 				),
 				/* translators: %s: URL path. */
 				'serverCache'  => __( 'The server sent itself: 2 × QUERY %s, anonymous', 'wp-http-query' ),
+				/* translators: 1: URL path. 2: An origin, such as https://example.com. */
+				'serverCors'   => __( 'The server sent itself: OPTIONS %1$s, Origin: %2$s, Access-Control-Request-Method: QUERY, anonymous', 'wp-http-query' ),
 			),
-			'summary'      => array(
-				'passed'   => __( 'All 4 checks passed.', 'wp-http-query' ),
-				// Indexed by how many checks didn't pass.
-				'problems' => array(
-					/* translators: %d: Number of checks that didn't pass. */
-					1 => sprintf( _n( '%d problem found:', '%d problems found:', 1, 'wp-http-query' ), 1 ),
-					/* translators: %d: Number of checks that didn't pass. */
-					2 => sprintf( _n( '%d problem found:', '%d problems found:', 2, 'wp-http-query' ), 2 ),
-					/* translators: %d: Number of checks that didn't pass. */
-					3 => sprintf( _n( '%d problem found:', '%d problems found:', 3, 'wp-http-query' ), 3 ),
-					/* translators: %d: Number of checks that didn't pass. */
-					4 => sprintf( _n( '%d problem found:', '%d problems found:', 4, 'wp-http-query' ), 4 ),
-				),
-			),
+			'summary'      => self_test_summary_strings( 2 + count( server_checks() ) ), // The two browser checks, and the server's.
 			/* translators: 1: A check's title. 2: Its result, such as "passed". */
 			'titleStatus'  => __( '%1$s: %2$s', 'wp-http-query' ),
 			'status'       => array(
@@ -379,13 +372,33 @@ function self_test_script_data(): array {
 }
 
 /**
+ * The self-test's summary line, for every outcome.
+ *
+ * @param int $checks How many checks run.
+ * @return array{passed: string, problems: array<int, string>} 'problems' is indexed by how many checks didn't pass.
+ */
+function self_test_summary_strings( int $checks ): array {
+	$problems = array();
+	for ( $n = 1; $n <= $checks; $n++ ) {
+		/* translators: %d: Number of checks that didn't pass. */
+		$problems[ $n ] = sprintf( _n( '%d problem found:', '%d problems found:', $n, 'wp-http-query' ), $n );
+	}
+
+	return array(
+		/* translators: %d: Number of checks, more than one. */
+		'passed'   => sprintf( __( 'All %d checks passed.', 'wp-http-query' ), $checks ),
+		'problems' => $problems,
+	);
+}
+
+/**
  * Renders the "Test your server" section of Settings → HTTP QUERY.
  */
 function render_self_test(): void {
 	printf( '<h2>%s</h2>', esc_html__( 'Test your server', 'wp-http-query' ) );
 	printf(
 		'<p>%s <a href="%s">%s</a></p>',
-		esc_html__( 'Checks that QUERY requests reach WordPress intact, from this browser and from the server itself, and whether a cache on the way stores QUERY responses. It sends a few small requests to this site and changes nothing.', 'wp-http-query' ),
+		esc_html__( 'Checks that QUERY requests reach WordPress intact, from this browser and from the server itself, whether a cache on the way stores QUERY responses, and whether CORS lets pages on other sites send QUERY. It sends a few small requests to this site and changes nothing.', 'wp-http-query' ),
 		esc_url( admin_url( 'site-health.php' ) ),
 		esc_html__( 'Site Health runs the server checks too.', 'wp-http-query' )
 	);

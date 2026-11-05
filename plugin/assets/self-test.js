@@ -1,7 +1,7 @@
 /**
  * Settings → HTTP QUERY: the "Test your server" button.
  *
- * Runs four checks, in two groups, and shows each result in plain language:
+ * Runs five checks, in two groups, and shows each result in plain language:
  *
  * From your browser, through everything in front of the site:
  * 1. QUERY reaches WordPress: a real fetch() with method QUERY to the echo
@@ -12,16 +12,20 @@
  *    see whether a cache on the way answers the second with the first's
  *    response.
  *
- * From your server (a loopback, run in PHP): the same two checks.
+ * From your server (a loopback, run in PHP): the same two checks, plus
+ * whether CORS lets pages on other sites send QUERY: the preflight a browser
+ * on another origin sends first, OPTIONS with Origin and
+ * Access-Control-Request-Method: QUERY. Server only: this page's own requests
+ * are same-origin, so the browser never preflights them.
  *
- * The two "reaches WordPress" checks run at the same time; the two cache
- * checks run after them, one after the other, because their probe pairs go
- * to the same URL and must not interleave. Results always render in the same
+ * The two "reaches WordPress" checks and the CORS check run at the same
+ * time; the two cache checks run after them, one after the other, because
+ * their probe pairs go to the same URL and must not interleave. Results always render in the same
  * order.
  *
  * What a response means is decided in PHP, once (diagnose_echo_response(),
- * diagnose_cache_probe()): this file only reports what the browser saw to the
- * diagnose route, including a network failure ({ status: 0, error }), an
+ * diagnose_cache_probe(), diagnose_cors_preflight()): this file only
+ * reports what the browser saw to the diagnose route, including a network failure ({ status: 0, error }), an
  * opaque redirect ({ redirect: true }) and a browser that won't build a QUERY
  * request ({ unsupported: true }). The one verdict made here is test_failed,
  * when the diagnose or server route itself can't be reached.
@@ -219,7 +223,7 @@
 		if ( 'string' !== typeof requested ) {
 			requested = result.signed_in ? requested.signedIn : requested.anonymous;
 		}
-		sent.appendChild( el( 'code', '', format( requested, path( url ) ) ) );
+		sent.appendChild( el( 'code', '', format( requested, path( url ), config.corsOrigin ) ) );
 		if ( result.http_statuses && result.http_statuses.length ) {
 			sent.appendChild( document.createTextNode( ' ' + format( i18n.httpStatus, result.http_statuses.join( ', ' ) ) ) );
 		}
@@ -279,6 +283,16 @@
 						return serverCheck( config.cacheUrl );
 					},
 				},
+				{
+					id: 'server-cors',
+					key: 'serverCors',
+					check: 'cors',
+					url: config.fingerprintUrl,
+					sent: i18n.sent.serverCors,
+					run: function () {
+						return serverCheck( config.corsUrl );
+					},
+				},
 			],
 		},
 	];
@@ -294,6 +308,7 @@
 	var browserCacheCheck = GROUPS[ 0 ].checks[ 1 ];
 	var serverEchoCheck = GROUPS[ 1 ].checks[ 0 ];
 	var serverCacheCheck = GROUPS[ 1 ].checks[ 1 ];
+	var serverCorsCheck = GROUPS[ 1 ].checks[ 2 ];
 
 	function summary( checks ) {
 		var problems = checks.filter( function ( check ) {
@@ -320,14 +335,15 @@
 		output.textContent = '';
 		output.appendChild( el( 'p', '', i18n.running ) );
 
-		var echoes = await Promise.all( [ attempt( browserEchoCheck ), attempt( serverEchoCheck ) ] );
-		browserEchoCheck.result = echoes[ 0 ];
-		serverEchoCheck.result = echoes[ 1 ];
+		var first = await Promise.all( [ attempt( browserEchoCheck ), attempt( serverEchoCheck ), attempt( serverCorsCheck ) ] );
+		browserEchoCheck.result = first[ 0 ];
+		serverEchoCheck.result = first[ 1 ];
+		serverCorsCheck.result = first[ 2 ];
 		browserCacheCheck.result = await attempt( browserCacheCheck );
 		serverCacheCheck.result = await attempt( serverCacheCheck );
 
 		output.textContent = '';
-		output.appendChild( summary( [ browserEchoCheck, browserCacheCheck, serverEchoCheck, serverCacheCheck ] ) );
+		output.appendChild( summary( [ browserEchoCheck, browserCacheCheck, serverEchoCheck, serverCacheCheck, serverCorsCheck ] ) );
 		GROUPS.forEach( function ( group ) {
 			var section = el( 'div', 'wp-http-query-self-test-group' );
 			section.setAttribute( 'data-group', group.id );
