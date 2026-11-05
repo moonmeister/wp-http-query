@@ -56,11 +56,11 @@ const DEMO_ROUTE_OFF = 'wp_http_query_fixture_demo_route_off';
 /**
  * Set only by the serial lifecycle suite, through WP-CLI, to change how REST
  * CORS is handled the way a site might. Never set by an HTTP request. Its value
- * is an array: 'scenario' picks one, 'priority' is the rest_pre_serve_request
- * priority it acts at, and 'competing' also takes 'origin' and 'methods'.
+ * is an array: 'scenario' picks one, and 'competing' also takes 'origin' and
+ * 'methods'.
  *
  * - remove-late: removes core's handler, turning REST CORS off.
- * - competing: adds a callback at 'priority' that sends restricted CORS
+ * - competing: adds a callback after core's handler that sends restricted CORS
  *   headers, as a CORS plugin might: 'origin', 'methods', no credentials.
  */
 const CORS = 'wp_http_query_fixture_cors';
@@ -73,7 +73,6 @@ add_action(
 		if ( ! is_array( $cors ) ) {
 			return;
 		}
-		$priority = (int) ( $cors['priority'] ?? 10 );
 
 		switch ( $cors['scenario'] ?? '' ) {
 			case 'remove-late':
@@ -91,7 +90,7 @@ add_action(
 						}
 						return $value;
 					},
-					$priority
+					10
 				);
 				break;
 		}

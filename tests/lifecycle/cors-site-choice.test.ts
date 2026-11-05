@@ -70,7 +70,7 @@ describe.each( sites )( 'CORS, as the site configured it: $label', ( site ) => {
 	} );
 
 	it( 'lets a CORS callback that runs after core’s win', async () => {
-		const competing = { scenario: 'competing', priority: 10, origin: 'https://allowed.example', methods: 'GET, OPTIONS' };
+		const competing = { scenario: 'competing', origin: 'https://allowed.example', methods: 'GET, OPTIONS' };
 		for ( const res of await withCorsScenario( site, competing, bothRequests ) ) {
 			expect( res.headers.get( 'access-control-allow-origin' ) ).toBe( competing.origin );
 			expect( res.headers.get( 'access-control-allow-methods' ) ).toBe( competing.methods );
