@@ -127,7 +127,7 @@ it is the kind of mitigation that looks responsible and does nothing.
   disproportionate to that, and would be the first method-specific cache behavior in the REST
   API.
 - Two upstream plugin issues were drafted (WPSC and W3TC should switch to allowlists) but
-  **not filed**: [#39](../../issues/39) was closed as not planned on 2026-11-05.
+  **not filed**: [#39](https://github.com/moonmeister/wp-http-query/issues/39) was closed as not planned on 2026-11-05.
 
 → [ADR 0003](../../docs/decisions/0003-cache-safety-default.md) for the decision this produced.
 
