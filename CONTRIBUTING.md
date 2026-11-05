@@ -244,8 +244,8 @@ build, run `npx wp-env start --update --config=.wp-env.nightly.json`.
 - **Branch, then open a draft PR.** A maintainer marks it ready.
 - **Verify claims before writing them down.** Cite file and line, date anything time-sensitive,
   and say how you measured it. The README's [Principles](README.md#principles) explain why.
-- **Text for other trackers is drafted, not sent.** [`docs/submissions/`](docs/submissions/) holds
-  drafts for Trac and other projects. Filing is a human step.
+- **Text for other trackers is drafted, not sent.** Issues, Trac comments and PRs for other
+  projects are drafted for a maintainer to review and file. Filing is a human step.
 - **Use a conventional PR title** (`feat: ...`, `fix: ...`); see
   [Pull request titles](#pull-request-titles).
 - **Releases follow [RELEASING.md](RELEASING.md).** Release-drafter keeps a draft GitHub release

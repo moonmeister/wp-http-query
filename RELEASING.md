@@ -100,10 +100,6 @@ fails the build. `plugin/` itself is never modified.
 
 ## After the release
 
-- **The first published release is the trigger for [#39](../../issues/39):** the page-cache
-  reports for WP Super Cache and W3 Total Cache are written and parked until there's a released
-  plugin that sends `QUERY`. Once v0.1.0 is published, they can be filed (filing is still a human
-  step; see [CONTRIBUTING.md](CONTRIBUTING.md#conventions)).
 - **WordPress.org** publishing is tracked in [#45](../../issues/45).
 
 ## What goes in the zip

@@ -166,11 +166,12 @@ Not silence — **the survey**. Three things, none of them core behavior:
    right there and reviewers read RFCs. A ten-row table beats an assurance, and beats silence,
    which reads as not-considered. Tracked as
    [#21](https://github.com/moonmeister/wp-http-query/issues/21).
-2. **Write the upstream reports for WP Super Cache and W3 Total Cache — and hold them until
-   `QUERY` is reachable.** Both use denylists, so both default-allow *every* future method, not
-   just `QUERY`. Drafted and locator-verified in [`docs/submissions/`](../submissions/); filed
-   when the feature plugin publishes or a core release carries `QUERY` dispatch, tracked as
-   [#39](https://github.com/moonmeister/wp-http-query/issues/39).
+2. **Upstream reports for WP Super Cache and W3 Total Cache: drafted, not filed.** Both use
+   denylists, so both default-allow *every* future method, not just `QUERY`. The reports were
+   drafted and locator-verified, then dropped on 2026-11-05 ([#39](https://github.com/moonmeister/wp-http-query/issues/39), closed as not
+   planned). The handling is instead: the W3 Total Cache Pro caveat is documented in
+   `plugin/README.md`, and the plugin's self-test detects a page cache that stores `QUERY`
+   responses.
 
    **This was decided the other way first, on 2026-08-19, and reversed the same day.** The
    argument for filing immediately was that it converts "plugins can fix compatibility on

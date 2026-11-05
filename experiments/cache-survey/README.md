@@ -73,8 +73,7 @@ This is where the risk actually lives. These run in PHP, inside or ahead of Word
 | **W3 Total Cache** | `in_array( …, array( 'DELETE','PUT','OPTIONS','TRACE','CONNECT','POST' ) )` — **`QUERY` passes** | **denylist** | ⚠️ **only while `pgcache.rest !== 'cache'`.** Pro users who enable REST caching get a dedicated `rest` cache group, and `QUERY` clears the method gate |
 
 **Exact locators**, re-verified 2026-08-19 against the wordpress.org downloads, for the two
-denylists — these are what the upstream reports in
-[`docs/submissions/`](../../docs/submissions/) cite:
+denylists:
 
 | Claim | File | Version |
 | --- | --- | --- |
@@ -127,11 +126,8 @@ it is the kind of mitigation that looks responsible and does nothing.
 - Any core-side default — `no-store`, `private, no-cache`, or a capability signal — is
   disproportionate to that, and would be the first method-specific cache behavior in the REST
   API.
-- Two upstream plugin issues are worth filing eventually: WPSC and W3TC should switch to
-  allowlists. **Written and parked** in [`docs/submissions/`](../../docs/submissions/) — they
-  go out when something actually sends `QUERY` to a WordPress site, which is the feature
-  plugin's publication or a core release. Nothing is exposed by waiting; nothing sends `QUERY`
-  today. See [#39](../../../../issues/39).
+- Two upstream plugin issues were drafted (WPSC and W3TC should switch to allowlists) but
+  **not filed**: [#39](https://github.com/moonmeister/wp-http-query/issues/39) was closed as not planned on 2026-11-05.
 
 → [ADR 0003](../../docs/decisions/0003-cache-safety-default.md) for the decision this produced.
 
