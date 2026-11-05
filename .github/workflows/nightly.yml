@@ -48,7 +48,7 @@ jobs:
       - if: steps.decide.outputs.result == 'build'
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.0'  # the oldest PHP the plugin supports
+          php-version: '7.4'  # the oldest PHP the plugin supports
           coverage: none
 
       - name: Build the zip
