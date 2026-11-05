@@ -116,7 +116,7 @@ Sample result, from an nginx site using plain permalinks:
 |---|---|
 | Passed | `QUERY` reached WordPress with its method and body intact |
 | `405` | nginx answering a `QUERY` to the site root. Use `/wp-json/…` or `/index.php?rest_route=…` ([matrix notes](../matrix/README.md)) |
-| `403` from the web server, not WordPress | A rule that allows only `GET` and `POST`, such as nginx's `limit_except GET POST` or Apache's `<LimitExcept GET POST>`, or a firewall |
+| `403` from the web server, not WordPress | A rule that allows only `GET` and `POST`, such as nginx's `limit_except GET POST` or Apache's `<LimitExcept GET POST>`, or a firewall. See [Fixing a 403](#fixing-a-403-from-a-hardening-rule) |
 | `501` | Varnish 8.0 – 9.0.x in front of the site, or PHP's built-in server (`php -S`) |
 | `301`, `302` or another redirect | A client that follows it may switch `QUERY` to `GET` and drop the body. WordPress's HTTP API does on a `302`; browsers on a `303`. Check the Site Address in **Settings → General** |
 | Method changed | Something between the client and WordPress turned `QUERY` into another method |
@@ -187,9 +187,7 @@ over HTTP/1.1 with request bodies up to 64 KiB:
 | Apache with `<LimitExcept GET POST>` | No, `403` |
 
 The `403` rows are hardening rules that allow only `GET` and `POST`. They block `QUERY` the same
-way they block `PUT` or `DELETE`. Apache accepts `QUERY` as a method name, so you can add it to a
-`LimitExcept` list. nginx can't name `QUERY` in `limit_except` (as of 2026-08-10, see
-[docs/ecosystem.md](../docs/ecosystem.md#nginx--no-native-method-identifier)).
+way they block `PUT` or `DELETE`.
 
 **Caches and proxies in front of the site.** By default, no shipping cache stores a `QUERY`
 response, so you won't get one visitor's results served to another. **One exception: W3 Total
@@ -206,6 +204,41 @@ default config (2026-08-19).
 **Not tested:** LiteSpeed and OpenLiteSpeed, HTTP/2 and HTTP/3, TLS, and CDNs, WAFs and managed
 hosts. Not tested means unknown, not broken. [The self-test](#check-your-server) tells you about your
 own stack.
+
+### Fixing a 403 from a hardening rule
+
+**Check the web server's access log, not PHP's.** These rules answer before PHP runs, so a `403`
+with nothing in the PHP or WordPress log means the web server refused the request. Look for the
+`QUERY` request and its `403` in the web server's access log.
+
+**Widening the rule is your call.** Someone added it to shrink what the site accepts. Letting
+`QUERY` through is a security decision for whoever runs the server, not something this plugin can
+make for you.
+
+**Apache.** `<Limit>` and `<LimitExcept>` match method names as text, so you can name `QUERY`. Add
+it to both lists:
+
+```apache
+<Limit GET POST QUERY>
+    Require all granted
+</Limit>
+<LimitExcept GET POST QUERY>
+    Require all denied
+</LimitExcept>
+```
+
+Keep both `Require` lines inside a `<Limit>` or `<LimitExcept>`. Apache ORs the `Require` lines in
+one context, so an unscoped `Require all granted` next to `<LimitExcept GET POST>`'s
+`Require all denied` grants every method: the rule looks hardened and blocks nothing. To check it
+is in force, send `curl -i -X DELETE` to the site: Apache should answer `403`. This project's own test
+config fell into this trap ([matrix notes](../matrix/README.md#two-traps-this-harness-fell-into-both-now-guarded)).
+
+**nginx.** There's no clean fix. `limit_except` can't name `QUERY`: nginx has no method identifier
+for it as of 2026-08-10, so `limit_except GET POST QUERY` is a config error and nginx won't start
+([docs/ecosystem.md](../docs/ecosystem.md#nginx--no-native-method-identifier)). The only way to let
+`QUERY` through is to remove `limit_except` from every location a REST request passes through
+(usually `location /` and `location ~ \.php$`), which drops the restriction for every other
+method too.
 
 ## Choosing which routes accept QUERY
 
