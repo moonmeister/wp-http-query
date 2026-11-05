@@ -236,7 +236,7 @@ plugin has.
 
 | Core | What differs | What to do |
 |---|---|---|
-| Before 7.2 | Array-form `methods` aren't comma-split (Trac#65905). CORS has no filter, so the plugin replaces core's CORS handler | Use the string form of `methods`. The plugin handles CORS |
+| Before 7.2 | Array-form `methods` aren't comma-split (Trac#65905). CORS has no filter, so the plugin replaces core's CORS handler, if it's still hooked | Use the string form of `methods`. The plugin handles CORS, unless core's handler was removed: a site or CORS plugin that replaced it needs `QUERY` added to its own method list |
 | 7.2 and later | Both fixed ([r63756](https://core.trac.wordpress.org/changeset/63756), [r64730](https://core.trac.wordpress.org/changeset/64730)). The plugin adds `QUERY` through core's `rest_allowed_cors_methods` filter | Nothing |
 | A future core with `QUERYABLE` | Not proposed yet; parked until the plugin ships ([ADR 0002](decisions/0002-allmethods-vs-queryable.md)). The constant is planned as `WP_REST_Server::QUERYABLE` | `query_method()` already checks for it first |
 
