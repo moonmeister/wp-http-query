@@ -75,11 +75,12 @@ describe.skipIf( ! sites.includes( main ) || ! main.localCli )( 'multisite netwo
 
 	// Last: it uninstalls the plugin, and afterAll network-activates it again.
 	it( 'deletes the option on every site of the network on uninstall', () => {
-		// Enough sites for a second batch. One wp eval, not a wp site create per site:
-		// each WP-CLI call through wp-env costs about a second. Idempotent by slug.
+		// BATCH sites of its own, plus / and /sub/, make a second batch whatever else
+		// is on the network. One wp eval, not a wp site create per site: each WP-CLI
+		// call through wp-env costs about a second. Idempotent by slug.
 		evalPhp( `
 			$network = get_network();
-			for ( $i = 1; get_sites( array( 'count' => true ) ) <= ${ BATCH } + 1; $i++ ) {
+			for ( $i = 1; $i <= ${ BATCH }; $i++ ) {
 				$path = $network->path . '${ FILLER }' . $i . '/';
 				if ( ! domain_exists( $network->domain, $path, $network->id ) ) {
 					wp_insert_site( array( 'domain' => $network->domain, 'path' => $path, 'title' => '${ FILLER }' . $i ) );

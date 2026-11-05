@@ -83,7 +83,7 @@ with `--url`, and activate or deactivate the plugin with `--network`.
 
 `tests/lifecycle/multisite.test.ts` covers what only a network has: the preset setting is per
 site, and uninstall deletes the option from every site, across `uninstall.php`'s batches of 100.
-For that it adds sites until the network has more than 100 (`wphq-batch-N`, kept for later runs;
+For that it adds 100 sites of its own (`wphq-batch-1` to `-100`, kept for later runs;
 the first run spends about 30 seconds creating them). The network belongs to the tests: they
 restore the main site and `/sub/`, but a network uninstall clears every site, so a site you add by
 hand loses its `wp_http_query_presets` value whenever the lifecycle suite runs.
