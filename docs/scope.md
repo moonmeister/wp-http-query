@@ -251,8 +251,8 @@ response is 4xx, no-cache headers are forced. `QUERY` work must not regress that
   `QUERY` response; RFC 9111 §3 forbids it for any cache that has not implemented §2.7 keying.
   What remains is *reporting* two WordPress page-cache method denylists upstream
   ([#39](../../issues/39)) — ecosystem work, not core, and **deferred until something actually
-  sends `QUERY`**: the reports are written in [docs/submissions/](submissions/) and filed when
-  the feature plugin publishes or a core release carries `QUERY`. See §4.1.
+  sends `QUERY`**. The reports were written but **not filed**: #39 was closed as not planned on
+  2026-11-05. See §4.1.
 - **Empirical test matrix:** proving the request body reaches PHP across real deployments (§6).
 
 ### Out of scope
@@ -398,8 +398,8 @@ understood it.
 The one live vector is WordPress-side — **W3 Total Cache Pro with REST caching enabled**, whose
 method **denylist** default-allows `QUERY`. Severity is **confusion, not disclosure**: every
 parameter expressible in a `QUERY` body is expressible in a `GET` query string. Reported
-upstream rather than worked around in core — reports written in
-[docs/submissions/](submissions/), filed on release ([#39](../../issues/39)).
+upstream rather than worked around in core — reports written, then not filed
+([#39](../../issues/39), closed 2026-11-05). The plugin README documents the caveat.
 
 A `Cache-Control` header — the obvious mitigation, and what this section proposed — would not
 have reached that layer at all. It decides in PHP on the write path and honors
