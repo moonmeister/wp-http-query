@@ -1,6 +1,6 @@
 # Scope: HTTP QUERY support in WordPress
 
-**Status:** plugin first (decided 2026-11-04, see §8). The plugin shipped as v0.1.0; core gets small, separate patches on [Trac#65616](https://core.trac.wordpress.org/ticket/65616), per [#60](https://github.com/moonmeister/wp-http-query/issues/60)
+**Status:** plugin first (decided 2026-11-04). The plugin shipped as v0.1.0; the route to core is a likely direct core patch on [Trac#65616](https://core.trac.wordpress.org/ticket/65616), scope still to be decided, per [#60](https://github.com/moonmeister/wp-http-query/issues/60)
 **Core baseline:** `7.2-alpha-63166-src` @ `e7739d5414`
 **Trunk references verified:** 2026-08-16
 
@@ -683,35 +683,9 @@ from its current behavior of leaving it alone?
 
 ## 8. Sequencing
 
-**Task breakdown: [GitHub issues](https://github.com/moonmeister/wp-http-query/issues)**, mapped
-in [background.md](background.md#where-the-work-lands) and ordered on the
-[project board](https://github.com/users/moonmeister/projects/1). They track who
-does what and where — the work lands in six places, only one of which we control. This section
-states the ordering principle; it deliberately does not duplicate the task list.
-
-The critical path is short, and **no part of it is empirical any more**. Q2 — whether `QUERY`
-and its body reach PHP — was the gating unknown and is answered. What remains:
-
-1. ~~**Read [Trac#65616](https://core.trac.wordpress.org/ticket/65616) and finish Q3.**~~
-   **Done 2026-08-16.** The ticket is real, uncontested, comment-free and tagged `2nd-opinion`.
-   Engagement with an open thread, not a fresh proposal.
-2. ~~**Settle [ADRs 0001–0004](decisions/).**~~ **Done for the plugin.** ADRs 0001–0003 are
-   decided and ADR 0005 is settled for the plugin (opt-in reach). ADR 0004 (`Location`
-   indirection) is planned as a plugin feature in
-   [#19](https://github.com/moonmeister/wp-http-query/issues/19).
-3. ~~**Ship the plugin.**~~ **Done: [v0.1.0](https://github.com/moonmeister/wp-http-query/releases/tag/v0.1.0),
-   2026-11-05.** Opt-in reach, tested on real installs
-   ([#22](https://github.com/moonmeister/wp-http-query/issues/22)), and published
-   ([#23](https://github.com/moonmeister/wp-http-query/issues/23)).
-4. **Next: small core patches to [Trac#65616](https://core.trac.wordpress.org/ticket/65616)**, one
-   at a time, each arguing from what the plugin has proven. The order and status are tracked in
-   [#60](https://github.com/moonmeister/wp-http-query/issues/60).
-
-Deliberate ordering: arrive with a shipped plugin and evidence rather than a patch and
-an argument. Both core defects found on the way are already fixed for 7.2
-([r63756](https://core.trac.wordpress.org/changeset/63756),
-[r64730](https://core.trac.wordpress.org/changeset/64730)). Note that the Requests track (§5.1) runs independently and ahead — core will not
-accept patches to vendored dependencies, so anything in `Requests/` must land upstream first.
+Planning lives on the [project board](https://github.com/users/moonmeister/projects/1) and the
+[milestones](https://github.com/moonmeister/wp-http-query/milestones); the route to core is
+tracked in [#60](https://github.com/moonmeister/wp-http-query/issues/60).
 
 ---
 

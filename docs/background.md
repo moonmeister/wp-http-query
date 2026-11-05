@@ -34,10 +34,10 @@ Two core defects found along the way are fixed upstream for 7.2:
 
 ### Route to core (decided 2026-11-05)
 
-Not an official feature plugin. The plugin stays a plugin, and core gets small, separate patches on
-[Trac#65616](https://core.trac.wordpress.org/ticket/65616), each arguing from what the plugin has
-proven. The patch order and the evidence are in
-[#60](https://github.com/moonmeister/wp-http-query/issues/60).
+Not an official feature plugin: we'll likely skip that step and propose a core patch on
+[Trac#65616](https://core.trac.wordpress.org/ticket/65616) directly, arguing from what the plugin
+has proven. Whether that's one patch or several is undecided until the exact scope of the core
+changes is known. Tracked in [#60](https://github.com/moonmeister/wp-http-query/issues/60).
 
 ## Research status
 
@@ -159,8 +159,8 @@ prior art".
 | Repo | Purpose | Branch |
 |---|---|---|
 | **wp-http-query** (this) | The plugin, plus docs, ADRs and the matrix | `main` |
-| [wordpress-develop](https://github.com/WordPress/wordpress-develop) fork | Core patches, sent per [#60](https://github.com/moonmeister/wp-http-query/issues/60) | `feat-http-query` (predates 7.2, needs a rebase) |
-| [WordPress/Requests](https://github.com/WordPress/Requests) fork | `Requests::QUERY` constant + tests | `add-query-method` *(not yet created)* |
+| [WordPress/wordpress-develop](https://github.com/WordPress/wordpress-develop) | Core patch work, per [#60](https://github.com/moonmeister/wp-http-query/issues/60). Exploratory patches exist on a `feat-http-query` branch (predates 7.2, needs a rebase) | — |
+| [WordPress/Requests](https://github.com/WordPress/Requests) | `Requests::QUERY` constant + tests, upstream in [Requests#1075](https://github.com/WordPress/Requests/pull/1075) | — |
 
-The forks stay clean and live as sibling checkouts; see
-[CONTRIBUTING.md](../CONTRIBUTING.md#repository-layout) and its conventions.
+Core and Requests changes are made in those projects, not here; see
+[CONTRIBUTING.md](../CONTRIBUTING.md#conventions).

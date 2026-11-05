@@ -39,8 +39,8 @@ commands.
 [v0.1.0](https://github.com/moonmeister/wp-http-query/releases/tag/v0.1.0) prerelease ·
 WordPress 7.0+ · PHP 8.0+ · next release: the
 [v0.2.0 milestone](https://github.com/moonmeister/wp-http-query/milestone/5) · route to core:
-[#60](https://github.com/moonmeister/wp-http-query/issues/60), small patches to
-[Trac#65616](https://core.trac.wordpress.org/ticket/65616) (unofficial, not a feature plugin).
+[#60](https://github.com/moonmeister/wp-http-query/issues/60), likely a direct core patch on
+[Trac#65616](https://core.trac.wordpress.org/ticket/65616) rather than a feature plugin.
 
 ## License
 

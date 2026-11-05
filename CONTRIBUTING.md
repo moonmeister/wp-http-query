@@ -205,18 +205,10 @@ matrix/
 experiments/          One-off research: blast radius, cache survey, plugin spike
 ```
 
-The forks are sibling checkouts, deliberately not submodules: they track upstream on upstream's
-schedule and get rebased independently. Only the ADR 0002 blast-radius experiment uses the core
-fork, and it needs more than the sibling checkout (a scratch worktree at a pinned commit, a running
-`wordpress-develop` Docker stack, and a separate test database): see
-[experiments/blast-radius/README.md](experiments/blast-radius/README.md#reproducing).
-
-```
-~/code/moonmeister/
-├── wp-http-query/        # this repo
-├── wordpress-develop/    # core fork
-└── Requests/             # Requests fork
-```
+Everything above needs only this repo. One experiment, the ADR 0002 blast-radius run, also needs
+a checkout of [WordPress/wordpress-develop](https://github.com/WordPress/wordpress-develop)
+(upstream or your own fork), plus a scratch worktree, a running Docker stack and a separate test
+database: see [experiments/blast-radius/README.md](experiments/blast-radius/README.md#reproducing).
 
 ## PR previews
 
@@ -296,7 +288,8 @@ build, run `npx wp-env start --update --config=.wp-env.nightly.json`.
 
 ## Conventions
 
-- **Branch, then open a draft PR.** A maintainer marks it ready.
+- **Open a draft PR while you're working,** and mark it ready for review when it's done: CI green
+  and review comments addressed. Copilot reviews drafts, so you get feedback early.
 - **Verify claims before writing them down.** Cite file and line, date anything time-sensitive,
   and say how you measured it. [Principles](#principles) explains why.
 - **Text for other trackers is drafted, not sent.** Issues, Trac comments and PRs for other
@@ -305,10 +298,9 @@ build, run `npx wp-env start --update --config=.wp-env.nightly.json`.
   [Pull request titles](#pull-request-titles).
 - **Releases follow [RELEASING.md](RELEASING.md).** Release-drafter keeps a draft GitHub release
   up to date from merged PRs; a maintainer publishes it, and the zip is built and attached then.
-- **Keep the forks clean.** Core patches live in the `wordpress-develop` fork, Requests changes in
-  the Requests fork. Nothing goes there that isn't meant for upstream: project notes, scratch files
-  and experiments belong here. A stray file in a core checkout has to be cleaned out before a Trac
-  patch.
+- **Changes to WordPress core or Requests go to those projects,** from your own checkout or fork of
+  them, not this repo. This repo holds the plugin, its tests, docs and research. Keep project notes
+  and scratch files out of core checkouts: a stray file has to be cleaned out before a Trac patch.
 
 ## Principles
 
