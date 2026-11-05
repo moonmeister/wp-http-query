@@ -11,15 +11,15 @@
  *
  * The echo route is put back to its default, admins only, so the server
  * check has to carry the admin's sign-in through the loopback. Restored in
- * afterAll. Every request sends Connection: close (see session.ts).
+ * afterAll. Every request sends Connection: close (see FRESH in http.ts).
  */
 import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { CORE_CORS_METHODS, rest } from '../http';
+import { CORE_CORS_METHODS, FRESH, rest } from '../http';
 import { wp } from '../seed';
 import { NO_LOCAL_CLI, sites } from '../sites';
 import { clickTestButton, type StubElement } from './self-test-button';
-import { FRESH, Session } from './session';
+import { Session } from './session';
 import { FIXTURE_DEMO_ROUTE_OFF, setOption, snapshotOption } from './site-state';
 
 const PAGE = '/wp-admin/options-general.php?page=wp-http-query';
@@ -474,7 +474,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 		} );
 
 		it( 'refuses a signed-out caller', async () => {
-			const res = await rest( site, 'GET', SERVER, { headers: FRESH } );
+			const res = await rest( site, 'GET', SERVER );
 			expect( res.status ).toBe( 401 );
 		} );
 
@@ -495,7 +495,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 		} );
 
 		it( 'refuses a signed-out caller and a bad nonce', async () => {
-			expect( ( await rest( site, 'GET', CACHE, { headers: FRESH } ) ).status ).toBe( 401 );
+			expect( ( await rest( site, 'GET', CACHE ) ).status ).toBe( 401 );
 			expect( ( await admin.rest( 'GET', CACHE, { nonce: '0123456789' } ) ).status ).toBe( 403 );
 		} );
 	} );
@@ -516,7 +516,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 		} );
 
 		it( 'refuses a signed-out caller and a bad nonce', async () => {
-			expect( ( await rest( site, 'GET', CORS, { headers: FRESH } ) ).status ).toBe( 401 );
+			expect( ( await rest( site, 'GET', CORS ) ).status ).toBe( 401 );
 			expect( ( await admin.rest( 'GET', CORS, { nonce: '0123456789' } ) ).status ).toBe( 403 );
 		} );
 	} );
@@ -551,7 +551,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 		} );
 
 		it( 'answers QUERY only', async () => {
-			expect( ( await rest( site, 'GET', FINGERPRINT, { headers: FRESH } ) ).status ).toBe( 404 );
+			expect( ( await rest( site, 'GET', FINGERPRINT ) ).status ).toBe( 404 );
 		} );
 	} );
 
@@ -621,7 +621,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 
 		it( 'refuses a signed-out caller and a bad nonce', async () => {
 			const json = { check: 'echo', marker: MARKER, response: { status: 200 } };
-			expect( ( await rest( site, 'POST', DIAGNOSE, { json, headers: FRESH } ) ).status ).toBe( 401 );
+			expect( ( await rest( site, 'POST', DIAGNOSE, { json } ) ).status ).toBe( 401 );
 			expect( ( await admin.rest( 'POST', DIAGNOSE, { json, nonce: '0123456789' } ) ).status ).toBe( 403 );
 		} );
 	} );

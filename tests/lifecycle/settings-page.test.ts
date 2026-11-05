@@ -17,7 +17,7 @@
  * Decision: docs/decisions/0005-reach-for-existing-read-routes.md
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ECHO, FIXTURE_OPTED_IN_ROUTE, rest } from '../http';
+import { ECHO, FIXTURE_OPTED_IN_ROUTE, FRESH, rest } from '../http';
 import { NO_LOCAL_CLI, type Site, sites } from '../sites';
 import {
 	deleteOption,
@@ -28,7 +28,7 @@ import {
 	setOption,
 	snapshotOption,
 } from './site-state';
-import { FRESH, Session } from './session';
+import { Session } from './session';
 
 const PAGE = '/wp-admin/options-general.php?page=wp-http-query';
 const CHECKBOX = 'id="wp_http_query_presets-core-collections"';
@@ -81,7 +81,7 @@ function statusRows( html: string ): Record< string, string > {
 }
 
 const query = async ( site: Site, route: string ) =>
-	( await rest( site, 'QUERY', route, { json: {}, headers: FRESH } ) ).status;
+	( await rest( site, 'QUERY', route, { json: {} } ) ).status;
 
 describe.each( sites )( 'settings page: $label', ( site ) => {
 	if ( ! site.localCli ) {

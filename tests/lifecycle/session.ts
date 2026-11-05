@@ -1,12 +1,6 @@
 import { expect } from 'vitest';
+import { FRESH } from '../http';
 import type { Site } from '../sites';
-
-/**
- * Sent on every request from the lifecycle suite. Steps spend seconds in
- * WP-CLI between requests, and a pooled keep-alive socket that Apache closed
- * in the meantime fails the next fetch with "other side closed".
- */
-export const FRESH = { connection: 'close' };
 
 /**
  * A logged-in WordPress session over real HTTP: a cookie jar, and fetch that

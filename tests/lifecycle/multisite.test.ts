@@ -65,14 +65,12 @@ describe.skipIf( ! sites.includes( main ) || ! main.localCli )( 'multisite netwo
 	} );
 
 	it( 'keeps the preset setting per site', async () => {
-		setOption( sub, PRESETS_OPTION, [ 'core-collections' ] );
-		expect( ( await rest( sub, 'QUERY', PRESET_ROUTE, { json: {} } ) ).status ).toBe( 200 );
-		expect( ( await rest( main, 'QUERY', PRESET_ROUTE, { json: {} } ) ).status ).toBe( 404 );
-
-		deleteOption( sub, PRESETS_OPTION );
-		setOption( main, PRESETS_OPTION, [ 'core-collections' ] );
-		expect( ( await rest( main, 'QUERY', PRESET_ROUTE, { json: {} } ) ).status ).toBe( 200 );
-		expect( ( await rest( sub, 'QUERY', PRESET_ROUTE, { json: {} } ) ).status ).toBe( 404 );
+		for ( const [ on, off ] of [ [ sub, main ], [ main, sub ] ] ) {
+			deleteOption( off, PRESETS_OPTION );
+			setOption( on, PRESETS_OPTION, [ 'core-collections' ] );
+			expect( ( await rest( on, 'QUERY', PRESET_ROUTE, { json: {} } ) ).status ).toBe( 200 );
+			expect( ( await rest( off, 'QUERY', PRESET_ROUTE, { json: {} } ) ).status ).toBe( 404 );
+		}
 	} );
 
 	// Last: it uninstalls the plugin, and afterAll network-activates it again.

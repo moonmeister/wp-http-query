@@ -9,14 +9,14 @@
  * WP-CLI, and puts it back in afterAll, along with the subscriber it creates.
  *
  * Runs in the serial lifecycle suite because it changes site state. Every
- * request sends Connection: close (see session.ts).
+ * request sends Connection: close (see FRESH in http.ts).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ECHO, type Echo, rest } from '../http';
 import { wp } from '../seed';
 import { NO_LOCAL_CLI, sites } from '../sites';
-import { FRESH, Session } from './session';
-import { deleteOption, FIXTURE_DEMO_ROUTE_OFF, setOption, snapshotOption } from './site-state';
+import { Session } from './session';
+import { deleteOption, FIXTURE_DEMO_ROUTE_OFF, networkFlag, setOption, snapshotOption } from './site-state';
 
 // Letters only: multisite rejects usernames with anything else.
 const SUBSCRIBER = 'wphqdemosubscriber';
@@ -32,8 +32,8 @@ describe.each( sites )( 'demo route: $label', ( site ) => {
 	const subscriber = new Session( site, SUBSCRIBER, SUBSCRIBER_PASSWORD );
 	let restoreSwitch = () => {};
 
-	// On a network, users belong to the network: a site-level delete only removes them from the site.
-	const network = site.network ? [ '--network' ] : [];
+	// On a network a site-level delete only removes the user from the site.
+	const network = networkFlag( site );
 	const deleteSubscriber = () => {
 		if ( wp( site, [ 'user', 'list', `--login=${ SUBSCRIBER }`, '--format=count', ...network ] ).trim() !== '0' ) {
 			wp( site, [ 'user', 'delete', SUBSCRIBER, '--yes', ...network ] );
@@ -56,7 +56,7 @@ describe.each( sites )( 'demo route: $label', ( site ) => {
 
 	describe( 'filter left at its default', () => {
 		it( 'refuses a signed-out QUERY with 401', async () => {
-			const res = await rest( site, 'QUERY', ECHO, { json: {}, headers: FRESH } );
+			const res = await rest( site, 'QUERY', ECHO, { json: {} } );
 			expect( res.status ).toBe( 401 );
 			expect( ( await res.json() ).code ).toBe( 'rest_forbidden' );
 		} );
@@ -64,7 +64,7 @@ describe.each( sites )( 'demo route: $label', ( site ) => {
 		it( 'refuses a signed-out request through the method-override tunnel with 401', async () => {
 			const res = await rest( site, 'POST', ECHO, {
 				json: {},
-				headers: { ...FRESH, 'x-http-method-override': 'QUERY' },
+				headers: { 'x-http-method-override': 'QUERY' },
 			} );
 			expect( res.status ).toBe( 401 );
 			expect( ( await res.json() ).code ).toBe( 'rest_forbidden' );
@@ -95,7 +95,7 @@ describe.each( sites )( 'demo route: $label', ( site ) => {
 	describe( 'filter returning true', () => {
 		it( 'answers a signed-out QUERY', async () => {
 			deleteOption( site, FIXTURE_DEMO_ROUTE_OFF ); // The fixture's filter makes it public.
-			const res = await rest( site, 'QUERY', ECHO, { json: { search: 'needle' }, headers: FRESH } );
+			const res = await rest( site, 'QUERY', ECHO, { json: { search: 'needle' } } );
 			expect( res.status ).toBe( 200 );
 			const echo: Echo = await res.json();
 			expect( echo.method ).toBe( 'QUERY' );
