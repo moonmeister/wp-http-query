@@ -29,8 +29,14 @@ trunk), so a plugin could ship the whole capability. It shipped as
 [v0.1.0](https://github.com/moonmeister/wp-http-query/releases/tag/v0.1.0).
 
 Two core defects found along the way are fixed upstream for 7.2:
-[Trac#65905](https://core.trac.wordpress.org/ticket/65905) (r63756) and
-[Trac#46992](https://core.trac.wordpress.org/ticket/46992) (r64730).
+[Trac#65905](https://core.trac.wordpress.org/ticket/65905) (r63756, array-form `methods` never
+comma-split, [#36](https://github.com/moonmeister/wp-http-query/issues/36)) and
+[Trac#46992](https://core.trac.wordpress.org/ticket/46992) (r64730, the CORS header clobber,
+[#16](https://github.com/moonmeister/wp-http-query/issues/16)). They differ on disclosure,
+deliberately. #16 was framed with no reference to `QUERY` at all. Trac#65905 **does** disclose it,
+because there the overlap is the strongest argument available: if `READABLE` gains a second method
+the bug produces 14 failures in core's own suite, so core is one multi-method constant away from
+breaking its own routes.
 
 ### Route to core (decided 2026-11-05)
 
@@ -54,7 +60,7 @@ A log of the research behind the plugin, as of 2026-11-05. Each row links to its
 | ADR 0002 blast radius | **Run 2026-08-16** against core's REST suite: options A and B change nothing, option D fails 20. **All three numbers are misleading and the ADR says why**: core uses `ALLMETHODS` once, so the suite cannot measure option A, and 14 of D's 20 are a pre-existing core bug. [Experiment](../experiments/blast-radius/) · [ADR 0002](decisions/0002-allmethods-vs-queryable.md) |
 | ADR 0001 | **Decided 2026-08-19: option B**, JSON + form-encoded. One line: `'QUERY'` into `$accepts_body_data`. Option D (pluggable per-route formats) declined as unneeded, and free to defer because routes can already parse their own bodies with no core support. [ADR 0001](decisions/0001-query-body-media-type.md) |
 | ADR 0002 | **Decided 2026-09-15: option B**, additive `QUERYABLE = 'QUERY'`; `READABLE` and `ALLMETHODS` untouched, nothing migrates on upgrade. The C → D reversal of 2026-08-19 did not survive [#38](https://github.com/moonmeister/wp-http-query/issues/38): it rested on "handlers do not break," which was true of the mechanism it had refuted (parameter population) and false of one nobody had looked for. **C was dropped too**: its only distinguishing feature is a promise to fold `QUERY` into `ALLMETHODS` later, and `ALLMETHODS` has the same failure mode at lower volume. Reach moved to [ADR 0005](decisions/0005-reach-for-existing-read-routes.md). [ADR 0002](decisions/0002-allmethods-vs-queryable.md) · [#10](https://github.com/moonmeister/wp-http-query/issues/10) |
-| ADR 0003 | **Decided 2026-08-19: option C, core emits nothing method-specific.** The threat model was falsified: **no shipping cache stores a `QUERY` response.** Varnish `synth(501)`s it before the origin sees it (8.0 – 9.0.x; 9.1.0+ `pass`es it), nginx's cache-method bitmask holds only `GET`/`HEAD`/`POST`, `mod_cache`/Squid/Fastly/Cloudflare allowlist, and RFC 9111 §3 forbids storing a response whose method the cache has not *understood*. Residual vector: W3TC Pro with REST caching on: **confusion, not disclosure** (see #39 under [Where the work lands](#where-the-work-lands)). [Survey](../experiments/cache-survey/) · [ADR 0003](decisions/0003-cache-safety-default.md) |
+| ADR 0003 | **Decided 2026-08-19: option C, core emits nothing method-specific.** The threat model was falsified: **no shipping cache stores a `QUERY` response.** Varnish `synth(501)`s it before the origin sees it (8.0 – 9.0.x; 9.1.0+ `pass`es it), nginx's cache-method bitmask holds only `GET`/`HEAD`/`POST`, `mod_cache`/Squid/Fastly/Cloudflare allowlist, and RFC 9111 §3 forbids storing a response whose method the cache has not *understood*. Residual vector: W3TC Pro with REST caching on: **confusion, not disclosure** ([#39](https://github.com/moonmeister/wp-http-query/issues/39), closed as not planned; the plugin README documents the caveat). [Survey](../experiments/cache-survey/) · [ADR 0003](decisions/0003-cache-safety-default.md) |
 | ADR 0005 | **Decided and built 2026-11-04: reach is opt-in.** Off by default; routes opt in with `QUERYABLE`, sites with the `wp_http_query_routes` filter or the `core-collections` preset. [ADR 0005](decisions/0005-reach-for-existing-read-routes.md) · [usage](../plugin/README.md#choosing-which-routes-accept-query) |
 | Method-branching risk | **Measured 2026-09-15, and it named a break.** 170 plugins / 16.9M installs branch on the request method; **28–65 plugins / 0.82M–11.96M installs** also use `READABLE`, and the range cannot be narrowed without following each registration to its callback; both bounds were falsified by reading their largest member. Verified case: **Jetpack (3M)** registers three routes `READABLE` whose callbacks are `if ( 'GET' === get_method() ) { read } else { write }`, so a `QUERY` activates modules. Authorization fails *closed*; it is a safe-method violation, not an escalation. This ended the option D lean. [Sweep](../experiments/plugin-spike/README.md#method-branching-sweep) · [#38](https://github.com/moonmeister/wp-http-query/issues/38) |
 | Gap 3 behavior measured | **Done 2026-08-16**, unmodified trunk. A `QUERY` with a **JSON** body already populates and schema-validates params correctly: dispatched at the real posts controller it filters the collection and `400`s a bad `per_page`. Only **form-encoded** bodies are lost, and they return the full unfiltered collection with a `200`. Gap 3 is the only gap whose failure is a silent wrong answer, so it is first in the core patch order. [Probes](../experiments/blast-radius/) |
@@ -63,52 +69,6 @@ A log of the research behind the plugin, as of 2026-11-05. Each row links to its
 | Requests upstream PR | **In flight upstream, not ours**. See [Upstream tickets](#upstream-tickets) |
 | Plugin | **Shipped as [v0.1.0](https://github.com/moonmeister/wp-http-query/releases/tag/v0.1.0)** (prerelease). All three gaps worked around in userland, with `Accept-Query`, opt-in reach, a settings page and a self-test. Tested on WordPress 7.0, 7.1 and nightly |
 | Core patch (`QUERY`) | ADRs 0001–0003 are decided, and exploratory patches for gap 3 and `QUERYABLE` exist on a `wordpress-develop` branch, `feat-http-query` (see [Repos](#repos)). Whether core gets one patch or several is undecided until the scope is known; see [#60](https://github.com/moonmeister/wp-http-query/issues/60) |
-
-## Where the work lands
-
-Issues are organized by **capability delivered**, not by venue. Venue is a label, because a single
-capability usually needs research here, code in a fork, and a writeup on someone else's tracker.
-Reporting is a deliverable: the pitch is "arrive with verified evidence", and a patch nobody
-writes up is worth about as much as no patch.
-
-The capability tree as of 2026-11-05 (the project board has the working order):
-
-| Capability | Venue | State |
-|---|---|---|
-| [#5 Plugin](https://github.com/moonmeister/wp-http-query/issues/5): run on a real install ([#22](https://github.com/moonmeister/wp-http-query/issues/22)), publish ([#23](https://github.com/moonmeister/wp-http-query/issues/23)) | this repo | Done in v0.1.0 |
-| [#1 Method constants & route matching](https://github.com/moonmeister/wp-http-query/issues/1): gap 2, opt-in reach ([ADR 0005](decisions/0005-reach-for-existing-read-routes.md)) | this repo | Done in v0.1.0 |
-| [#2 Request body parsing](https://github.com/moonmeister/wp-http-query/issues/2): gap 3, via `rest_request_parameter_order` | this repo | Done |
-| [#3 CORS preflight](https://github.com/moonmeister/wp-http-query/issues/3): gap 1, core's `rest_allowed_cors_methods` on 7.2+ ([r64730](https://core.trac.wordpress.org/changeset/64730)), a wrapper around core's handler before that | this repo | Done |
-| [#4 `Accept-Query`](https://github.com/moonmeister/wp-http-query/issues/4): cache safety needs nothing ([ADR 0003](decisions/0003-cache-safety-default.md) option C) | this repo | Done |
-| Core patches: [#11](https://github.com/moonmeister/wp-http-query/issues/11), [#14](https://github.com/moonmeister/wp-http-query/issues/14), [#35](https://github.com/moonmeister/wp-http-query/issues/35), [#20](https://github.com/moonmeister/wp-http-query/issues/20), [#34](https://github.com/moonmeister/wp-http-query/issues/34) and the Trac write-ups [#12](https://github.com/moonmeister/wp-http-query/issues/12), [#15](https://github.com/moonmeister/wp-http-query/issues/15), [#21](https://github.com/moonmeister/wp-http-query/issues/21), ordered in [#60](https://github.com/moonmeister/wp-http-query/issues/60) | core | Core patch milestone |
-| [#6 PHP client, `WP_Http` / Requests](https://github.com/moonmeister/wp-http-query/issues/6): review, not authorship | WordPress/Requests | Open |
-| [#7 JS clients](https://github.com/moonmeister/wp-http-query/issues/7): `api-fetch` and browser `fetch()` | this repo | Open |
-
-Standalone issues from the same period:
-[#31](https://github.com/moonmeister/wp-http-query/issues/31) re-filed the WebKit standards
-position (done);
-[#32](https://github.com/moonmeister/wp-http-query/issues/32) documents the hardening-allowlist 403
-and the Varnish 8.0 – 9.0.x `501`, fixed upstream in 9.1.0 (v0.2.0);
-[#33](https://github.com/moonmeister/wp-http-query/issues/33) matrix Axis A leftovers (HTTP/2, HTTP/3, TLS, OpenLiteSpeed), closed as not planned: the plugin's
-self-test and Site Health checks gather that evidence from real hosts instead of a bigger lab matrix;
-[#36](https://github.com/moonmeister/wp-http-query/issues/36) filed the array-form `methods` bug
-(see below); and
-[#39](https://github.com/moonmeister/wp-http-query/issues/39) proposed reporting two page-cache
-method denylists upstream. Those reports were drafted but not filed, and #39 was closed as not
-planned on 2026-11-05. The plugin README documents the W3 Total Cache Pro caveat instead, and the
-self-test detects a page cache storing `QUERY` responses.
-
-**Two of these landed regardless of `QUERY`**:
-[#16](https://github.com/moonmeister/wp-http-query/issues/16) (the CORS header clobber) and
-[#36](https://github.com/moonmeister/wp-http-query/issues/36) (array-form `methods` never
-comma-split). Both are real core defects, and both are fixed for 7.2:
-[r64730](https://core.trac.wordpress.org/changeset/64730) and
-[r63756](https://core.trac.wordpress.org/changeset/63756).
-
-They differ on disclosure, deliberately. #16 was framed with no reference to `QUERY` at all.
-Trac#65905 **does** disclose it, because there the overlap is the strongest argument available: if
-`READABLE` gains a second method the bug produces 14 failures in core's own suite, so core is one
-multi-method constant away from breaking its own routes.
 
 ## Explicitly not doing
 
