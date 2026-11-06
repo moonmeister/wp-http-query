@@ -64,8 +64,14 @@ export function changeSite( site: Site, changes: SiteChanges ): () => void {
 	const del = changes.delete ?? [];
 	const names = [ ...new Set( [ ...( changes.snapshot ?? [] ), ...Object.keys( set ), ...del ] ) ];
 
+	const putBack = `foreach ( $prior as $name => $was ) {
+		null === $was ? delete_option( $name ) : update_option( $name, $was['value'] );
+	}`;
+
 	// The sentinel tells a missing row from any stored value; passing a default
-	// also keeps a registered default from standing in for a missing row.
+	// also keeps a registered default from standing in for a missing row. If
+	// setUp throws, the caller never gets a restore function, so the options go
+	// back here before the error surfaces.
 	const prior = evalJson< Record< string, { value: unknown } | null > >(
 		site,
 		`$missing = new stdClass();
@@ -74,26 +80,24 @@ export function changeSite( site: Site, changes: SiteChanges ): () => void {
 			$value = get_option( $name, $missing );
 			$prior[ $name ] = $value === $missing ? null : array( 'value' => $value );
 		}
-		foreach ( $input['set'] as $name => $value ) {
-			update_option( $name, $value );
+		try {
+			foreach ( $input['set'] as $name => $value ) {
+				update_option( $name, $value );
+			}
+			foreach ( $input['delete'] as $name ) {
+				delete_option( $name );
+			}
+			${ changes.setUp ?? '' }
+		} catch ( Throwable $e ) {
+			${ putBack }
+			throw $e;
 		}
-		foreach ( $input['delete'] as $name ) {
-			delete_option( $name );
-		}
-		${ changes.setUp ?? '' }
 		return $prior;`,
 		{ names, set, delete: del }
 	);
 
 	return () => {
-		evalJson(
-			site,
-			`${ changes.tearDown ?? '' }
-			foreach ( $input as $name => $was ) {
-				null === $was ? delete_option( $name ) : update_option( $name, $was['value'] );
-			}`,
-			prior
-		);
+		evalJson( site, `${ changes.tearDown ?? '' }\n$prior = $input;\n${ putBack }`, prior );
 	};
 }
 
