@@ -59,8 +59,11 @@ def main(out, lines_key=None):
 
     comparisons = unique([r for k in ("eq_after", "eq_before") for r in data[k]
                           if not REGISTRATION.search(r[4])])
-    # A line that also checks a literal 'GET' keeps working.
-    vs_request = [r for r in comparisons if REQUEST_METHOD.search(r[4]) and not re.search(r"['\"]GET['\"]", r[4])]
+    # A READABLE check that also accepts a literal 'GET' keeps working; 'GET' is no
+    # fallback for CREATABLE or DELETABLE.
+    get_fallback = lambda line: (re.search(r"['\"]GET['\"]", line) and "READABLE" in line
+                                 and not re.search(r"CREATABLE|DELETABLE", line))
+    vs_request = [r for r in comparisons if REQUEST_METHOD.search(r[4]) and not get_fallback(r[4])]
     token = [r for r in comparisons if not REQUEST_METHOD.search(r[4])]
     schema_copy = [r for r in token if SCHEMA_ARGS.search(r[4])]
     one_method = data["one_method"]
