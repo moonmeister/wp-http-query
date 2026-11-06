@@ -28,10 +28,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * QUERY reaches a route in exactly three ways:
  *
- * 1. The route registers it. Put QUERYABLE (or 'QUERY') in 'methods':
+ * 1. The route registers it. Put 'QUERY' in 'methods':
  *
  *        register_rest_route( 'my/v1', '/things', array(
- *            'methods'  => WP_REST_Server::READABLE . ', ' . \WPHttpQuery\QUERYABLE,
+ *            'methods'  => WP_REST_Server::READABLE . ', QUERY',
  *            ...
  *        ) );
  *

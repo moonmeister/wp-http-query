@@ -13,11 +13,15 @@
  *   lifecycle suite has switched that off (PRESET_FILTER_OFF below).
  * - Opts two core routes in by exact route key, one plain and one with a
  *   URL parameter, so both key shapes are covered.
- * - Registers a route that opts itself in with WPHttpQuery\QUERYABLE.
+ * - Registers a route that opts itself in with 'QUERY' in its methods.
  * - Registers a GET route shaped like Jetpack's hazard, opted in nowhere,
  *   which must keep answering QUERY with 404.
  *
  * /wp/v2/types is deliberately left alone: the default-off tests use it.
+ *
+ * For tests/forward-compat.test.ts (issue #67) it registers ALREADY_PROVIDED,
+ * a route on which everything the plugin adds is already there, as a future
+ * core or the route would provide it: see "Already provided" below.
  *
  * One more option, also set only by the lifecycle suite, changes how REST
  * CORS is handled, as a site might: see CORS below.
@@ -130,6 +134,7 @@ add_filter(
 	static function ( array $routes ): array {
 		$routes[] = '/wp/v2/taxonomies';
 		$routes[] = '/wp/v2/posts/(?P<id>[\d]+)';
+		$routes[] = '/' . NAMESPACE_ . ALREADY_PROVIDED;
 		return $routes;
 	}
 );
@@ -137,14 +142,14 @@ add_filter(
 add_action(
 	'rest_api_init',
 	static function (): void {
-		// mu-plugins load before plugins, so only read the constant once
+		// mu-plugins load before plugins, so only check for the plugin once
 		// rest_api_init runs, and skip the route if the plugin is inactive.
-		if ( defined( 'WPHttpQuery\QUERYABLE' ) ) {
+		if ( defined( 'WP_HTTP_QUERY_VERSION' ) ) {
 			register_rest_route(
 				NAMESPACE_,
 				'/queryable',
 				array(
-					'methods'             => \WP_REST_Server::READABLE . ', ' . \WPHttpQuery\QUERYABLE,
+					'methods'             => \WP_REST_Server::READABLE . ', QUERY',
 					'permission_callback' => '__return_true',
 					'callback'            => static function ( \WP_REST_Request $request ): array {
 						return array(
@@ -174,4 +179,145 @@ add_action(
 			)
 		);
 	}
+);
+
+/*
+ * -------------------------------------------------------------------------
+ * Already provided (issue #67): everything the plugin adds, already there on
+ * one route, as a future core or the route itself would provide it. The plugin
+ * must neither duplicate nor overwrite any of it.
+ *
+ * - Its handler registers 'GET, QUERY', and wp_http_query_routes opts it in.
+ * - A rest_allowed_cors_methods callback, before the plugin's, adds QUERY.
+ * - A rest_request_parameter_order callback, before the plugin's, adds POST
+ *   for QUERY where core puts it for its body methods.
+ * - The callback sets its own Accept-Query.
+ *
+ * Observers that run after the plugin report what it left: the response body
+ * has the handler's raw methods and the parameter order, and a header has the
+ * CORS list. Core dedupes the CORS list after the filter, so the header the
+ * browser sees can't show a duplicate; the observer's can.
+ * ----------------------------------------------------------------------
+ */
+
+/** The route, relative to NAMESPACE_. */
+const ALREADY_PROVIDED = '/already-provided';
+
+/** The Accept-Query value the route sends itself. */
+const ALREADY_PROVIDED_ACCEPT_QUERY = '"application/jsonpath"';
+
+/** Response header carrying the CORS list as the plugin's filter left it. */
+const OBSERVED_CORS_HEADER = 'X-WP-HTTP-Query-Test-CORS-Methods';
+
+/**
+ * Whether a request is for the already-provided route.
+ *
+ * @param mixed $request The request, if any.
+ */
+function is_already_provided( $request ): bool {
+	return $request instanceof \WP_REST_Request && '/' . NAMESPACE_ . ALREADY_PROVIDED === $request->get_route();
+}
+
+/**
+ * What the observers saw after the plugin ran, by key.
+ *
+ * @param string $key   'methods' or 'order'.
+ * @param mixed  $value The value to record. Omit to read.
+ * @return mixed The recorded value, or null.
+ */
+function observed( string $key, $value = null ) {
+	static $seen = array();
+
+	if ( null !== $value ) {
+		$seen[ $key ] = $value;
+	}
+
+	return $seen[ $key ] ?? null;
+}
+
+add_action(
+	'rest_api_init',
+	static function (): void {
+		register_rest_route(
+			NAMESPACE_,
+			ALREADY_PROVIDED,
+			array(
+				'methods'             => 'GET, QUERY',
+				'permission_callback' => '__return_true',
+				'callback'            => static function ( \WP_REST_Request $request ): \WP_REST_Response {
+					// Reads the parameters, so the parameter order is worked out and observed.
+					$request->get_params();
+
+					return new \WP_REST_Response(
+						array(
+							'methods' => observed( 'methods' ),
+							'order'   => observed( 'order' ),
+						),
+						200,
+						array( 'Accept-Query' => ALREADY_PROVIDED_ACCEPT_QUERY )
+					);
+				},
+			)
+		);
+	}
+);
+
+add_filter(
+	'rest_endpoints',
+	static function ( array $endpoints ): array {
+		$handlers = $endpoints[ '/' . NAMESPACE_ . ALREADY_PROVIDED ] ?? null;
+		if ( is_array( $handlers ) ) {
+			observed( 'methods', $handlers['methods'] ?? $handlers[0]['methods'] ?? null );
+		}
+		return $endpoints;
+	},
+	PHP_INT_MAX
+);
+
+add_filter(
+	'rest_allowed_cors_methods',
+	static function ( array $methods, $request ): array {
+		if ( is_already_provided( $request ) && ! in_array( 'QUERY', $methods, true ) ) {
+			array_splice( $methods, (int) array_search( 'GET', $methods, true ) + 1, 0, array( 'QUERY' ) );
+		}
+		return $methods;
+	},
+	9,
+	2
+);
+
+add_filter(
+	'rest_allowed_cors_methods',
+	static function ( array $methods, $request ): array {
+		if ( is_already_provided( $request ) ) {
+			header( OBSERVED_CORS_HEADER . ': ' . implode( ', ', $methods ) );
+		}
+		return $methods;
+	},
+	PHP_INT_MAX,
+	2
+);
+
+add_filter(
+	'rest_request_parameter_order',
+	static function ( array $order, \WP_REST_Request $request ): array {
+		if ( is_already_provided( $request ) && 'QUERY' === $request->get_method() && ! in_array( 'POST', $order, true ) ) {
+			array_splice( $order, (int) array_search( 'GET', $order, true ), 0, array( 'POST' ) );
+		}
+		return $order;
+	},
+	9,
+	2
+);
+
+add_filter(
+	'rest_request_parameter_order',
+	static function ( array $order, \WP_REST_Request $request ): array {
+		if ( is_already_provided( $request ) ) {
+			observed( 'order', $order );
+		}
+		return $order;
+	},
+	PHP_INT_MAX,
+	2
 );

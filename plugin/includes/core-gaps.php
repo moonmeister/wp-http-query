@@ -74,6 +74,9 @@ add_filter(
  *
  * Structured Fields List syntax — NOT the legacy Accept grammar, despite the
  * surface similarity. Emitted alongside core's generic Allow header logic.
+ *
+ * Only when the response has none: a value the route or a future core sent
+ * is kept, never overwritten.
  * ----------------------------------------------------------------------
  */
 
@@ -115,7 +118,7 @@ add_filter(
 			$answers[ $route ] = accepts_query( $server->get_routes()[ $route ] ?? array() );
 		}
 
-		if ( $answers[ $route ] ) {
+		if ( $answers[ $route ] && ! isset( array_change_key_case( $response->get_headers() )['accept-query'] ) ) {
 			$response->header(
 				'Accept-Query',
 				implode(

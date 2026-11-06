@@ -16,7 +16,8 @@
  *   "is this GET?". See is_safe_method().
  * - QUERY is only registered when something supports it: the wp-http-query
  *   plugin, or a future core with WP_REST_Server::QUERYABLE. Without either,
- *   the route answers GET only.
+ *   the route answers GET only. Nothing here references the plugin unguarded,
+ *   so removing the plugin can't break this file.
  *
  * The tests in tests/examples.test.ts exercise this file over HTTP. If you
  * change it, change the samples in docs/integrating.md to match.
@@ -35,23 +36,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 const ROUTE_NAMESPACE = 'query-route-example/v1';
 
 /**
- * The QUERY method name, or null if nothing on this site supports QUERY.
+ * Whether something on this site supports QUERY.
  *
  * Call it on rest_api_init or later, not when this file loads. Plugins load
  * in alphabetical order, so wp-http-query may not have loaded yet.
  */
-function query_method(): ?string {
-	// A future core release. Not in any release as of 2026-11-04.
+function supports_query(): bool {
+	// A future core release. Not in any release as of 2026-11-05.
 	if ( defined( 'WP_REST_Server::QUERYABLE' ) ) {
-		return constant( 'WP_REST_Server::QUERYABLE' );
+		return true;
 	}
 
 	// The wp-http-query feature plugin.
-	if ( defined( 'WPHttpQuery\QUERYABLE' ) ) {
-		return constant( 'WPHttpQuery\QUERYABLE' );
-	}
-
-	return null;
+	return defined( 'WP_HTTP_QUERY_VERSION' );
 }
 
 /**
@@ -71,9 +68,8 @@ add_action(
 	static function (): void {
 		$read_methods = array( \WP_REST_Server::READABLE );
 
-		$query = query_method();
-		if ( null !== $query ) {
-			$read_methods[] = $query;
+		if ( supports_query() ) {
+			$read_methods[] = 'QUERY';
 		}
 
 		register_rest_route(

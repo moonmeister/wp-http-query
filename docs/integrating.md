@@ -42,9 +42,8 @@ add_action(
 	static function (): void {
 		$read_methods = array( \WP_REST_Server::READABLE );
 
-		$query = query_method();
-		if ( null !== $query ) {
-			$read_methods[] = $query;
+		if ( supports_query() ) {
+			$read_methods[] = 'QUERY';
 		}
 
 		register_rest_route(
@@ -91,7 +90,7 @@ add_action(
 );
 ```
 
-`query_method()` is the feature check; see [Feature detection](#feature-detection). When the
+`supports_query()` is the feature check; see [Feature detection](#feature-detection). When the
 plugin is active, `$read_methods` is `array( 'GET', 'QUERY' )`.
 
 The read handler. Nothing in it is specific to `QUERY`:
@@ -194,23 +193,27 @@ similar sees every method on every route. If it treats "not `GET`" as a write, i
 Register `QUERY` only when something on the site supports it. From the example:
 
 ```php
-function query_method(): ?string {
-	// A future core release. Not in any release as of 2026-11-04.
+function supports_query(): bool {
+	// A future core release. Not in any release as of 2026-11-05.
 	if ( defined( 'WP_REST_Server::QUERYABLE' ) ) {
-		return constant( 'WP_REST_Server::QUERYABLE' );
+		return true;
 	}
 
 	// The wp-http-query feature plugin.
-	if ( defined( 'WPHttpQuery\QUERYABLE' ) ) {
-		return constant( 'WPHttpQuery\QUERYABLE' );
-	}
-
-	return null;
+	return defined( 'WP_HTTP_QUERY_VERSION' );
 }
 ```
 
-When it returns `null`, register `GET` only. The route keeps working, and a `QUERY` gets core's
+When it returns `false`, register `GET` only. The route keeps working, and a `QUERY` gets core's
 `404`. The lifecycle test deactivates wp-http-query and checks exactly that.
+
+**Make your code safe to remove the plugin from.** Never reference anything from wp-http-query
+unguarded: no function, class or constant in its `WPHttpQuery` namespace. Sites will remove it,
+for example once core supports `QUERY`, and an unguarded reference is a fatal error from then on.
+Register with the string `'QUERY'`. To know whether the plugin is active, check
+`defined( 'WP_HTTP_QUERY_VERSION' )`, as `supports_query()` does; it holds the plugin's version,
+but check that it exists, not what it says. Its filters, such as `wp_http_query_routes`, are safe
+to keep: a filter nothing applies does nothing.
 
 **Why not register `QUERY` anyway?** Core will dispatch it without the plugin, but it gets three
 things wrong. Form-encoded bodies are silently dropped, so a filtered search returns everything
@@ -223,7 +226,7 @@ plugin has.
 
 **Core versions.** wp-http-query needs WordPress 7.2 or later. A future core may add
 `WP_REST_Server::QUERYABLE` itself: not proposed yet, and parked until the plugin ships
-([ADR 0002](decisions/0002-allmethods-vs-queryable.md)). `query_method()` already checks for it
+([ADR 0002](decisions/0002-allmethods-vs-queryable.md)). `supports_query()` already checks for it
 first. Don't compare version numbers. Alpha and beta builds of a release compare lower than the
 release. Check for the constant.
 

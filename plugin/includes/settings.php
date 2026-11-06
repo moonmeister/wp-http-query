@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * -------------------------------------------------------------------------
  * Settings → HTTP QUERY.
  *
- * Only presets get UI. Route lists and QUERYABLE stay code-only. One option,
+ * Only presets get UI. Route lists and route registrations stay code-only. One option,
  * a list of enabled preset names, default empty, registered in the plugin's
  * own option group and saved through options.php. uninstall.php deletes it.
  *

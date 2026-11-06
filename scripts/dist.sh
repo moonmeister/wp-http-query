@@ -6,7 +6,8 @@
 #
 # The version never lives on main: plugin/ always says 0.0.0-dev. Given a version (the argument,
 # or the VERSION environment variable), the build stamps it into the COPY of the plugin it zips,
-# in the header's `Version:` and readme.txt's `Stable tag:`. plugin/ itself is never modified.
+# in the header's `Version:`, the WP_HTTP_QUERY_VERSION constant and readme.txt's `Stable tag:`.
+# plugin/ itself is never modified.
 # Without one, the header's own value (0.0.0-dev) is used; that's what PR builds do.
 # The version must be semver: x.y.z, optionally with a -prerelease and/or +build suffix,
 # e.g. 0.1.0, 0.2.0-beta.1, 0.0.0-nightly.20261105+abc1234.
@@ -130,6 +131,22 @@ stamp() {
 	mv "$file.tmp" "$file"
 }
 stamp wp-http-query.php 'Version'
+
+# The WP_HTTP_QUERY_VERSION constant, the same way: its first define() line only.
+main="$stage/$SLUG/wp-http-query.php"
+if ! awk -v v="$version" -v q="'" '
+	!done && $0 ~ ("^define\\( " q "WP_HTTP_QUERY_VERSION" q ", " q "[^" q "]*" q " \\);$") {
+		print "define( " q "WP_HTTP_QUERY_VERSION" q ", " q v q " );"
+		done = 1
+		next
+	}
+	{ print }
+	END { exit !done }
+' "$main" >"$main.tmp"; then
+	echo "error: plugin/wp-http-query.php has no WP_HTTP_QUERY_VERSION define() line to stamp the version into" >&2
+	exit 1
+fi
+mv "$main.tmp" "$main"
 if [ -f "$stage/$SLUG/readme.txt" ]; then
 	stamp readme.txt 'Stable tag'
 fi

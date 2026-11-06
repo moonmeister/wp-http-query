@@ -147,6 +147,7 @@ from:
 | `adr-0001-accept-query.test.ts` | `Accept-Query` advertises `application/json` only (current default, revisitable) |
 | `gap-1-cors.test.ts` | `QUERY` is in `Access-Control-Allow-Methods`, and core's defaults are kept |
 | `adr-0003-no-cache-headers.test.ts` | [ADR 0003](docs/decisions/0003-cache-safety-default.md) C: no cache headers added |
+| `forward-compat.test.ts` | [#67](../../issues/67): when `QUERY` is already in the CORS list, `POST` already in the parameter order, `QUERY` already on an opted-in handler or `Accept-Query` already set, the plugin neither duplicates nor overwrites it |
 | `method-override-tunnel.test.ts` | `POST` + `X-HTTP-Method-Override: QUERY` is handled as `QUERY` |
 | `adr-0005-reach.test.ts` | [ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md): no route gains `QUERY` by default; the route, filter and preset opt-ins work; write handlers never gain it; a form-encoded `QUERY /wp/v2/posts` search filters a real collection |
 | `lifecycle/adr-0005-preset-setting.test.ts` | ADR 0005: the stored preset setting switches reach, and the filter overrides it |
@@ -172,7 +173,7 @@ No test uses it today.
 **Opt-ins for the tests live in a fixture mu-plugin**,
 [`tests/fixtures/mu-plugins/`](tests/fixtures/mu-plugins/), mounted on every site. It enables the
 `core-collections` preset, opts in `/wp/v2/taxonomies` and `/wp/v2/posts/(?P<id>[\d]+)`, and
-registers two test routes. It also makes the plugin's diagnostic echo route public; it's admins only by default.
+registers three test routes, one of them the already-provided route `forward-compat.test.ts` uses. It also makes the plugin's diagnostic echo route public; it's admins only by default.
 `/wp/v2/types` is deliberately left alone for the default-off tests.
 Global setup seeds two posts through WP-CLI, idempotently. Changing the mappings in the
 `.wp-env*.json` files needs `make up` to take effect.
@@ -338,3 +339,9 @@ build, run `npx wp-env start --update --config=.wp-env.nightly.json`.
    [ADR 0002](docs/decisions/0002-allmethods-vs-queryable.md). This applies to the plugin too:
    reach is opt-in, never all routes by default
    ([ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md)).
+5. **Check for a provider, never a core version.** Before the plugin adds something, it checks
+   whether it's already there: `QUERY` in the CORS list, `POST` in the parameter order, `QUERY` on
+   the handler, an `Accept-Query` header. A new feature does the same, and gets a test in
+   `forward-compat.test.ts` that fakes the provider. Never compare WordPress versions: a core that
+   gains `QUERY` support must find old plugin versions adding nothing twice and overwriting
+   nothing ([#67](../../issues/67)).
