@@ -52,7 +52,7 @@ def main(out, lines_key=None):
         n, p, i = summary(data[key])
         print(f"| `{key}` | `{meta['id']}` | {n:,} | {p:,} | {i:,} |")
 
-    comparisons = [r for k in ("eq_after", "eq_before", "multi_eq") for r in data[k]
+    comparisons = [r for k in ("eq_after", "eq_before") for r in data[k]
                    if not REGISTRATION.search(r[4])]
     # A line that also checks a literal 'GET' keeps working.
     vs_request = [r for r in comparisons if REQUEST_METHOD.search(r[4]) and not re.search(r"['\"]GET['\"]", r[4])]
@@ -72,6 +72,7 @@ def main(out, lines_key=None):
     print(row("`in_array` on the request method (all also list `'GET'`: survives)", in_array_req))
     print(row("`switch`/`case` on a constant (largest: Elementor, on the registered constant: survives)", data["case"]))
     print(row("already treats a constant as a list (control)", data["as_list"]))
+    print(row("`EDITABLE`/`ALLMETHODS` compared as one method (already broken today: control)", data["multi_eq"]))
 
     den = {}
     for k in ("d_readable", "d_creatable", "d_deletable"):

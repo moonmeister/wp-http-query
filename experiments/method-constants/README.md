@@ -25,14 +25,15 @@ That includes WooCommerce, Elementor and Jetpack.
 
 | Set | Lines | Plugins | Installs |
 |---|---|---|---|
-| **Breaks if the value changes** (union of the next two) | 216 | 60 | 20,759,880 |
-| compared with the request's method (`get_method()`) | 41 | 25 | 17,340,430 |
+| **Breaks if the value changes** (union of the next two) | 215 | 60 | 20,759,880 |
+| compared with the request's method (`get_method()`) | 40 | 25 | 17,340,430 |
 | passed where one method is required (`'method' =>`, `new WP_REST_Request()`) | 175 | 35 | 3,419,450 |
-| compared with a variable (mostly the constant passed in: survives) | 552 | 169 | 19,872,320 |
+| compared with a variable (mostly the constant passed in: survives) | 518 | 166 | 19,851,480 |
 | of which copies of core's schema-args pattern | 282 | 137 | 1,232,140 |
 | `in_array` on the request method (all also list `'GET'`: survives) | 4 | 1 | 10,000 |
 | `switch`/`case` on a constant (largest: Elementor, on the registered constant: survives) | 32 | 4 | 10,091,020 |
 | already treats a constant as a list (control) | 13 | 11 | 10,178,510 |
+| `EDITABLE`/`ALLMETHODS` compared as one method (already broken today: control) | 35 | 12 | 115,040 |
 
 Denominator: 4,362 plugins / 110.6M installs use at least one of the three constants.
 
@@ -70,7 +71,7 @@ sides change together. Most "compared with a variable" hits are like this:
   reading the source resolves these.
 - **Already broken today.** `EDITABLE` compared with the request's method, e.g. BuddyPress
   `class-bp-rest-members-endpoint.php:808` `$append = WP_REST_Server::EDITABLE ===
-  $request->get_method();`, is always false. It's counted under `multi_eq`, and it shows authors
+  $request->get_method();`, is always false. It's a control, not part of the total, because a constant change can't cause it. It shows authors
   treat the constants as single methods regardless of what they hold.
 - **The `READABLE` denominator differs from the earlier sweep** (3,775 plugins here, 2,428 in the
   method-branching sweep's search #7). That search's term had a leading space

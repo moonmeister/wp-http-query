@@ -57,6 +57,9 @@ def main(out):
         if ids.get(key, {}).get("term") != term:
             res = req("POST", API, {"term": term, "repo": "plugins"})
             ids[key] = {"id": res["id"], "term": term}
+            stale = os.path.join(out, f"{key}.json")
+            if os.path.exists(stale):
+                os.remove(stale)  # results of the old regex
             json.dump(ids, open(ids_path, "w"), indent=2)
             time.sleep(10)
     for key, meta in ids.items():
