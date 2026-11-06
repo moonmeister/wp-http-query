@@ -1,5 +1,4 @@
 import { expect } from 'vitest';
-import { FRESH } from '../http';
 import type { Site } from '../sites';
 
 /**
@@ -8,6 +7,8 @@ import type { Site } from '../sites';
  */
 export class Session {
 	private cookies = new Map< string, string >();
+	/** This session's wp_rest nonce, fetched on its first rest() call. */
+	private nonce?: Promise< string >;
 
 	constructor(
 		private site: Site,
@@ -24,7 +25,7 @@ export class Session {
 		path: string,
 		init: { method?: string; form?: URLSearchParams; json?: unknown; headers?: Record< string, string > } = {}
 	): Promise< Response > {
-		const headers: Record< string, string > = { ...FRESH, ...init.headers };
+		const headers: Record< string, string > = { ...init.headers };
 		if ( this.cookies.size ) {
 			headers.cookie = this.cookieHeader();
 		}
@@ -54,6 +55,7 @@ export class Session {
 	}
 
 	async logIn(): Promise< void > {
+		this.nonce = undefined;
 		this.cookies.set( 'wordpress_test_cookie', 'WP%20Cookie%20check' );
 		const res = await this.request( '/wp-login.php', {
 			form: new URLSearchParams( {
@@ -75,7 +77,7 @@ export class Session {
 	}
 
 	/** A wp_rest nonce for this session, from core's rest-nonce admin-ajax action. */
-	async restNonce(): Promise< string > {
+	private async restNonce(): Promise< string > {
 		const res = await this.request( '/wp-admin/admin-ajax.php?action=rest-nonce' );
 		const nonce = ( await res.text() ).trim();
 		if ( res.status !== 200 || ! /^[0-9a-f]{10}$/.test( nonce ) ) {
@@ -84,13 +86,13 @@ export class Session {
 		return nonce;
 	}
 
-	/** A REST request with this session's cookies and, unless one is given, a fresh nonce. */
+	/** A REST request with this session's cookies and, unless one is given, the session's nonce. */
 	async rest(
 		method: string,
 		route: string,
 		opts: { json?: unknown; headers?: Record< string, string >; nonce?: string | null } = {}
 	): Promise< Response > {
-		const nonce = opts.nonce === undefined ? await this.restNonce() : opts.nonce;
+		const nonce = opts.nonce === undefined ? await ( this.nonce ??= this.restNonce() ) : opts.nonce;
 		const headers: Record< string, string > = { ...opts.headers };
 		if ( nonce !== null ) {
 			headers[ 'x-wp-nonce' ] = nonce;

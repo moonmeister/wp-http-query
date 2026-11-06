@@ -23,7 +23,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { CORE_COLLECTIONS, ECHO, FIXTURE_OPTED_IN_ROUTE, rest, tokens } from './http';
 import { SEED_POSTS, seededPostId } from './seed';
-import { type Site, sites } from './sites';
+import { describeLocalSites, type Site, sites } from './sites';
 
 /** A core read route nobody has opted in. */
 const CORE_READ_ROUTE = '/wp/v2/types';
@@ -37,18 +37,6 @@ async function handlerMethods( site: Site, route: string ): Promise< string[][] 
 }
 
 describe.each( sites )( 'ADR 0005 reach: $label', ( site ) => {
-	// Seeded by tests/global-setup.ts.
-	const ids: Record< string, number > = {};
-
-	beforeAll( async () => {
-		if ( ! site.localCli ) {
-			return; // Not seeded; the tests that need these ids are skipped below.
-		}
-		for ( const { slug } of SEED_POSTS ) {
-			ids[ slug ] = await seededPostId( site, slug );
-		}
-	} );
-
 	describe( 'default off', () => {
 		it( 'dispatches QUERY on a route that registered it', async () => {
 			const res = await rest( site, 'QUERY', ECHO, { json: {} } );
@@ -84,19 +72,14 @@ describe.each( sites )( 'ADR 0005 reach: $label', ( site ) => {
 			expect( await res.json() ).toHaveProperty( 'category' );
 		} );
 
-		it.skipIf( ! site.localCli )( 'matches a parameterized route by its registered regex key', async () => {
-			const id = ids[ SEED_POSTS[ 0 ].slug ];
-			const res = await rest( site, 'QUERY', `/wp/v2/posts/${ id }`, { json: {} } );
-			expect( res.status ).toBe( 200 );
-			expect( ( await res.json() ).id ).toBe( id );
-		} );
-
 		it( 'adds QUERY to every route in an enabled preset', async () => {
-			for ( const route of CORE_COLLECTIONS ) {
-				const res = await rest( site, 'QUERY', route, { json: {} } );
-				expect( res.status, route ).toBe( 200 );
-				expect( Array.isArray( await res.json() ), route ).toBe( true );
-			}
+			await Promise.all(
+				CORE_COLLECTIONS.map( async ( route ) => {
+					const res = await rest( site, 'QUERY', route, { json: {} } );
+					expect( res.status, route ).toBe( 200 );
+					expect( Array.isArray( await res.json() ), route ).toBe( true );
+				} )
+			);
 		} );
 
 		it( 'dispatches QUERY on a route that lists QUERY in its methods', async () => {
@@ -105,31 +88,46 @@ describe.each( sites )( 'ADR 0005 reach: $label', ( site ) => {
 			expect( await res.json() ).toMatchObject( { method: 'QUERY', params: { a: 1 } } );
 		} );
 
-		it.skipIf( ! site.localCli )( 'adds QUERY to the GET handler only, never to write handlers on the same route', async () => {
-			// One GET handler, one EDITABLE (POST, PUT, PATCH), one DELETE.
-			const item = await handlerMethods( site, `/wp/v2/posts/${ ids[ SEED_POSTS[ 0 ].slug ] }` );
-			const collection = await handlerMethods( site, '/wp/v2/posts' );
-
-			for ( const methods of [ ...item, ...collection ] ) {
-				expect( methods.includes( 'QUERY' ), methods.join( ',' ) ).toBe( methods.includes( 'GET' ) );
-			}
-			expect( item.flat() ).toEqual( expect.arrayContaining( [ 'POST', 'PUT', 'PATCH', 'DELETE' ] ) );
-		} );
-
 		it( 'leaves a route outside every opt-in at 404 for QUERY', async () => {
 			const res = await rest( site, 'QUERY', '/wp/v2/statuses', { json: {} } );
 			expect( res.status ).toBe( 404 );
 		} );
 	} );
+} );
+
+/** The tests that need the posts tests/global-setup.ts seeds over WP-CLI. */
+describeLocalSites( 'ADR 0005 reach, seeded posts: $label', ( site ) => {
+	const [ zebra ] = SEED_POSTS;
+	let id: number;
+
+	beforeAll( async () => {
+		id = await seededPostId( site, zebra.slug );
+	} );
+
+	it( 'matches a parameterized route by its registered regex key', async () => {
+		const res = await rest( site, 'QUERY', `/wp/v2/posts/${ id }`, { json: {} } );
+		expect( res.status ).toBe( 200 );
+		expect( ( await res.json() ).id ).toBe( id );
+	} );
+
+	it( 'adds QUERY to the GET handler only, never to write handlers on the same route', async () => {
+		// One GET handler, one EDITABLE (POST, PUT, PATCH), one DELETE.
+		const item = await handlerMethods( site, `/wp/v2/posts/${ id }` );
+		const collection = await handlerMethods( site, '/wp/v2/posts' );
+
+		for ( const methods of [ ...item, ...collection ] ) {
+			expect( methods.includes( 'QUERY' ), methods.join( ',' ) ).toBe( methods.includes( 'GET' ) );
+		}
+		expect( item.flat() ).toEqual( expect.arrayContaining( [ 'POST', 'PUT', 'PATCH', 'DELETE' ] ) );
+	} );
 
 	describe( 'a real collection (gap 3 end to end, #22)', () => {
-		it.skipIf( ! site.localCli )( 'filters QUERY /wp/v2/posts by a form-encoded search', async () => {
-			const [ zebra ] = SEED_POSTS;
+		it( 'filters QUERY /wp/v2/posts by a form-encoded search', async () => {
 			const res = await rest( site, 'QUERY', '/wp/v2/posts', { form: { search: zebra.term } } );
 			expect( res.status ).toBe( 200 );
 
 			const posts: { id: number }[] = await res.json();
-			expect( posts.map( ( p ) => p.id ) ).toEqual( [ ids[ zebra.slug ] ] );
+			expect( posts.map( ( p ) => p.id ) ).toEqual( [ id ] );
 		} );
 	} );
 } );

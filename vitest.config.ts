@@ -6,6 +6,7 @@ export default defineConfig( {
 		// Mutates site state; run serially by vitest.lifecycle.config.ts.
 		exclude: [ ...configDefaults.exclude, 'tests/lifecycle/**' ],
 		globalSetup: [ 'tests/global-setup.ts' ],
+		setupFiles: [ 'tests/no-keep-alive.ts' ],
 		testTimeout: 15_000,
 	},
 } );

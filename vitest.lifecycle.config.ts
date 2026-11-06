@@ -9,6 +9,7 @@ export default defineConfig( {
 	test: {
 		include: [ 'tests/lifecycle/**/*.test.ts' ],
 		globalSetup: [ 'tests/lifecycle/global-setup.ts' ],
+		setupFiles: [ 'tests/no-keep-alive.ts' ],
 		fileParallelism: false,
 		// Every step is a WP-CLI call through wp-env, about a second each.
 		testTimeout: 60_000,

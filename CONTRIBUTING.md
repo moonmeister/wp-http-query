@@ -182,7 +182,7 @@ Global setup seeds two posts through WP-CLI, idempotently. Changing the mappings
 uninstall routine or write options, so they'd break the main suite if they ran alongside it.
 `make test` runs them after the main suite, one file at a time
 (`vitest.lifecycle.config.ts`), and each restores what it changed in `afterAll`, failure or not.
-`npx vitest run` alone skips them. They take about a minute and a half: every step is a WP-CLI call.
+`npx vitest run` alone skips them. They take a little over a minute: most of it is WP-CLI calls, about a second each.
 
 **The example plugin is tested too.** [`examples/query-route-example/`](examples/query-route-example/)
 is mounted and activated on every site, next to the plugin. The full-route samples in
@@ -195,9 +195,14 @@ they drift. Change the example and the guide together.
 
 1. Put it in the file for the decision it checks, or create `tests/<adr-or-gap>-<topic>.test.ts`
    with a header naming the decision and issue.
-2. Wrap it in `describe.each( sites )` so it runs against every test site.
+2. Wrap it in `describe.each( sites )` so it runs against every test site, or in
+   `describeLocalSites()` ([`tests/sites.ts`](tests/sites.ts)) if it needs WP-CLI: a site whose
+   URL is overridden then gets a skip note instead.
 3. Use the helpers in [`tests/http.ts`](tests/http.ts): `rest( site, 'QUERY', route, { json } )`,
-   `{ form }` for form-encoded bodies, and `tokens()` for comma-separated headers.
+   `{ form }` for form-encoded bodies, and `tokens()` for comma-separated headers. For site state,
+   `changeSite()` in [`tests/lifecycle/site-state.ts`](tests/lifecycle/site-state.ts) and
+   `evalJson()` in [`tests/seed.ts`](tests/seed.ts) batch WP-CLI work into one `wp eval`: each
+   WP-CLI call costs about a second.
 
 ## Compatibility matrix
 

@@ -11,10 +11,8 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { rest, tokens } from './http';
+import { BOOKS, rest, tokens } from './http';
 import { sites } from './sites';
-
-const BOOKS = '/query-route-example/v1/books';
 
 interface Book {
 	title: string;
@@ -52,7 +50,7 @@ describe.each( sites )( 'example plugin: $label', ( site ) => {
 	} );
 
 	it( 'gives QUERY with a body the same answer as GET with a query string', async () => {
-		const get = await fetch( `${ site.url }/wp-json${ BOOKS }?search=dune` );
+		const get = await rest( site, 'GET', `${ BOOKS }?search=dune` );
 		const query = await rest( site, 'QUERY', BOOKS, { json: { search: 'dune' } } );
 
 		expect( get.status ).toBe( 200 );

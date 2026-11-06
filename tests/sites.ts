@@ -1,3 +1,5 @@
+import { describe, it } from 'vitest';
+
 /**
  * The WordPress sites every decision test runs against.
  *
@@ -15,7 +17,7 @@
  * An overridden site is HTTP-only: WP-CLI always reaches the local wp-env
  * container, never the overridden install, so anything needing WP-CLI
  * (seeding, option changes, plugin activation) is skipped for it. See
- * `localCli` and the guard in tests/seed.ts.
+ * `localCli`, describeLocalSites() and the guard in tests/seed.ts.
  */
 export interface Site {
 	key: 'nightly' | 'multisite' | 'multisite-sub';
@@ -59,5 +61,16 @@ const wanted = process.env.SITES?.split( ',' ).map( ( s ) => s.trim() ).filter( 
 
 export const sites = wanted?.length ? [ ...all, ...networkSites ].filter( ( s ) => wanted.includes( s.key ) ) : all;
 
-/** Why WP-CLI-dependent tests are skipped for a site whose URL is overridden. */
-export const NO_LOCAL_CLI = 'skipped: URL overridden, and WP-CLI only reaches the local wp-env site';
+/**
+ * describe.each( sites ) for tests that need WP-CLI: a site whose URL is
+ * overridden gets one skipped test saying why, instead of the block.
+ */
+export function describeLocalSites( name: string, fn: ( site: Site ) => void ): void {
+	describe.each( sites )( name, ( site ) => {
+		if ( ! site.localCli ) {
+			it.skip( 'skipped: URL overridden, and WP-CLI only reaches the local wp-env site', () => {} );
+			return;
+		}
+		fn( site );
+	} );
+}

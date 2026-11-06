@@ -10,29 +10,25 @@
  * setting, so it is switched off with the fixture-only option, as in
  * adr-0005-preset-setting.test.ts, and everything is put back in afterAll.
  *
- * Every request here sends Connection: close. Several steps spend seconds in
- * WP-CLI between requests, and a pooled keep-alive socket that Apache closed
- * in the meantime fails the next fetch with "other side closed".
- *
  * Decision: docs/decisions/0005-reach-for-existing-read-routes.md
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ECHO, FIXTURE_OPTED_IN_ROUTE, FRESH, rest } from '../http';
-import { NO_LOCAL_CLI, type Site, sites } from '../sites';
+import { afterAll, beforeAll, expect, it } from 'vitest';
+import { CORE_COLLECTIONS, ECHO, FIXTURE_OPTED_IN_ROUTE, rest, SETTINGS_PAGE } from '../http';
+import { describeLocalSites, type Site } from '../sites';
 import {
+	changeSite,
 	deleteOption,
 	FIXTURE_DEMO_ROUTE_OFF,
 	FIXTURE_PRESET_FILTER_OFF,
 	getOption,
 	PRESETS_OPTION,
+	PRESET_SETTING_UNSET,
 	setOption,
-	snapshotOption,
 } from './site-state';
 import { Session } from './session';
 
-const PAGE = '/wp-admin/options-general.php?page=wp-http-query';
 const CHECKBOX = 'id="wp_http_query_presets-core-collections"';
-const PRESET_ROUTE = '/wp/v2/posts';
+const PRESET_ROUTE = CORE_COLLECTIONS[ 0 ];
 /** Registered by the test fixture with 'QUERY' in its methods. */
 const SELF_REGISTERED_ROUTE = '/wp-http-query-test/v1/queryable';
 
@@ -40,7 +36,7 @@ const SELF_REGISTERED_ROUTE = '/wp-http-query-test/v1/queryable';
 class Admin extends Session {
 	/** Submits the settings page's form, as a browser would, with or without the box ticked. */
 	async savePreset( checked: boolean ): Promise< Response > {
-		const page = await this.html( PAGE );
+		const page = await this.html( SETTINGS_PAGE );
 		const form = new URLSearchParams( {
 			'option_page': hiddenField( page, 'option_page' ),
 			action: hiddenField( page, 'action' ),
@@ -83,41 +79,26 @@ function statusRows( html: string ): Record< string, string > {
 const query = async ( site: Site, route: string ) =>
 	( await rest( site, 'QUERY', route, { json: {} } ) ).status;
 
-describe.each( sites )( 'settings page: $label', ( site ) => {
-	if ( ! site.localCli ) {
-		it.skip( NO_LOCAL_CLI, () => {} );
-		return;
-	}
-
+describeLocalSites( 'settings page: $label', ( site ) => {
 	const admin = new Admin( site );
-	let restorePresets = () => {};
-	let restoreFilterSwitch = () => {};
-	let restoreDemoSwitch = () => {};
+	let restore = () => {};
 
 	beforeAll( async () => {
-		restorePresets = snapshotOption( site, PRESETS_OPTION );
-		restoreFilterSwitch = snapshotOption( site, FIXTURE_PRESET_FILTER_OFF );
-		restoreDemoSwitch = snapshotOption( site, FIXTURE_DEMO_ROUTE_OFF );
-		setOption( site, FIXTURE_PRESET_FILTER_OFF, 1 );
-		deleteOption( site, PRESETS_OPTION );
+		restore = changeSite( site, { ...PRESET_SETTING_UNSET, snapshot: [ FIXTURE_DEMO_ROUTE_OFF ] } );
 		await admin.logIn();
 	} );
 
-	afterAll( () => {
-		restoreDemoSwitch();
-		restoreFilterSwitch();
-		restorePresets();
-	} );
+	afterAll( () => restore() );
 
 	it( 'sends a logged-out visitor to the login page instead', async () => {
-		const res = await fetch( `${ site.url }${ PAGE }`, { headers: FRESH, redirect: 'manual' } );
+		const res = await new Session( site ).request( SETTINGS_PAGE );
 		expect( res.status ).toBe( 302 );
 		expect( res.headers.get( 'location' ) ).toContain( '/wp-login.php' );
 		expect( await res.text() ).not.toContain( CHECKBOX );
 	} );
 
 	it( 'renders the preset checkbox, unticked, and the status table', async () => {
-		const page = await admin.html( PAGE );
+		const page = await admin.html( SETTINGS_PAGE );
 
 		expect( page ).toContain( '<h1>HTTP QUERY</h1>' );
 		expect( page ).toContain( "name='option_page' value='wp-http-query'" );
@@ -138,7 +119,7 @@ describe.each( sites )( 'settings page: $label', ( site ) => {
 	it( 'says the echo route is admins only when the filter is left at its default', async () => {
 		setOption( site, FIXTURE_DEMO_ROUTE_OFF, 1 );
 		try {
-			expect( statusRows( await admin.html( PAGE ) )[ ECHO ] ).toBe( 'Demo route: admins only (used by the self-test)' );
+			expect( statusRows( await admin.html( SETTINGS_PAGE ) )[ ECHO ] ).toBe( 'Demo route: admins only (used by the self-test)' );
 		} finally {
 			deleteOption( site, FIXTURE_DEMO_ROUTE_OFF );
 		}
@@ -161,7 +142,7 @@ describe.each( sites )( 'settings page: $label', ( site ) => {
 		expect( getOption( site, PRESETS_OPTION ) ).toEqual( [ 'core-collections' ] );
 		expect( await query( site, PRESET_ROUTE ) ).toBe( 200 );
 
-		const page = await admin.html( PAGE );
+		const page = await admin.html( SETTINGS_PAGE );
 		expect( page ).toMatch( new RegExp( `${ CHECKBOX } name="wp_http_query_presets\\[\\]" value="core-collections"\\s+checked='checked'` ) );
 		const rows = statusRows( page );
 		expect( rows[ PRESET_ROUTE ] ).toBe( 'Preset: core-collections' );
@@ -174,13 +155,13 @@ describe.each( sites )( 'settings page: $label', ( site ) => {
 
 		expect( getOption( site, PRESETS_OPTION ) ).toEqual( [] );
 		expect( await query( site, PRESET_ROUTE ) ).toBe( 404 );
-		expect( statusRows( await admin.html( PAGE ) ) ).not.toHaveProperty( PRESET_ROUTE );
+		expect( statusRows( await admin.html( SETTINGS_PAGE ) ) ).not.toHaveProperty( PRESET_ROUTE );
 	} );
 
 	it( 'says so when the wp_http_query_presets filter overrides the setting', async () => {
 		deleteOption( site, FIXTURE_PRESET_FILTER_OFF ); // The fixture's filter enables the preset.
 
-		const page = await admin.html( PAGE );
+		const page = await admin.html( SETTINGS_PAGE );
 		expect( page ).toContain( 'Code on this site overrides this setting through the wp_http_query_presets filter.' );
 		expect( statusRows( page )[ PRESET_ROUTE ] ).toBe( 'Preset: core-collections' );
 	} );

@@ -8,51 +8,57 @@
  * switches the fixture's filter off with a fixture-only option, set over
  * WP-CLI, and puts it back in afterAll, along with the subscriber it creates.
  *
- * Runs in the serial lifecycle suite because it changes site state. Every
- * request sends Connection: close (see FRESH in http.ts).
+ * Runs in the serial lifecycle suite because it changes site state.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ECHO, type Echo, rest } from '../http';
-import { wp } from '../seed';
-import { NO_LOCAL_CLI, sites } from '../sites';
+import { describeLocalSites } from '../sites';
 import { Session } from './session';
-import { deleteOption, FIXTURE_DEMO_ROUTE_OFF, networkFlag, setOption, snapshotOption } from './site-state';
+import { changeSite, deleteOption, FIXTURE_DEMO_ROUTE_OFF } from './site-state';
 
 // Letters only: multisite rejects usernames with anything else.
 const SUBSCRIBER = 'wphqdemosubscriber';
 const SUBSCRIBER_PASSWORD = 'wphq-demo-subscriber-password';
 
-describe.each( sites )( 'demo route: $label', ( site ) => {
-	if ( ! site.localCli ) {
-		it.skip( NO_LOCAL_CLI, () => {} );
-		return;
-	}
+/**
+ * Deletes the subscriber if a run left one behind. Users belong to the
+ * network on multisite, and a site-level delete only removes the user from
+ * the site, so it's wpmu_delete_user() there.
+ */
+const DELETE_SUBSCRIBER_PHP = `
+	require_once ABSPATH . 'wp-admin/includes/user.php';
+	$user = get_user_by( 'login', '${ SUBSCRIBER }' );
+	if ( $user && is_multisite() ) {
+		require_once ABSPATH . 'wp-admin/includes/ms.php';
+		wpmu_delete_user( $user->ID );
+	} elseif ( $user ) {
+		wp_delete_user( $user->ID );
+	}`;
 
+describeLocalSites( 'demo route: $label', ( site ) => {
 	const admin = new Session( site );
 	const subscriber = new Session( site, SUBSCRIBER, SUBSCRIBER_PASSWORD );
-	let restoreSwitch = () => {};
-
-	// On a network a site-level delete only removes the user from the site.
-	const network = networkFlag( site );
-	const deleteSubscriber = () => {
-		if ( wp( site, [ 'user', 'list', `--login=${ SUBSCRIBER }`, '--format=count', ...network ] ).trim() !== '0' ) {
-			wp( site, [ 'user', 'delete', SUBSCRIBER, '--yes', ...network ] );
-		}
-	};
+	let restore = () => {};
 
 	beforeAll( async () => {
-		restoreSwitch = snapshotOption( site, FIXTURE_DEMO_ROUTE_OFF );
-		setOption( site, FIXTURE_DEMO_ROUTE_OFF, 1 );
-		deleteSubscriber();
-		wp( site, [ 'user', 'create', SUBSCRIBER, `${ SUBSCRIBER }@example.test`, '--role=subscriber', `--user_pass=${ SUBSCRIBER_PASSWORD }` ] );
-		await admin.logIn();
-		await subscriber.logIn();
+		restore = changeSite( site, {
+			set: { [ FIXTURE_DEMO_ROUTE_OFF ]: 1 },
+			setUp: `${ DELETE_SUBSCRIBER_PHP }
+				$id = wp_insert_user( array(
+					'user_login' => '${ SUBSCRIBER }',
+					'user_pass'  => '${ SUBSCRIBER_PASSWORD }',
+					'user_email' => '${ SUBSCRIBER }@example.test',
+					'role'       => 'subscriber',
+				) );
+				if ( is_wp_error( $id ) ) {
+					throw new Exception( $id->get_error_message() );
+				}`,
+			tearDown: DELETE_SUBSCRIBER_PHP,
+		} );
+		await Promise.all( [ admin.logIn(), subscriber.logIn() ] );
 	} );
 
-	afterAll( () => {
-		deleteSubscriber();
-		restoreSwitch();
-	} );
+	afterAll( () => restore() );
 
 	describe( 'filter left at its default', () => {
 		it( 'refuses a signed-out QUERY with 401', async () => {

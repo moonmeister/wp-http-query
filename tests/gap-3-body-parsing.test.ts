@@ -32,11 +32,7 @@ describe.each( sites )( 'gap 3 body parsing: $label', ( site ) => {
 	} );
 
 	it( 'lets the body win over the query string, as for POST', async () => {
-		const res = await fetch( `${ site.url }/wp-json${ ECHO }?search=from-url`, {
-			method: 'QUERY',
-			headers: { 'content-type': 'application/x-www-form-urlencoded' },
-			body: 'search=from-body',
-		} );
+		const res = await rest( site, 'QUERY', `${ ECHO }?search=from-url`, { form: { search: 'from-body' } } );
 
 		const echo: Echo = await res.json();
 		expect( echo.merged_params.search ).toBe( 'from-body' );

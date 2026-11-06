@@ -1,4 +1,4 @@
-import { wp } from '../seed';
+import { evalJson, wp } from '../seed';
 import type { Site } from '../sites';
 
 export const PLUGIN = 'wp-http-query';
@@ -28,41 +28,97 @@ export function getOption( site: Site, name: string ): unknown {
 	return JSON.parse( wp( site, [ 'option', 'get', name, '--format=json' ] ) );
 }
 
+/** Deletes an option, whether or not it exists. */
 export function deleteOption( site: Site, name: string ): void {
-	if ( optionExists( site, name ) ) {
-		wp( site, [ 'option', 'delete', name ] );
-	}
+	evalJson( site, 'delete_option( $input );', name );
+}
+
+/** PHP that activates the plugin as `wp plugin activate` does: network-wide on a network. No-op if already active. */
+export const ACTIVATE_PLUGIN_PHP = `
+	require_once ABSPATH . 'wp-admin/includes/plugin.php';
+	$activated = activate_plugin( '${ PLUGIN }/${ PLUGIN }.php', '', is_multisite() );
+	if ( is_wp_error( $activated ) ) {
+		throw new Exception( $activated->get_error_message() );
+	}`;
+
+export interface SiteChanges {
+	/** Options to snapshot and restore without changing them. Those in `set` and `delete` are snapshotted too. */
+	snapshot?: string[];
+	/** Options to store, name => value. */
+	set?: Record< string, unknown >;
+	/** Options to delete. */
+	delete?: string[];
+	/** More PHP for the same `wp eval`, run after the option changes. */
+	setUp?: string;
+	/** More PHP for the restoring `wp eval`, run before the options are put back. */
+	tearDown?: string;
 }
 
 /**
- * Snapshots an option and returns a function that puts it back: the stored
- * value if there was one, otherwise no row at all.
+ * Changes site state for a test file in one `wp eval`, and returns a function
+ * that undoes it in one more: tearDown's PHP, then every snapshotted option
+ * back as it was, its stored value or no row at all.
  */
-export function snapshotOption( site: Site, name: string ): () => void {
-	const existed = optionExists( site, name );
-	const value = existed ? getOption( site, name ) : undefined;
+export function changeSite( site: Site, changes: SiteChanges ): () => void {
+	const set = changes.set ?? {};
+	const del = changes.delete ?? [];
+	const names = [ ...new Set( [ ...( changes.snapshot ?? [] ), ...Object.keys( set ), ...del ] ) ];
+
+	const putBack = `foreach ( $prior as $name => $was ) {
+		null === $was ? delete_option( $name ) : update_option( $name, $was['value'] );
+	}`;
+
+	// The sentinel tells a missing row from any stored value; passing a default
+	// also keeps a registered default from standing in for a missing row. If
+	// setUp throws, the caller never gets a restore function, so the options go
+	// back here before the error surfaces.
+	const prior = evalJson< Record< string, { value: unknown } | null > >(
+		site,
+		`$missing = new stdClass();
+		$prior = array();
+		foreach ( $input['names'] as $name ) {
+			$value = get_option( $name, $missing );
+			$prior[ $name ] = $value === $missing ? null : array( 'value' => $value );
+		}
+		try {
+			foreach ( $input['set'] as $name => $value ) {
+				update_option( $name, $value );
+			}
+			foreach ( $input['delete'] as $name ) {
+				delete_option( $name );
+			}
+			${ changes.setUp ?? '' }
+		} catch ( Throwable $e ) {
+			${ putBack }
+			throw $e;
+		}
+		return $prior;`,
+		{ names, set, delete: del }
+	);
 
 	return () => {
-		if ( existed ) {
-			setOption( site, name, value );
-		} else {
-			deleteOption( site, name );
-		}
+		evalJson( site, `${ changes.tearDown ?? '' }\n$prior = $input;\n${ putBack }`, prior );
 	};
 }
 
-/**
- * WP-CLI's --network on a network site: the plugin is network-activated, and
- * users belong to the network, so their commands act network-wide there.
- */
-export const networkFlag = ( site: Site ): string[] => ( site.network ? [ '--network' ] : [] );
+/** The stored preset setting in charge, and unset: the fixture's presets filter switched off. */
+export const PRESET_SETTING_UNSET: SiteChanges = {
+	set: { [ FIXTURE_PRESET_FILTER_OFF ]: 1 },
+	delete: [ PRESETS_OPTION ],
+};
 
 export function activatePlugin( site: Site ): void {
-	wp( site, [ 'plugin', 'activate', PLUGIN, ...networkFlag( site ) ] );
+	evalJson( site, ACTIVATE_PLUGIN_PHP );
 }
 
 export function deactivatePlugin( site: Site ): void {
-	wp( site, [ 'plugin', 'deactivate', PLUGIN, ...networkFlag( site ) ] );
+	// --network on a network site, where the plugin is network-activated.
+	wp( site, [ 'plugin', 'deactivate', PLUGIN, ...( site.network ? [ '--network' ] : [] ) ] );
+}
+
+/** The plugin's status as `wp plugin list` reports it: active, active-network or inactive. */
+export function pluginStatus( site: Site ): string {
+	return wp( site, [ 'plugin', 'list', `--name=${ PLUGIN }`, '--field=status' ] ).trim();
 }
 
 /**
