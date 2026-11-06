@@ -13,7 +13,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ECHO, FIXTURE_OPTED_IN_ROUTE, ORIGIN, rest, tokens } from '../http';
 import { wp } from '../seed';
-import { NO_LOCAL_CLI, sites } from '../sites';
+import { networkSites, NO_LOCAL_CLI, sites } from '../sites';
 import {
 	activatePlugin,
 	deactivatePlugin,
@@ -34,16 +34,17 @@ describe.each( sites )( 'plugin lifecycle: $label', ( site ) => {
 		return;
 	}
 
-	let restorePresets = () => {};
+	let restorePresets: ( () => void )[] = [];
 
 	beforeAll( () => {
-		restorePresets = snapshotOption( site, PRESETS_OPTION );
+		// On a network, uninstall deletes the option from every site.
+		restorePresets = ( site.network ? networkSites : [ site ] ).map( ( s ) => snapshotOption( s, PRESETS_OPTION ) );
 		activatePlugin( site );
 	} );
 
 	afterAll( () => {
 		activatePlugin( site );
-		restorePresets();
+		restorePresets.forEach( ( restore ) => restore() );
 	} );
 
 	describe( 'deactivated', () => {

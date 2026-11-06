@@ -41,3 +41,30 @@ jobs:
           echo "::group::wp-env logs"
           npx --no-install wp-env logs all --no-watch --config=.wp-env.nightly.json || true
           echo "::endgroup::"
+
+  multisite:
+    # Issue #46. Its own job, so it runs alongside the matrix above instead of adding to it.
+    # PHP 8.4 only: the network tests multisite behavior; the PHP matrix covers the rest.
+    name: make check-multisite (PHP 8.4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      WP_ENV_PHP_VERSION: '8.4'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - run: make check-multisite
+
+      - name: Diagnostics
+        if: failure()
+        run: |
+          docker ps -a || true
+          echo "::group::wp-env logs (.wp-env.multisite.json)"
+          npx --no-install wp-env logs all --no-watch --config=.wp-env.multisite.json || true

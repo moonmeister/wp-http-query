@@ -65,6 +65,38 @@ pretty permalinks, and default settings. The echo route is admins only. It opens
 targets never touch it. WP-CLI works as for the others (`scripts/env.sh wp demo plugin list`). For
 a newer nightly, `npx wp-env start --update --config=.wp-env.demo.json`.
 
+## Multisite
+
+```sh
+make check-multisite
+```
+
+A separate subdirectory network on <http://localhost:8876> (`admin` / `password`), on the
+nightly build like the test site, so a failure here is a multisite difference, not a version one,
+and with the same mappings. Each env downloads nightly when it's created; for a newer build, `npx
+wp-env start --update --config=.wp-env.multisite.json`, as for the test site. `scripts/env.sh start multisite`
+network-activates the plugin and the example plugin, creates a `/sub/` subsite and sets pretty
+permalinks on both sites. `make check-multisite` then runs the whole suite against the main site
+and the subsite (`SITES=multisite,multisite-sub`), so reach, CORS, `Accept-Query` and the self-test
+are all checked under a site path (`/sub/wp-json/...`). On a network site the tests reach WP-CLI
+with `--url`, and activate or deactivate the plugin with `--network`.
+
+`tests/lifecycle/multisite.test.ts` covers what only a network has: the preset setting is per
+site, and uninstall deletes the option from every site, across `uninstall.php`'s batches of 100.
+For that it adds 100 sites of its own (`wphq-batch-1` to `-100`, kept for later runs;
+the first run spends about 30 seconds creating them). The network belongs to the tests: they
+restore the main site and `/sub/`, but a network uninstall clears every site, so a site you add by
+hand loses its `wp_http_query_presets` value whenever the lifecycle suite runs.
+
+Subdomain networks aren't covered: they need wildcard DNS for `*.localhost`, inside the containers
+as well as on the host. The plugin builds every URL with `rest_url()`, so nothing in it depends
+on the network type.
+
+`make multisite-down` stops it; `scripts/env.sh destroy multisite` removes it. It's never part of
+`make up`, `make test` or `make check`. CI runs it as its own job, on PHP 8.4 only, alongside
+the `make check` jobs. WP-CLI: `scripts/env.sh wp multisite --url=http://localhost:8876/sub/ option
+get wp_http_query_presets`.
+
 ## Commands
 
 Run `make help` for the list. The ones you'll use:
@@ -88,7 +120,7 @@ scripts/env.sh wp nightly core version
 scripts/env.sh wp nightly option get permalink_structure
 ```
 
-The first argument after `wp` picks the site (`nightly` or `demo`). The rest goes to WP-CLI.
+The first argument after `wp` picks the site (`nightly`, `demo` or `multisite`). The rest goes to WP-CLI.
 
 Routes register on `rest_api_init`, which doesn't fire under WP-CLI, so the command line can't see
 them. Test REST behavior over HTTP instead; that's what the test suite does.
@@ -122,6 +154,7 @@ from:
 | `lifecycle/cors-site-choice.test.ts` | A site that removed core's CORS handler keeps REST CORS off, and a CORS callback that runs after core's still wins. The self-test's CORS check reports each as the preflight shows it, and flags a `rest_allowed_cors_methods` callback that removes `QUERY` |
 | `lifecycle/self-test.test.ts` | Not a decision: the self-test's button, REST routes and Site Health tests, and its verdicts for each documented failure mode, from fabricated responses |
 | `lifecycle/plugin-lifecycle.test.ts` | [#22](../../issues/22): deactivated, the site is stock; uninstall deletes the option |
+| `lifecycle/multisite.test.ts` | [#46](../../issues/46): the preset setting is per site; uninstall deletes the option on every site of a network. Only with `SITES=multisite` |
 | `examples.test.ts` | Not a decision: the example plugin behind [docs/integrating.md](docs/integrating.md) works, and the guide quotes it verbatim |
 | `lifecycle/examples-feature-detection.test.ts` | Not a decision: without wp-http-query, the example answers `GET` and doesn't register `QUERY` |
 

@@ -32,7 +32,7 @@ It stores one option and adds no tables, cron jobs or cache headers.
 
 - PHP 7.4 or later.
 - WordPress 7.2 or later, including its betas and release candidates. Tested on nightly builds
-  (7.2-beta4, as of 2026-11-05).
+  (7.2-beta4, as of 2026-11-05), single site and multisite. See [Multisite](#multisite).
 - A web server that passes `QUERY` through to PHP. Most do. See
   [Check your server](#check-your-server).
 
@@ -337,7 +337,26 @@ SHA-256 of the body it received and a value that's new on every request, and not
 echoes nothing back and sends no cache headers of its own. The CORS check sends its preflight
 there too, since the plugin always registers it for `QUERY`.
 
+## Multisite
+
+Supported. Network-activate it or activate it site by site; it behaves the same on every site of a
+subdirectory network, including REST routes under a site's path (`/blog/wp-json/...`). Tested on a
+nightly build with the plugin network-activated, on the main site and a subsite. Subdomain
+networks aren't tested: nothing in the plugin depends on the URL scheme (every URL comes from
+`rest_url()`), but the test setup has no wildcard DNS.
+
+Everything is per site:
+
+- **The preset setting.** Each site has its own **Settings → HTTP QUERY**, for that site's
+  administrators. There is no network settings screen. A site's routes, content and caches are its
+  own, so whether they accept `QUERY` is a site decision.
+- **The self-test and Site Health checks** test the site you run them from.
+- **The filters** run on each site's requests, so a network-wide policy is code: put the
+  [`wp_http_query_presets` filter](#3-your-site-enables-a-preset) in a network mu-plugin to turn a
+  preset on (or off, with `array()`) on every site, whatever each site's setting says.
+
 ## Data
 
 One option, `wp_http_query_presets`, holding the enabled preset names. Deactivating keeps it;
-uninstalling deletes it.
+uninstalling deletes it. On multisite, uninstalling (from **Network Admin → Plugins**) deletes it
+from every site of the network, archived, spam and deleted sites included.

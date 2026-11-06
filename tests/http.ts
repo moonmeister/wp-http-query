@@ -9,6 +9,15 @@ export const ECHO = '/wp-http-query/v1/echo';
 
 export const ORIGIN = 'http://example.test';
 
+/**
+ * No keep-alive, sent by rest() and the lifecycle suite's Session. Lifecycle
+ * steps spend seconds in WP-CLI between requests, and a pooled socket Apache
+ * closed in the meantime fails the next fetch with "other side closed". A
+ * network's sites share one origin, so one pool: there it bites on the first
+ * request to the second site.
+ */
+export const FRESH = { connection: 'close' };
+
 /** Core's default Access-Control-Allow-Methods list. */
 export const CORE_CORS_METHODS = [ 'OPTIONS', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE' ];
 
@@ -42,7 +51,7 @@ export function rest(
 	route: string,
 	opts: { json?: unknown; form?: Record< string, string >; headers?: Record< string, string > } = {}
 ): Promise< Response > {
-	const headers: Record< string, string > = { ...opts.headers };
+	const headers: Record< string, string > = { ...FRESH, ...opts.headers };
 	let body: string | undefined;
 
 	if ( opts.json !== undefined ) {

@@ -51,12 +51,18 @@ export function snapshotOption( site: Site, name: string ): () => void {
 	};
 }
 
+/**
+ * WP-CLI's --network on a network site: the plugin is network-activated, and
+ * users belong to the network, so their commands act network-wide there.
+ */
+export const networkFlag = ( site: Site ): string[] => ( site.network ? [ '--network' ] : [] );
+
 export function activatePlugin( site: Site ): void {
-	wp( site, [ 'plugin', 'activate', PLUGIN ] );
+	wp( site, [ 'plugin', 'activate', PLUGIN, ...networkFlag( site ) ] );
 }
 
 export function deactivatePlugin( site: Site ): void {
-	wp( site, [ 'plugin', 'deactivate', PLUGIN ] );
+	wp( site, [ 'plugin', 'deactivate', PLUGIN, ...networkFlag( site ) ] );
 }
 
 /**
@@ -69,5 +75,8 @@ export function deactivatePlugin( site: Site ): void {
  * uninstall.php.
  */
 export function uninstallPluginKeepingFiles( site: Site ): void {
-	wp( site, [ 'plugin', 'uninstall', PLUGIN, '--deactivate', '--skip-delete' ] );
+	// Not `uninstall --deactivate`: on a network it warns, leaves the plugin
+	// network-active and uninstalls it anyway.
+	deactivatePlugin( site );
+	wp( site, [ 'plugin', 'uninstall', PLUGIN, '--skip-delete' ] );
 }

@@ -13,13 +13,13 @@
  *
  * Runs in the serial lifecycle suite because it changes site state: the test
  * fixture's CORS option, set over WP-CLI and put back in afterAll. Every
- * request sends Connection: close (see session.ts).
+ * request sends Connection: close (see FRESH in http.ts).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CORE_COLLECTIONS, CORE_CORS_METHODS, ORIGIN, rest, tokens } from '../http';
 import { wp } from '../seed';
 import { NO_LOCAL_CLI, type Site, sites } from '../sites';
-import { FRESH, Session } from './session';
+import { Session } from './session';
 import { FIXTURE_CORS, setOption, snapshotOption } from './site-state';
 
 const ROUTE = CORE_COLLECTIONS[ 0 ];
@@ -72,8 +72,8 @@ describe.each( sites )( 'CORS, as the site configured it: $label', ( site ) => {
 		withCorsScenario( site, scenario, () => Promise.all( [ fn(), corsCheck() ] ) );
 
 	const preflight = () =>
-		rest( site, 'OPTIONS', ROUTE, { headers: { ...FRESH, origin: ORIGIN, 'access-control-request-method': 'QUERY' } } );
-	const get = () => rest( site, 'GET', ROUTE, { headers: { ...FRESH, origin: ORIGIN } } );
+		rest( site, 'OPTIONS', ROUTE, { headers: { origin: ORIGIN, 'access-control-request-method': 'QUERY' } } );
+	const get = () => rest( site, 'GET', ROUTE, { headers: { origin: ORIGIN } } );
 	const bothRequests = () => Promise.all( [ preflight(), get() ] );
 
 	it( 'adds QUERY when core’s handler is where core put it', async () => {
