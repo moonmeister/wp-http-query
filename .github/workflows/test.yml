@@ -43,7 +43,7 @@ jobs:
           echo "::endgroup::"
 
   multisite:
-    # Issue #46. Its own job, so it runs alongside the two above instead of adding to them.
+    # Issue #46. Its own job, so it runs alongside the matrix above instead of adding to it.
     # PHP 8.4 only: the network tests multisite behavior; the PHP matrix covers the rest.
     name: make check-multisite (PHP 8.4)
     runs-on: ubuntu-latest

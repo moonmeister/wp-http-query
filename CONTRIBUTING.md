@@ -93,8 +93,8 @@ as well as on the host. The plugin builds every URL with `rest_url()`, so nothin
 on the network type.
 
 `make multisite-down` stops it; `scripts/env.sh destroy multisite` removes it. It's never part of
-`make up`, `make test` or `make check`. CI runs it as its own job, on PHP 8.4 only, alongside the
-two `make check` jobs. WP-CLI: `scripts/env.sh wp multisite --url=http://localhost:8876/sub/ option
+`make up`, `make test` or `make check`. CI runs it as its own job, on PHP 8.4 only, alongside
+the `make check` jobs. WP-CLI: `scripts/env.sh wp multisite --url=http://localhost:8876/sub/ option
 get wp_http_query_presets`.
 
 ## Commands
