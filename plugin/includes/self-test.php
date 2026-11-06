@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Self-test: does QUERY work on this hosting?
  *
  * Settings → HTTP QUERY has a "Test your server" button, and Site Health has
- * two tests. Between them they ask:
+ * three tests. Between them they ask:
  *
  * 1. Does a QUERY, with its body, reach WordPress intact? The browser sends a
  *    real fetch() with method QUERY to the echo route; the server sends the
@@ -33,8 +33,14 @@ if ( ! defined( 'ABSPATH' ) ) {
  *    loopback usually doesn't, but catches page-cache plugins, such as W3
  *    Total Cache Pro with REST caching on (experiments/cache-survey/).
  *
- * What a response means is decided here, in two pure functions,
- * diagnose_echo_response() and diagnose_cache_probe(), that take a status,
+ * 3. May pages on other sites send QUERY? The server sends itself the
+ *    preflight a browser sends before a cross-origin QUERY, and reads
+ *    Access-Control-Allow-Methods. Server only: the browser check runs
+ *    same-origin, so it never preflights.
+ *
+ * What a response means is decided in diagnose.php, in pure functions,
+ * diagnose_echo_response(), diagnose_cache_probe() and
+ * diagnose_cors_preflight(), that take a status,
  * headers and body and return a verdict and a message. The loopback, Site
  * Health and the browser (through the diagnose route) all use them, and the
  * tests feed them fabricated responses. The causes they name come from the
@@ -51,6 +57,13 @@ const FINGERPRINT_ROUTE = '/' . NAMESPACE_ . '/self-test/fingerprint';
 const SERVER_ROUTE      = '/' . NAMESPACE_ . '/self-test/server';
 const CACHE_ROUTE       = '/' . NAMESPACE_ . '/self-test/cache';
 const DIAGNOSE_ROUTE    = '/' . NAMESPACE_ . '/self-test/diagnose';
+const CORS_ROUTE        = '/' . NAMESPACE_ . '/self-test/cors';
+
+/**
+ * The Origin the CORS check's preflight comes from: another site, under a
+ * name reserved for examples (RFC 2606), so it's never a real one.
+ */
+const CORS_TEST_ORIGIN = 'https://cross-origin.example';
 
 /** Seconds a loopback request may take. Core's loopback test uses the same. */
 const LOOPBACK_TIMEOUT = 10;
@@ -58,9 +71,10 @@ const LOOPBACK_TIMEOUT = 10;
 /** Site Health test keys, also the 'test' value in their results. */
 const HEALTH_TEST_REACH = 'wp_http_query_reaches_wordpress';
 const HEALTH_TEST_CACHE = 'wp_http_query_cache';
+const HEALTH_TEST_CORS  = 'wp_http_query_cors';
 
 /**
- * The two server checks, by Site Health test key: the REST route the
+ * The server checks, by Site Health test key: the REST route the
  * settings page and Site Health call, the function that runs the check, and
  * the Site Health label for each status. The REST routes, the Site Health
  * tests and health_result() all read this.
@@ -85,6 +99,15 @@ function server_checks(): array {
 				'good'        => __( 'No cache was seen storing HTTP QUERY responses', 'wp-http-query' ),
 				'recommended' => __( 'Couldn’t check whether a cache stores HTTP QUERY responses', 'wp-http-query' ),
 				'critical'    => __( 'A cache stores HTTP QUERY responses without the request body', 'wp-http-query' ),
+			),
+		),
+		HEALTH_TEST_CORS  => array(
+			'route'  => CORS_ROUTE,
+			'run'    => __NAMESPACE__ . '\\run_cors_check',
+			'labels' => array(
+				'good'        => __( 'CORS allows HTTP QUERY requests from other sites', 'wp-http-query' ),
+				'recommended' => __( 'Couldn’t confirm that CORS allows HTTP QUERY requests from other sites', 'wp-http-query' ),
+				'critical'    => __( 'CORS blocks HTTP QUERY requests from other sites', 'wp-http-query' ),
 			),
 		),
 	);
@@ -191,7 +214,7 @@ function handle_diagnose( \WP_REST_Request $request ): array {
 }
 
 /**
- * Sends a QUERY from the site to itself.
+ * Sends a request from the site to itself.
  *
  * Signed in as the current user when asked, the way core's loopback test
  * does it (WP_Site_Health::can_perform_loopback()): the browser's cookies
@@ -202,13 +225,14 @@ function handle_diagnose( \WP_REST_Request $request ): array {
  * 'redirection' => 0, so a redirect is reported rather than followed:
  * WP_Http turns any method into GET on a 302.
  *
- * @param string $url            URL.
- * @param string $body           JSON request body.
+ * @param string $method          HTTP method.
+ * @param string $url             URL.
+ * @param array  $headers         Request headers.
+ * @param string $body            Request body.
  * @param bool   $as_current_user Whether to sign in as the current user.
  * @return array{status: int, headers: array, body: string, error: string}
  */
-function loopback_query( string $url, string $body, bool $as_current_user ): array {
-	$headers = array( 'Content-Type' => 'application/json' );
+function loopback( string $method, string $url, array $headers, string $body, bool $as_current_user ): array {
 	$cookies = array();
 
 	if ( $as_current_user ) {
@@ -225,7 +249,7 @@ function loopback_query( string $url, string $body, bool $as_current_user ): arr
 	$response = wp_remote_request(
 		$url,
 		array(
-			'method'      => METHOD,
+			'method'      => $method,
 			'headers'     => $headers,
 			'body'        => $body,
 			'cookies'     => $cookies,
@@ -253,6 +277,18 @@ function loopback_query( string $url, string $body, bool $as_current_user ): arr
 		'body'    => wp_remote_retrieve_body( $response ),
 		'error'   => '',
 	);
+}
+
+/**
+ * Sends a QUERY with a JSON body from the site to itself. See loopback().
+ *
+ * @param string $url             URL.
+ * @param string $body            JSON request body.
+ * @param bool   $as_current_user Whether to sign in as the current user.
+ * @return array{status: int, headers: array, body: string, error: string}
+ */
+function loopback_query( string $url, string $body, bool $as_current_user ): array {
+	return loopback( METHOD, $url, array( 'Content-Type' => 'application/json' ), $body, $as_current_user );
 }
 
 /**
@@ -296,10 +332,42 @@ function run_cache_check(): array {
 }
 
 /**
+ * The CORS check: a cross-origin QUERY preflight, sent to the fingerprint route.
+ *
+ * Signed out, as browsers send every preflight. The fingerprint route is the
+ * one the plugin always registers for QUERY, public, whatever the presets and
+ * the echo route's filter say. WordPress answers OPTIONS without running a
+ * permission check, and core's CORS handler runs for every REST response, so
+ * the answer is the one a browser on another site would get for any route
+ * that accepts QUERY.
+ *
+ * @return array Verdict from diagnose_cors_preflight(), plus 'url' and 'signed_in'.
+ */
+function run_cors_check(): array {
+	$url      = rest_url( FINGERPRINT_ROUTE );
+	$response = loopback(
+		'OPTIONS',
+		$url,
+		array(
+			'Origin'                         => CORS_TEST_ORIGIN,
+			'Access-Control-Request-Method'  => METHOD,
+			'Access-Control-Request-Headers' => 'content-type',
+		),
+		'',
+		false
+	);
+
+	return diagnose_cors_preflight( $response, CORS_TEST_ORIGIN ) + array(
+		'url'       => $url,
+		'signed_in' => false,
+	);
+}
+
+/**
  * A check's result as a Site Health test result, with the check attached.
  *
  * @param string $test  A server_checks() key.
- * @param array  $check A verdict from run_server_check() or run_cache_check().
+ * @param array  $check A verdict from one of server_checks()' 'run' functions.
  * @return array
  */
 function health_result( string $test, array $check ): array {

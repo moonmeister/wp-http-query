@@ -58,7 +58,7 @@ pretty permalinks, and default settings. The echo route is admins only. It opens
    curl -X QUERY http://localhost:8873/wp-json/wp/v2/posts -H 'Content-Type: application/json' -d '{"search":"hello"}'
    ```
 
-4. Click **Test your server**. It runs four checks, from your browser and from the server, and
+4. Click **Test your server**. It runs five checks, from your browser and from the server, and
    explains each result.
 
 `make demo-down` stops it (data kept), `make demo-destroy` removes it (asks first). The test-site
@@ -119,7 +119,7 @@ from:
 | `adr-0005-reach.test.ts` | [ADR 0005](docs/decisions/0005-reach-for-existing-read-routes.md): no route gains `QUERY` by default; the route, filter and preset opt-ins work; write handlers never gain it; a form-encoded `QUERY /wp/v2/posts` search filters a real collection |
 | `lifecycle/adr-0005-preset-setting.test.ts` | ADR 0005: the stored preset setting switches reach, and the filter overrides it |
 | `lifecycle/demo-route.test.ts` | The diagnostic echo route is admins only unless `wp_http_query_public_demo_route` returns true |
-| `lifecycle/cors-site-choice.test.ts` | A site that removed core's CORS handler keeps REST CORS off, and a CORS callback that runs after core's still wins |
+| `lifecycle/cors-site-choice.test.ts` | A site that removed core's CORS handler keeps REST CORS off, and a CORS callback that runs after core's still wins. The self-test's CORS check reports each as the preflight shows it, and flags a `rest_allowed_cors_methods` callback that removes `QUERY` |
 | `lifecycle/self-test.test.ts` | Not a decision: the self-test's button, REST routes and Site Health tests, and its verdicts for each documented failure mode, from fabricated responses |
 | `lifecycle/plugin-lifecycle.test.ts` | [#22](../../issues/22): deactivated, the site is stock; uninstall deletes the option |
 | `examples.test.ts` | Not a decision: the example plugin behind [docs/integrating.md](docs/integrating.md) works, and the guide quotes it verbatim |

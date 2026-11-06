@@ -1,7 +1,7 @@
 /**
  * Settings → HTTP QUERY: the "Test your server" button.
  *
- * Runs four checks, in two groups, and shows each result in plain language:
+ * Runs five checks, in two groups, and shows each result in plain language:
  *
  * From your browser, through everything in front of the site:
  * 1. QUERY reaches WordPress: a real fetch() with method QUERY to the echo
@@ -12,16 +12,20 @@
  *    see whether a cache on the way answers the second with the first's
  *    response.
  *
- * From your server (a loopback, run in PHP): the same two checks.
+ * From your server (a loopback, run in PHP): the same two checks, plus
+ * whether CORS lets pages on other sites send QUERY: the preflight a browser
+ * on another origin sends first, OPTIONS with Origin and
+ * Access-Control-Request-Method: QUERY. Server only: this page's own requests
+ * are same-origin, so the browser never preflights them.
  *
- * The two "reaches WordPress" checks run at the same time; the two cache
- * checks run after them, one after the other, because their probe pairs go
- * to the same URL and must not interleave. Results always render in the same
+ * The checks run at the same time, except the two cache checks (serial):
+ * they run after the others, one after the other, because their probe
+ * pairs go to the same URL and must not interleave. Results always render in the same
  * order.
  *
  * What a response means is decided in PHP, once (diagnose_echo_response(),
- * diagnose_cache_probe()): this file only reports what the browser saw to the
- * diagnose route, including a network failure ({ status: 0, error }), an
+ * diagnose_cache_probe(), diagnose_cors_preflight()): this file only
+ * reports what the browser saw to the diagnose route, including a network failure ({ status: 0, error }), an
  * opaque redirect ({ redirect: true }) and a browser that won't build a QUERY
  * request ({ unsupported: true }). The one verdict made here is test_failed,
  * when the diagnose or server route itself can't be reached.
@@ -251,7 +255,7 @@
 			description: i18n.groups.browser.description,
 			checks: [
 				{ id: 'browser-echo', key: 'browserEcho', check: 'echo', url: config.echoUrl, sent: i18n.sent.browserEcho, run: browserEcho },
-				{ id: 'browser-cache', key: 'browserCache', check: 'cache', url: config.fingerprintUrl, sent: i18n.sent.browserCache, run: browserCache },
+				{ id: 'browser-cache', key: 'browserCache', check: 'cache', serial: true, url: config.fingerprintUrl, sent: i18n.sent.browserCache, run: browserCache },
 			],
 		},
 		{
@@ -273,27 +277,40 @@
 					id: 'server-cache',
 					key: 'serverCache',
 					check: 'cache',
+					serial: true,
 					url: config.fingerprintUrl,
 					sent: i18n.sent.serverCache,
 					run: function () {
 						return serverCheck( config.cacheUrl );
 					},
 				},
+				{
+					id: 'server-cors',
+					key: 'serverCors',
+					check: 'cors',
+					url: config.fingerprintUrl,
+					sent: i18n.sent.serverCors,
+					run: function () {
+						return serverCheck( config.corsUrl );
+					},
+				},
 			],
 		},
 	];
 
-	GROUPS.forEach( function ( group ) {
-		group.checks.forEach( function ( check ) {
-			check.title = i18n.checks[ check.key ];
-			check.description = i18n.descriptions[ check.check ];
-		} );
+	/** Every check, in display order. */
+	var CHECKS = GROUPS.reduce( function ( all, group ) {
+		return all.concat( group.checks );
+	}, [] );
+
+	CHECKS.forEach( function ( check ) {
+		check.title = i18n.checks[ check.key ];
+		check.description = i18n.descriptions[ check.check ];
 	} );
 
-	var browserEchoCheck = GROUPS[ 0 ].checks[ 0 ];
-	var browserCacheCheck = GROUPS[ 0 ].checks[ 1 ];
-	var serverEchoCheck = GROUPS[ 1 ].checks[ 0 ];
-	var serverCacheCheck = GROUPS[ 1 ].checks[ 1 ];
+	async function run( check ) {
+		check.result = await attempt( check );
+	}
 
 	function summary( checks ) {
 		var problems = checks.filter( function ( check ) {
@@ -320,14 +337,20 @@
 		output.textContent = '';
 		output.appendChild( el( 'p', '', i18n.running ) );
 
-		var echoes = await Promise.all( [ attempt( browserEchoCheck ), attempt( serverEchoCheck ) ] );
-		browserEchoCheck.result = echoes[ 0 ];
-		serverEchoCheck.result = echoes[ 1 ];
-		browserCacheCheck.result = await attempt( browserCacheCheck );
-		serverCacheCheck.result = await attempt( serverCacheCheck );
+		await Promise.all(
+			CHECKS.filter( function ( check ) {
+				return ! check.serial;
+			} ).map( run )
+		);
+		var serial = CHECKS.filter( function ( check ) {
+			return check.serial;
+		} );
+		for ( var i = 0; i < serial.length; i++ ) {
+			await run( serial[ i ] );
+		}
 
 		output.textContent = '';
-		output.appendChild( summary( [ browserEchoCheck, browserCacheCheck, serverEchoCheck, serverCacheCheck ] ) );
+		output.appendChild( summary( CHECKS ) );
 		GROUPS.forEach( function ( group ) {
 			var section = el( 'div', 'wp-http-query-self-test-group' );
 			section.setAttribute( 'data-group', group.id );

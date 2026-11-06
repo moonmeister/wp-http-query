@@ -1,6 +1,6 @@
 /**
  * The self-test: Settings → HTTP QUERY's "Test your server" button, its REST
- * routes, the two Site Health tests, and the pure functions that turn a
+ * routes, the three Site Health tests, and the pure functions that turn a
  * response into a verdict.
  *
  * Over real HTTP as an admin where a request is involved; through `wp eval`
@@ -15,7 +15,7 @@
  */
 import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { rest } from '../http';
+import { CORE_CORS_METHODS, rest } from '../http';
 import { wp } from '../seed';
 import { NO_LOCAL_CLI, sites } from '../sites';
 import { clickTestButton, type StubElement } from './self-test-button';
@@ -27,6 +27,8 @@ const SERVER = '/wp-http-query/v1/self-test/server';
 const CACHE = '/wp-http-query/v1/self-test/cache';
 const DIAGNOSE = '/wp-http-query/v1/self-test/diagnose';
 const FINGERPRINT = '/wp-http-query/v1/self-test/fingerprint';
+const CORS = '/wp-http-query/v1/self-test/cors';
+const CORS_ORIGIN = 'https://cross-origin.example';
 
 interface Check {
 	verdict: string;
@@ -178,6 +180,128 @@ const CACHE_CASES: Record< string, { first: object; second: object; verdict: str
 	},
 };
 
+const CORE_LIST = CORE_CORS_METHODS.join( ', ' );
+// Sent on every REST response, CORS on or off: not a sign CORS is on.
+const ALWAYS = { 'Access-Control-Allow-Headers': 'Authorization, X-WP-Nonce, Content-Type', 'Access-Control-Expose-Headers': 'X-WP-Total' };
+const CORS_ON = { ...ALWAYS, 'Access-Control-Allow-Origin': CORS_ORIGIN, 'Access-Control-Allow-Credentials': 'true', Vary: 'Origin' };
+
+/**
+ * Fabricated preflight responses => expected verdict.
+ */
+const CORS_CASES: Record< string, { response: Observation; verdict: string; status: string; says?: string[] } > = {
+	'QUERY in the list': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': `${ CORE_LIST }, QUERY` } ),
+		verdict: 'cors_query',
+		status: 'good',
+		says: [ `${ CORE_LIST }, QUERY` ],
+	},
+	'QUERY in the list, repeated headers joined': {
+		response: { status: 200, headers: { ...CORS_ON, 'Access-Control-Allow-Methods': [ 'GET', 'QUERY' ] } as unknown as Record< string, string > },
+		verdict: 'cors_query',
+		status: 'good',
+	},
+	'wildcard origin and methods': {
+		response: seen( 200, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': '*', 'Access-Control-Allow-Headers': '*' } ),
+		verdict: 'cors_query',
+		status: 'good',
+		says: [ 'without cookies' ],
+	},
+	// "*" depends on the QUERY's credentials mode, not Allow-Credentials:
+	// a QUERY without cookies passes either way.
+	'wildcard methods, credentials allowed': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': '*' } ),
+		verdict: 'cors_query',
+		status: 'good',
+		says: [ 'without cookies' ],
+	},
+	// A browser refuses a preflight whose Allow-Origin doesn't admit its origin.
+	'QUERY listed, another origin allowed': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Origin': 'https://allowed.example', 'Access-Control-Allow-Methods': `${ CORE_LIST }, QUERY` } ),
+		verdict: 'cors_other_origin',
+		status: 'recommended',
+		says: [ '(https://allowed.example) doesn’t admit the test’s origin, https://cross-origin.example' ],
+	},
+	'QUERY listed, no Allow-Origin': {
+		response: seen( 200, { 'Access-Control-Allow-Methods': `${ CORE_LIST }, QUERY` } ),
+		verdict: 'cors_other_origin',
+		status: 'recommended',
+		says: [ '(none)' ],
+	},
+	// Methods are case-sensitive, and fetch normalizes only the standard ones.
+	'lower-case query': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': 'GET, query' } ),
+		verdict: 'cors_no_query',
+		status: 'critical',
+	},
+	// Fetch refuses a preflight whose list doesn't parse, even if it names what's needed.
+	'malformed methods list': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': 'QUERY, GET POST' } ),
+		verdict: 'cors_no_query',
+		status: 'critical',
+		says: [ 'isn’t a valid list' ],
+	},
+	'malformed headers list': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Headers': 'Content-Type, X Custom', 'Access-Control-Allow-Methods': 'QUERY' } ),
+		verdict: 'cors_no_content_type',
+		status: 'critical',
+		says: [ 'isn’t a valid list' ],
+	},
+	// A control character isn't HTTP whitespace, so it can't be trimmed away.
+	'vertical tab in the methods list': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': 'QUERY, \vGET' } ),
+		verdict: 'cors_no_query',
+		status: 'critical',
+	},
+	'vertical tab in the headers list': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Headers': 'Content-Type, \vX-Custom', 'Access-Control-Allow-Methods': 'QUERY' } ),
+		verdict: 'cors_no_content_type',
+		status: 'critical',
+	},
+	'empty list entries are skipped': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': 'GET, , QUERY,' } ),
+		verdict: 'cors_query',
+		status: 'good',
+	},
+	'Content-Type not among the allowed headers': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Headers': 'Authorization, X-WP-Nonce', 'Access-Control-Allow-Methods': `${ CORE_LIST }, QUERY` } ),
+		verdict: 'cors_no_content_type',
+		status: 'critical',
+		says: [ '(Authorization, X-WP-Nonce) leaves out Content-Type' ],
+	},
+	'no Access-Control-Allow-Headers': {
+		response: seen( 200, { 'Access-Control-Allow-Origin': CORS_ORIGIN, 'Access-Control-Allow-Methods': 'QUERY' } ),
+		verdict: 'cors_no_content_type',
+		status: 'critical',
+		says: [ '(none)' ],
+	},
+	// Header names are case-insensitive.
+	'lower-case content-type allowed': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Allow-Methods': 'QUERY' } ),
+		verdict: 'cors_query',
+		status: 'good',
+	},
+	'CORS off: only the headers sent on every response': {
+		response: seen( 200, ALWAYS ),
+		verdict: 'cors_off',
+		status: 'recommended',
+		says: [ 'the plugin respects that' ],
+	},
+	'a restricted list: a filter callback or another plugin removes it': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': 'GET, OPTIONS' } ),
+		verdict: 'cors_no_query',
+		status: 'critical',
+		says: [ '(GET, OPTIONS) leaves out QUERY', 'rest_allowed_cors_methods callback' ],
+	},
+	'an origin but no methods': {
+		response: seen( 200, { 'Access-Control-Allow-Origin': CORS_ORIGIN } ),
+		verdict: 'cors_no_query',
+		status: 'critical',
+		says: [ 'without Access-Control-Allow-Methods' ],
+	},
+	'OPTIONS refused before WordPress': { response: seen( 405, {}, '<html>405 Not Allowed</html>' ), verdict: 'inconclusive', status: 'recommended', says: [ 'HTTP 405' ] },
+	'network error': { response: { status: 0, error: 'cURL error 28: timed out' }, verdict: 'inconclusive', status: 'recommended', says: [ 'cURL error 28' ] },
+};
+
 /** Fabricated headers => hints expected among cache_header_hints(). */
 const HINT_CASES: Record< string, { headers: Record< string, string >; hints: Record< string, string > } > = {
 	LiteSpeed: { headers: { 'X-LiteSpeed-Cache': 'hit', Server: 'LiteSpeed' }, hints: { 'x-litespeed-cache': 'LiteSpeed', server: 'LiteSpeed' } },
@@ -222,6 +346,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 			expect( data.fingerprintUrl ).toBe( `${ site.url }/wp-json${ FINGERPRINT }` );
 			expect( data.serverUrl ).toBe( `${ site.url }/wp-json${ SERVER }` );
 			expect( data.cacheUrl ).toBe( `${ site.url }/wp-json${ CACHE }` );
+			expect( data.corsUrl ).toBe( `${ site.url }/wp-json${ CORS }` );
 			expect( data.diagnoseUrl ).toBe( `${ site.url }/wp-json${ DIAGNOSE }` );
 			expect( data.markerKey ).toBe( 'wp_http_query_self_test' );
 			expect( data.statuses[ 'test_failed' ] ).toBe( 'recommended' );
@@ -252,25 +377,26 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 		const boxes = ( output: StubElement ) => output.findAll( ( el ) => el.getAttribute( 'data-check' ) !== undefined );
 		const text = ( els: StubElement[] ) => els.map( ( el ) => el.textContent );
 
-		it( 'runs four different checks and shows them in two labelled groups, in a fixed order', async () => {
+		it( 'runs five different checks and shows them in two labelled groups, in a fixed order', async () => {
 			const { output, sent } = await run();
 
-			// Four different requests behind four boxes.
+			// Five different requests behind five boxes.
 			const requests = sent.map( ( r ) => `${ r.method } ${ r.path }${ r.signedIn ? '' : ' (anonymous)' }` );
 			expect( requests.filter( ( r ) => ! r.startsWith( 'POST' ) ).sort() ).toEqual( [
 				'GET /wp-json/wp-http-query/v1/self-test/cache',
+				'GET /wp-json/wp-http-query/v1/self-test/cors',
 				'GET /wp-json/wp-http-query/v1/self-test/server',
 				'QUERY /wp-json/wp-http-query/v1/echo',
 				'QUERY /wp-json/wp-http-query/v1/self-test/fingerprint (anonymous)',
 				'QUERY /wp-json/wp-http-query/v1/self-test/fingerprint (anonymous)',
 			] );
 
-			// The two "reaches WordPress" checks start together; the cache
-			// checks start after both, one after the other.
+			// The two "reaches WordPress" checks and the CORS check start
+			// together; the cache checks start after all three, one after the other.
 			const at = ( path: string ) => sent.filter( ( r ) => r.path.endsWith( path ) );
-			const [ echo, server, cache ] = [ at( '/echo' )[ 0 ], at( '/self-test/server' )[ 0 ], at( '/self-test/cache' )[ 0 ] ];
+			const [ echo, server, cors, cache ] = [ '/echo', '/self-test/server', '/self-test/cors', '/self-test/cache' ].map( ( p ) => at( p )[ 0 ] );
 			const probes = at( '/fingerprint' );
-			expect( Math.max( echo.start, server.start ) ).toBeLessThan( Math.min( echo.end, server.end ) );
+			expect( Math.max( echo.start, server.start, cors.start ) ).toBeLessThan( Math.min( echo.end, server.end, cors.end ) );
 			expect( probes[ 0 ].start ).toBeGreaterThan( Math.max( ...sent.filter( ( r ) => r.start < probes[ 0 ].start ).map( ( r ) => r.end ) ) );
 			expect( cache.start ).toBeGreaterThan( Math.max( ...probes.map( ( r ) => r.end ) ) );
 
@@ -280,14 +406,15 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 				'wp-http-query-self-test-group',
 				'description',
 			] );
-			expect( output.children[ 0 ].textContent ).toBe( 'All 4 checks passed.' );
+			expect( output.children[ 0 ].textContent ).toBe( 'All 5 checks passed.' );
 			expect( text( output.findAll( ( el ) => el.tagName === 'h3' ) ) ).toEqual( [ 'From your browser', 'From your server' ] );
 			expect( output.children[ 3 ].textContent ).toContain( 'sample, not a guarantee' );
 
 			const shown = boxes( output );
-			expect( shown.map( ( b ) => b.getAttribute( 'data-check' ) ) ).toEqual( [ 'browser-echo', 'browser-cache', 'server-echo', 'server-cache' ] );
-			expect( shown.map( ( b ) => b.getAttribute( 'data-verdict' ) ) ).toEqual( [ 'pass', 'clean', 'pass', 'clean' ] );
-			expect( shown.map( ( b ) => b.className ) ).toEqual( Array( 4 ).fill( 'notice inline notice-success' ) );
+			expect( shown.map( ( b ) => b.getAttribute( 'data-check' ) ) ).toEqual( [ 'browser-echo', 'browser-cache', 'server-echo', 'server-cache', 'server-cors' ] );
+			expect( shown.map( ( b ) => b.getAttribute( 'data-verdict' ) ) ).toEqual( [ 'pass', 'clean', 'pass', 'clean', 'cors_query' ] );
+			expect( shown.map( ( b ) => b.className ) ).toEqual( Array( 5 ).fill( 'notice inline notice-success' ) );
+			expect( boxes( output.children[ 2 ] ).map( ( b ) => b.getAttribute( 'data-check' ) ) ).toEqual( [ 'server-echo', 'server-cache', 'server-cors' ] );
 
 			const titles = shown.map( ( b ) => b.findAll( ( el ) => el.tagName === 'h4' )[ 0 ].textContent );
 			expect( titles ).toEqual( [
@@ -295,6 +422,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 				'No cache between your browser and WordPress stores QUERY responses: passed',
 				'QUERY reaches WordPress from the server itself: passed',
 				'No cache on the server’s own path stores QUERY responses: passed',
+				'Pages on other sites may send QUERY (CORS): passed',
 			] );
 
 			// Each box says what was sent, where, and as whom.
@@ -304,8 +432,10 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 				'Your browser sent: 2 × QUERY /wp-json/wp-http-query/v1/self-test/fingerprint, anonymous',
 				'The server sent itself: QUERY /wp-json/wp-http-query/v1/echo, signed in as you',
 				'The server sent itself: 2 × QUERY /wp-json/wp-http-query/v1/self-test/fingerprint, anonymous',
+				`The server sent itself: OPTIONS /wp-json/wp-http-query/v1/self-test/fingerprint, Origin: ${ CORS_ORIGIN }, Access-Control-Request-Method: QUERY, anonymous`,
 			] );
-			expect( new Set( text( shown ) ).size ).toBe( 4 );
+			expect( new Set( text( shown ) ).size ).toBe( 5 );
+			expect( shown[ 4 ].textContent ).toContain( 'Sends the preflight a browser sends before a QUERY from another site' );
 		} );
 
 		it( 'counts and lists a failing check in the summary', async () => {
@@ -320,7 +450,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 			expect( text( summary.findAll( ( el ) => el.tagName === 'li' ) ) ).toEqual( [ 'QUERY reaches WordPress from your browser: failed' ] );
 
 			const shown = boxes( output );
-			expect( shown.map( ( b ) => b.getAttribute( 'data-verdict' ) ) ).toEqual( [ 'not_allowed', 'clean', 'pass', 'clean' ] );
+			expect( shown.map( ( b ) => b.getAttribute( 'data-verdict' ) ) ).toEqual( [ 'not_allowed', 'clean', 'pass', 'clean', 'cors_query' ] );
 			expect( shown[ 0 ].className ).toBe( 'notice inline notice-error' );
 			expect( shown[ 0 ].textContent ).toContain( 'HTTP status 405.' );
 		} );
@@ -368,6 +498,27 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 		} );
 	} );
 
+	describe( 'the CORS check (loopback)', () => {
+		it( 'finds QUERY in the methods a cross-origin preflight is allowed', async () => {
+			const res = await admin.rest( 'GET', CORS );
+			expect( res.status ).toBe( 200 );
+			const result: HealthResult = await res.json();
+			expect( result.check ).toMatchObject( {
+				verdict: 'cors_query',
+				status: 'good',
+				'http_statuses': [ 200 ],
+				'signed_in': false,
+				url: `${ site.url }/wp-json${ FINGERPRINT }`,
+			} );
+			expect( result.check.message ).toBe( `Pages on other sites can send QUERY: the preflight’s Access-Control-Allow-Methods is ${ CORE_LIST }, QUERY.` );
+		} );
+
+		it( 'refuses a signed-out caller and a bad nonce', async () => {
+			expect( ( await rest( site, 'GET', CORS, { headers: FRESH } ) ).status ).toBe( 401 );
+			expect( ( await admin.rest( 'GET', CORS, { nonce: '0123456789' } ) ).status ).toBe( 403 );
+		} );
+	} );
+
 	describe( 'the fingerprint route', () => {
 		it( 'answers signed-out QUERYs with a hash of each body and a fresh value, echoing nothing', async () => {
 			const a = JSON.stringify( { probe: 'wphq-secret-alpha' } );
@@ -403,7 +554,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 	} );
 
 	describe( 'Site Health', () => {
-		it( 'registers both tests as async REST tests', () => {
+		it( 'registers all three tests as async REST tests', () => {
 			const tests = evalJson< Record< string, { label: string; test: string; has_rest: boolean; direct: boolean } > >(
 				site,
 				`require_once ABSPATH . 'wp-admin/includes/class-wp-site-health.php';
@@ -429,6 +580,12 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 					'has_rest': true,
 					direct: true,
 				},
+				'wp_http_query_cors': {
+					label: 'CORS allows HTTP QUERY requests from other sites',
+					test: `${ site.url }/wp-json${ CORS }`,
+					'has_rest': true,
+					direct: true,
+				},
 			} );
 		} );
 
@@ -436,6 +593,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 			for ( const [ route, key, label ] of [
 				[ SERVER, 'wp_http_query_reaches_wordpress', 'HTTP QUERY requests reach WordPress' ],
 				[ CACHE, 'wp_http_query_cache', 'No cache was seen storing HTTP QUERY responses' ],
+				[ CORS, 'wp_http_query_cors', 'CORS allows HTTP QUERY requests from other sites' ],
 			] ) {
 				const result: HealthResult = await ( await admin.rest( 'GET', `${ route }?_locale=user` ) ).json();
 				expect( result ).toMatchObject( { label, status: 'good', test: key, badge: { label: 'HTTP QUERY', color: 'blue' } } );
@@ -514,6 +672,33 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 				{ response: 2, header: 'x-varnish', value: '2 1', hint: 'Varnish' },
 				{ response: 2, header: 'age', value: '3', hint: 'set by a cache: seconds it has held this response' },
 			] );
+		} );
+
+		it( 'reads a preflight’s Access-Control-Allow-Methods the way a browser does, and names the likely cause', () => {
+			const out = evalJson< Record< string, Check > >(
+				site,
+				`$out = array();
+				foreach ( $input['cases'] as $name => $c ) {
+					$out[ $name ] = \\WPHttpQuery\\diagnose_cors_preflight( $c, $input['origin'] );
+				}
+				echo wp_json_encode( $out );`,
+				{
+					origin: CORS_ORIGIN,
+					cases: Object.fromEntries( Object.entries( CORS_CASES ).map( ( [ k, v ] ) => [ k, v.response ] ) ),
+				}
+			);
+
+			for ( const [ name, c ] of Object.entries( CORS_CASES ) ) {
+				expect( out[ name ], name ).toMatchObject( {
+					verdict: c.verdict,
+					status: c.status,
+					'http_statuses': c.response.status ? [ c.response.status ] : [],
+				} );
+				expect( out[ name ].message, name ).toMatch( /\S/ );
+				for ( const says of c.says ?? [] ) {
+					expect( out[ name ].message, name ).toContain( says );
+				}
+			}
 		} );
 
 		it( 'hints at the cache layer from response headers', () => {
