@@ -14,70 +14,31 @@
  *
  * Decision: docs/decisions/0005-reach-for-existing-read-routes.md   Issue: #1
  */
-import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, expect, it } from 'vitest';
 import { CORE_COLLECTIONS, FIXTURE_OPTED_IN_ROUTE, rest } from '../http';
-import { wpArgs } from '../seed';
-import { NO_LOCAL_CLI, sites } from '../sites';
-import {
-	deleteOption,
-	FIXTURE_PRESET_FILTER_OFF,
-	getOption,
-	PRESETS_OPTION,
-	setOption,
-	snapshotOption,
-} from './site-state';
+import { wpWithStderr } from '../seed';
+import { describeLocalSites, type Site } from '../sites';
+import { deleteOption, FIXTURE_PRESET_FILTER_OFF, getOption, PRESETS_OPTION, setOption, snapshotOptions } from './site-state';
 
-const ENV_SH = fileURLToPath( new URL( '../../scripts/env.sh', import.meta.url ) );
-
-/**
- * Stores a value through WP-CLI, which runs the registered sanitize callback,
- * and returns what PHP wrote to stderr. The test sites run with WP_DEBUG on, so
- * a warning or notice from the sanitizer shows up there.
- */
-function setOptionCapturingStderr( site: ( typeof sites )[ number ], name: string, value: unknown ): string {
-	const result = spawnSync(
-		ENV_SH,
-		wpArgs( site, [ 'option', 'update', name, JSON.stringify( value ), '--format=json' ] ),
-		{ encoding: 'utf8' }
-	);
-	if ( result.status !== 0 ) {
-		throw new Error( `wp option update failed: ${ result.stderr }` );
-	}
-	return result.stderr;
-}
-
-async function statuses( site: ( typeof sites )[ number ], routes: string[] ): Promise< Record< string, number > > {
-	const out: Record< string, number > = {};
-	for ( const route of routes ) {
-		out[ route ] = ( await rest( site, 'QUERY', route, { json: {} } ) ).status;
-	}
-	return out;
+/** QUERY status per route, the requests sent together. */
+async function statuses( site: Site, routes: string[] ): Promise< Record< string, number > > {
+	const responses = await Promise.all( routes.map( ( route ) => rest( site, 'QUERY', route, { json: {} } ) ) );
+	return Object.fromEntries( routes.map( ( route, i ) => [ route, responses[ i ].status ] ) );
 }
 
 const all = ( status: number ) => Object.fromEntries( CORE_COLLECTIONS.map( ( r ) => [ r, status ] ) );
 
-describe.each( sites )( 'ADR 0005 preset setting: $label', ( site ) => {
-	if ( ! site.localCli ) {
-		it.skip( NO_LOCAL_CLI, () => {} );
-		return;
-	}
-
-	let restorePresets = () => {};
-	let restoreFilterSwitch = () => {};
+describeLocalSites( 'ADR 0005 preset setting: $label', ( site ) => {
+	let restore = () => {};
 
 	beforeAll( () => {
-		restorePresets = snapshotOption( site, PRESETS_OPTION );
-		restoreFilterSwitch = snapshotOption( site, FIXTURE_PRESET_FILTER_OFF );
-		setOption( site, FIXTURE_PRESET_FILTER_OFF, 1 );
-		deleteOption( site, PRESETS_OPTION );
+		restore = snapshotOptions( site, [ PRESETS_OPTION, FIXTURE_PRESET_FILTER_OFF ], {
+			set: { [ FIXTURE_PRESET_FILTER_OFF ]: 1 },
+			delete: [ PRESETS_OPTION ],
+		} );
 	} );
 
-	afterAll( () => {
-		restoreFilterSwitch();
-		restorePresets();
-	} );
+	afterAll( () => restore() );
 
 	it( 'is off when the option is unset', async () => {
 		expect( await statuses( site, CORE_COLLECTIONS ) ).toEqual( all( 404 ) );
@@ -107,18 +68,13 @@ describe.each( sites )( 'ADR 0005 preset setting: $label', ( site ) => {
 		expect( await statuses( site, CORE_COLLECTIONS ) ).toEqual( all( 200 ) );
 	} );
 
-	// Last in the block: it spends seconds in WP-CLI, and a following HTTP test could
-	// reuse a keep-alive socket Apache has already closed.
 	it( 'drops malformed entries without PHP warnings or notices', () => {
 		// A crafted options.php post can nest arrays; this once raised an
-		// "Array to string conversion" notice inside the sanitizer.
-		const stderr = setOptionCapturingStderr( site, PRESETS_OPTION, [
-			[ 'core-collections' ],
-			{ name: 'core-collections' },
-			42,
-			null,
-			'core-collections',
-		] );
+		// "Array to string conversion" notice inside the sanitizer. WP-CLI runs
+		// the registered sanitize callback, and the test sites run with WP_DEBUG
+		// on, so a warning or notice from it shows up on stderr.
+		const malformed = [ [ 'core-collections' ], { name: 'core-collections' }, 42, null, 'core-collections' ];
+		const { stderr } = wpWithStderr( site, [ 'option', 'update', PRESETS_OPTION, JSON.stringify( malformed ), '--format=json' ] );
 
 		expect( getOption( site, PRESETS_OPTION ) ).toEqual( [ 'core-collections' ] );
 		expect( stderr ).not.toMatch( /\b(Warning|Notice|Deprecated|Fatal error)\b/ );

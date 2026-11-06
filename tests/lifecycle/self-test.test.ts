@@ -11,23 +11,17 @@
  *
  * The echo route is put back to its default, admins only, so the server
  * check has to carry the admin's sign-in through the loopback. Restored in
- * afterAll. Every request sends Connection: close (see FRESH in http.ts).
+ * afterAll.
  */
 import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { CORE_CORS_METHODS, FRESH, rest } from '../http';
-import { wp } from '../seed';
-import { NO_LOCAL_CLI, sites } from '../sites';
+import { CORE_CORS_METHODS, ECHO, rest, SELF_TEST, SETTINGS_PAGE } from '../http';
+import { evalJson } from '../seed';
+import { describeLocalSites } from '../sites';
 import { clickTestButton, type StubElement } from './self-test-button';
 import { Session } from './session';
-import { FIXTURE_DEMO_ROUTE_OFF, setOption, snapshotOption } from './site-state';
+import { FIXTURE_DEMO_ROUTE_OFF, snapshotOptions } from './site-state';
 
-const PAGE = '/wp-admin/options-general.php?page=wp-http-query';
-const SERVER = '/wp-http-query/v1/self-test/server';
-const CACHE = '/wp-http-query/v1/self-test/cache';
-const DIAGNOSE = '/wp-http-query/v1/self-test/diagnose';
-const FINGERPRINT = '/wp-http-query/v1/self-test/fingerprint';
-const CORS = '/wp-http-query/v1/self-test/cors';
 const CORS_ORIGIN = 'https://cross-origin.example';
 
 interface Check {
@@ -50,16 +44,6 @@ interface HealthResult {
 }
 
 const sha256 = ( s: string ) => createHash( 'sha256' ).update( s ).digest( 'hex' );
-
-/**
- * Runs PHP through `wp eval` and parses the JSON it prints. The cases go in as
- * JSON too, so nothing needs escaping into PHP source.
- */
-function evalJson< T >( site: Parameters< typeof wp >[ 0 ], php: string, input: unknown ): T {
-	const encoded = Buffer.from( JSON.stringify( input ) ).toString( 'base64' );
-	const out = wp( site, [ 'eval', `$input = json_decode( base64_decode( '${ encoded }' ), true ); ${ php }` ] );
-	return JSON.parse( out.slice( out.indexOf( '{' ), out.lastIndexOf( '}' ) + 1 ) );
-}
 
 const MARKER = 'fabricated-marker';
 const ECHO_OK = JSON.stringify( { method: 'QUERY', body_bytes: 40, merged_params: { wp_http_query_self_test: MARKER } } );
@@ -314,42 +298,81 @@ const HINT_CASES: Record< string, { headers: Record< string, string >; hints: Re
 	'unrelated headers': { headers: { Server: 'Apache/2.4', 'Content-Type': 'application/json' }, hints: {} },
 };
 
-describe.each( sites )( 'self-test: $label', ( site ) => {
-	if ( ! site.localCli ) {
-		it.skip( NO_LOCAL_CLI, () => {} );
-		return;
-	}
+/**
+ * What the WP-CLI-only tests read, from one `wp eval`: the Site Health
+ * registration, and the pure functions' verdicts for every fabricated case.
+ */
+interface FromPhp {
+	health: Record< string, { label: string; test: string; has_rest: boolean; direct: boolean } >;
+	echo: Record< string, Check >;
+	cache: Record< string, Check >;
+	cors: Record< string, Check >;
+	hints: Record< string, { header: string; hint: string }[] >;
+}
 
+const FROM_PHP = `
+	require_once ABSPATH . 'wp-admin/includes/class-wp-site-health.php';
+	$out = array_fill_keys( array( 'health', 'echo', 'cache', 'cors', 'hints' ), array() );
+	foreach ( WP_Site_Health::get_tests()['async'] as $key => $t ) {
+		if ( str_starts_with( $key, 'wp_http_query_' ) ) {
+			$out['health'][ $key ] = array( 'label' => $t['label'], 'test' => $t['test'], 'has_rest' => $t['has_rest'], 'direct' => is_callable( $t['async_direct_test'] ) );
+		}
+	}
+	foreach ( $input['echo'] as $name => $c ) {
+		$out['echo'][ $name ] = \\WPHttpQuery\\diagnose_echo_response( $c['response'], $input['marker'], $c['authenticated'] ?? true );
+	}
+	foreach ( $input['cache'] as $name => $c ) {
+		$out['cache'][ $name ] = \\WPHttpQuery\\diagnose_cache_probe( $c['first'], $c['second'] );
+	}
+	foreach ( $input['cors'] as $name => $c ) {
+		$out['cors'][ $name ] = \\WPHttpQuery\\diagnose_cors_preflight( $c, $input['origin'] );
+	}
+	foreach ( $input['hints'] as $name => $headers ) {
+		$out['hints'][ $name ] = \\WPHttpQuery\\cache_header_hints( (array) $headers );
+	}
+	return $out;`;
+
+const pick = < T, U >( cases: Record< string, T >, fn: ( c: T ) => U ) =>
+	Object.fromEntries( Object.entries( cases ).map( ( [ name, c ] ) => [ name, fn( c ) ] ) );
+
+describeLocalSites( 'self-test: $label', ( site ) => {
 	const admin = new Session( site );
 	/** The REST prefix as a path: /wp-json, or /sub/wp-json on a network subsite. */
 	const REST = `${ new URL( site.url ).pathname.replace( /\/$/, '' ) }/wp-json`;
-	let restoreDemoSwitch = () => {};
+	let restore = () => {};
+	let fromPhp: FromPhp;
 
 	beforeAll( async () => {
-		restoreDemoSwitch = snapshotOption( site, FIXTURE_DEMO_ROUTE_OFF );
-		setOption( site, FIXTURE_DEMO_ROUTE_OFF, 1 ); // The echo route at its default: admins only.
+		// The echo route at its default: admins only.
+		restore = snapshotOptions( site, [ FIXTURE_DEMO_ROUTE_OFF ], { set: { [ FIXTURE_DEMO_ROUTE_OFF ]: 1 } } );
+		fromPhp = evalJson< FromPhp >( site, FROM_PHP, {
+			marker: MARKER,
+			echo: ECHO_CASES,
+			cache: pick( CACHE_CASES, ( c ) => ( { first: c.first, second: c.second } ) ),
+			origin: CORS_ORIGIN,
+			cors: pick( CORS_CASES, ( c ) => c.response ),
+			hints: pick( HINT_CASES, ( c ) => c.headers ),
+		} );
 		await admin.logIn();
 	} );
 
-	afterAll( () => {
-		restoreDemoSwitch();
-	} );
+	afterAll( () => restore() );
 
 	describe( 'the settings page', () => {
 		it( 'has the button and loads the script with the URLs and a REST nonce', async () => {
-			const page = await admin.html( PAGE );
+			const page = await admin.html( SETTINGS_PAGE );
 			expect( page ).toContain( '<button type="button" class="button" id="wp-http-query-self-test">Test your server</button>' );
 			expect( page ).toContain( 'id="wp-http-query-self-test-results"' );
 			const tag = page.match( /<script[^>]*id="wp-http-query-self-test-js"[^>]*>/ )?.[ 0 ] ?? '';
 			expect( tag ).toMatch( / src="[^"]*\/wp-content\/plugins\/wp-http-query\/assets\/self-test\.js\?ver=\d+"/ );
 
 			const data = JSON.parse( page.match( /var wpHttpQuerySelfTest = (\{.*?\});\n/ )?.[ 1 ] ?? 'null' );
-			expect( data.echoUrl ).toBe( `${ site.url }/wp-json/wp-http-query/v1/echo` );
-			expect( data.fingerprintUrl ).toBe( `${ site.url }/wp-json${ FINGERPRINT }` );
-			expect( data.serverUrl ).toBe( `${ site.url }/wp-json${ SERVER }` );
-			expect( data.cacheUrl ).toBe( `${ site.url }/wp-json${ CACHE }` );
-			expect( data.corsUrl ).toBe( `${ site.url }/wp-json${ CORS }` );
-			expect( data.diagnoseUrl ).toBe( `${ site.url }/wp-json${ DIAGNOSE }` );
+			expect( data.echoUrl ).toBe( `${ site.url }/wp-json${ ECHO }` );
+			expect( data.fingerprintUrl ).toBe( `${ site.url }/wp-json${ SELF_TEST.fingerprint }` );
+			expect( data.serverUrl ).toBe( `${ site.url }/wp-json${ SELF_TEST.server }` );
+			expect( data.cacheUrl ).toBe( `${ site.url }/wp-json${ SELF_TEST.cache }` );
+			expect( data.corsUrl ).toBe( `${ site.url }/wp-json${ SELF_TEST.cors }` );
+			expect( data.diagnoseUrl ).toBe( `${ site.url }/wp-json${ SELF_TEST.diagnose }` );
 			expect( data.markerKey ).toBe( 'wp_http_query_self_test' );
 			expect( data.statuses[ 'test_failed' ] ).toBe( 'recommended' );
 			// Verdict messages come from PHP only, through the diagnose route.
@@ -357,7 +380,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 
 			// The nonce is a working wp_rest nonce for this session.
 			expect( data.nonce ).toMatch( /^[0-9a-f]{10}$/ );
-			expect( ( await admin.rest( 'GET', SERVER, { nonce: data.nonce } ) ).status ).toBe( 200 );
+			expect( ( await admin.rest( 'GET', SELF_TEST.server, { nonce: data.nonce } ) ).status ).toBe( 200 );
 		} );
 
 		it( 'loads the script on that page only', async () => {
@@ -365,17 +388,17 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 		} );
 
 		it( 'lists the fingerprint route as the public self-test probe', async () => {
-			const page = await admin.html( PAGE );
+			const page = await admin.html( SETTINGS_PAGE );
 			expect( page ).toContain(
-				`<tr><td><code>${ FINGERPRINT }</code></td><td>Self-test cache probe: public, answers only with a hash of the body</td></tr>`
+				`<tr><td><code>${ SELF_TEST.fingerprint }</code></td><td>Self-test cache probe: public, answers only with a hash of the body</td></tr>`
 			);
 		} );
 	} );
 
 	describe( 'the button (the shipped self-test.js, run against this site)', () => {
-		const config = async () => JSON.parse( ( await admin.html( PAGE ) ).match( /var wpHttpQuerySelfTest = (\{.*?\});\n/ )?.[ 1 ] ?? 'null' );
+		const config = async () => JSON.parse( ( await admin.html( SETTINGS_PAGE ) ).match( /var wpHttpQuerySelfTest = (\{.*?\});\n/ )?.[ 1 ] ?? 'null' );
 		const run = async ( intercept?: ( request: Request ) => Response | undefined ) =>
-			clickTestButton( admin, `${ site.url }${ PAGE }`, await config(), intercept );
+			clickTestButton( admin, `${ site.url }${ SETTINGS_PAGE }`, await config(), intercept );
 		const boxes = ( output: StubElement ) => output.findAll( ( el ) => el.getAttribute( 'data-check' ) !== undefined );
 		const text = ( els: StubElement[] ) => els.map( ( el ) => el.textContent );
 
@@ -385,12 +408,12 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 			// Five different requests behind five boxes.
 			const requests = sent.map( ( r ) => `${ r.method } ${ r.path }${ r.signedIn ? '' : ' (anonymous)' }` );
 			expect( requests.filter( ( r ) => ! r.startsWith( 'POST' ) ).sort() ).toEqual( [
-				`GET ${ REST }/wp-http-query/v1/self-test/cache`,
-				`GET ${ REST }/wp-http-query/v1/self-test/cors`,
-				`GET ${ REST }/wp-http-query/v1/self-test/server`,
-				`QUERY ${ REST }/wp-http-query/v1/echo`,
-				`QUERY ${ REST }/wp-http-query/v1/self-test/fingerprint (anonymous)`,
-				`QUERY ${ REST }/wp-http-query/v1/self-test/fingerprint (anonymous)`,
+				`GET ${ REST }${ SELF_TEST.cache }`,
+				`GET ${ REST }${ SELF_TEST.cors }`,
+				`GET ${ REST }${ SELF_TEST.server }`,
+				`QUERY ${ REST }${ ECHO }`,
+				`QUERY ${ REST }${ SELF_TEST.fingerprint } (anonymous)`,
+				`QUERY ${ REST }${ SELF_TEST.fingerprint } (anonymous)`,
 			] );
 
 			// The two "reaches WordPress" checks and the CORS check start
@@ -430,11 +453,11 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 			// Each box says what was sent, where, and as whom.
 			const requested = shown.map( ( b ) => text( b.findAll( ( el ) => el.tagName === 'code' ) )[ 0 ] );
 			expect( requested ).toEqual( [
-				`Your browser sent: QUERY ${ REST }/wp-http-query/v1/echo, signed in as you`,
-				`Your browser sent: 2 × QUERY ${ REST }/wp-http-query/v1/self-test/fingerprint, anonymous`,
-				`The server sent itself: QUERY ${ REST }/wp-http-query/v1/echo, signed in as you`,
-				`The server sent itself: 2 × QUERY ${ REST }/wp-http-query/v1/self-test/fingerprint, anonymous`,
-				`The server sent itself: OPTIONS ${ REST }/wp-http-query/v1/self-test/fingerprint, Origin: ${ CORS_ORIGIN }, Access-Control-Request-Method: QUERY, anonymous`,
+				`Your browser sent: QUERY ${ REST }${ ECHO }, signed in as you`,
+				`Your browser sent: 2 × QUERY ${ REST }${ SELF_TEST.fingerprint }, anonymous`,
+				`The server sent itself: QUERY ${ REST }${ ECHO }, signed in as you`,
+				`The server sent itself: 2 × QUERY ${ REST }${ SELF_TEST.fingerprint }, anonymous`,
+				`The server sent itself: OPTIONS ${ REST }${ SELF_TEST.fingerprint }, Origin: ${ CORS_ORIGIN }, Access-Control-Request-Method: QUERY, anonymous`,
 			] );
 			expect( new Set( text( shown ) ).size ).toBe( 5 );
 			expect( shown[ 4 ].textContent ).toContain( 'Sends the preflight a browser sends before a QUERY from another site' );
@@ -460,7 +483,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 
 	describe( 'the server check (loopback)', () => {
 		it( 'passes for an admin, carrying the sign-in to the admins-only echo route', async () => {
-			const res = await admin.rest( 'GET', SERVER );
+			const res = await admin.rest( 'GET', SELF_TEST.server );
 			expect( res.status ).toBe( 200 );
 			const result: HealthResult = await res.json();
 			expect( result.check ).toMatchObject( {
@@ -468,18 +491,18 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 				status: 'good',
 				'http_statuses': [ 200 ],
 				'signed_in': true,
-				url: `${ site.url }/wp-json/wp-http-query/v1/echo`,
+				url: `${ site.url }/wp-json${ ECHO }`,
 			} );
 			expect( result.check.message ).toBe( 'QUERY reached WordPress with its method and body intact, and the Accept-Query header came back.' );
 		} );
 
 		it( 'refuses a signed-out caller', async () => {
-			const res = await rest( site, 'GET', SERVER );
+			const res = await rest( site, 'GET', SELF_TEST.server );
 			expect( res.status ).toBe( 401 );
 		} );
 
 		it( 'refuses a bad nonce', async () => {
-			const res = await admin.rest( 'GET', SERVER, { nonce: '0123456789' } );
+			const res = await admin.rest( 'GET', SELF_TEST.server, { nonce: '0123456789' } );
 			expect( res.status ).toBe( 403 );
 			expect( ( await res.json() ).code ).toBe( 'rest_cookie_invalid_nonce' );
 		} );
@@ -487,7 +510,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 
 	describe( 'the cache check (loopback)', () => {
 		it( 'reports no caching on the test site, which has no cache in front', async () => {
-			const res = await admin.rest( 'GET', CACHE );
+			const res = await admin.rest( 'GET', SELF_TEST.cache );
 			expect( res.status ).toBe( 200 );
 			const result: HealthResult = await res.json();
 			expect( result.check ).toMatchObject( { verdict: 'clean', status: 'good', http_statuses: [ 200, 200 ] } );
@@ -495,14 +518,14 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 		} );
 
 		it( 'refuses a signed-out caller and a bad nonce', async () => {
-			expect( ( await rest( site, 'GET', CACHE ) ).status ).toBe( 401 );
-			expect( ( await admin.rest( 'GET', CACHE, { nonce: '0123456789' } ) ).status ).toBe( 403 );
+			expect( ( await rest( site, 'GET', SELF_TEST.cache ) ).status ).toBe( 401 );
+			expect( ( await admin.rest( 'GET', SELF_TEST.cache, { nonce: '0123456789' } ) ).status ).toBe( 403 );
 		} );
 	} );
 
 	describe( 'the CORS check (loopback)', () => {
 		it( 'finds QUERY in the methods a cross-origin preflight is allowed', async () => {
-			const res = await admin.rest( 'GET', CORS );
+			const res = await admin.rest( 'GET', SELF_TEST.cors );
 			expect( res.status ).toBe( 200 );
 			const result: HealthResult = await res.json();
 			expect( result.check ).toMatchObject( {
@@ -510,27 +533,21 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 				status: 'good',
 				'http_statuses': [ 200 ],
 				'signed_in': false,
-				url: `${ site.url }/wp-json${ FINGERPRINT }`,
+				url: `${ site.url }/wp-json${ SELF_TEST.fingerprint }`,
 			} );
 			expect( result.check.message ).toBe( `Pages on other sites can send QUERY: the preflight’s Access-Control-Allow-Methods is ${ CORE_LIST }, QUERY.` );
 		} );
 
 		it( 'refuses a signed-out caller and a bad nonce', async () => {
-			expect( ( await rest( site, 'GET', CORS ) ).status ).toBe( 401 );
-			expect( ( await admin.rest( 'GET', CORS, { nonce: '0123456789' } ) ).status ).toBe( 403 );
+			expect( ( await rest( site, 'GET', SELF_TEST.cors ) ).status ).toBe( 401 );
+			expect( ( await admin.rest( 'GET', SELF_TEST.cors, { nonce: '0123456789' } ) ).status ).toBe( 403 );
 		} );
 	} );
 
 	describe( 'the fingerprint route', () => {
 		it( 'answers signed-out QUERYs with a hash of each body and a fresh value, echoing nothing', async () => {
-			const a = JSON.stringify( { probe: 'wphq-secret-alpha' } );
-			const b = JSON.stringify( { probe: 'wphq-secret-beta' } );
-			const send = ( body: string ) =>
-				fetch( `${ site.url }/wp-json${ FINGERPRINT }`, {
-					method: 'QUERY',
-					headers: { ...FRESH, 'content-type': 'application/json' },
-					body,
-				} );
+			const [ a, b ] = [ { probe: 'wphq-secret-alpha' }, { probe: 'wphq-secret-beta' } ];
+			const send = ( json: object ) => rest( site, 'QUERY', SELF_TEST.fingerprint, { json } );
 
 			const [ ra, rb ] = [ await send( a ), await send( b ) ];
 			expect( ra.status ).toBe( 200 );
@@ -544,47 +561,36 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 
 			const [ ja, jb ] = [ JSON.parse( ta ), JSON.parse( tb ) ];
 			expect( Object.keys( ja ).sort() ).toEqual( [ 'body_sha256', 'fresh' ] );
-			expect( ja.body_sha256 ).toBe( sha256( a ) );
-			expect( jb.body_sha256 ).toBe( sha256( b ) );
+			// rest() sends JSON.stringify( json ), byte for byte.
+			expect( ja.body_sha256 ).toBe( sha256( JSON.stringify( a ) ) );
+			expect( jb.body_sha256 ).toBe( sha256( JSON.stringify( b ) ) );
 			expect( ja.body_sha256 ).not.toBe( jb.body_sha256 );
 			expect( ja.fresh ).not.toBe( jb.fresh );
 		} );
 
 		it( 'answers QUERY only', async () => {
-			expect( ( await rest( site, 'GET', FINGERPRINT ) ).status ).toBe( 404 );
+			expect( ( await rest( site, 'GET', SELF_TEST.fingerprint ) ).status ).toBe( 404 );
 		} );
 	} );
 
 	describe( 'Site Health', () => {
 		it( 'registers all three tests as async REST tests', () => {
-			const tests = evalJson< Record< string, { label: string; test: string; has_rest: boolean; direct: boolean } > >(
-				site,
-				`require_once ABSPATH . 'wp-admin/includes/class-wp-site-health.php';
-				$out = array();
-				foreach ( WP_Site_Health::get_tests()['async'] as $key => $t ) {
-					if ( str_starts_with( $key, 'wp_http_query_' ) ) {
-						$out[ $key ] = array( 'label' => $t['label'], 'test' => $t['test'], 'has_rest' => $t['has_rest'], 'direct' => is_callable( $t['async_direct_test'] ) );
-					}
-				}
-				echo wp_json_encode( $out );`,
-				null
-			);
-			expect( tests ).toEqual( {
+			expect( fromPhp.health ).toEqual( {
 				'wp_http_query_reaches_wordpress': {
 					label: 'HTTP QUERY requests reach WordPress',
-					test: `${ site.url }/wp-json${ SERVER }`,
+					test: `${ site.url }/wp-json${ SELF_TEST.server }`,
 					'has_rest': true,
 					direct: true,
 				},
 				'wp_http_query_cache': {
 					label: 'No cache was seen storing HTTP QUERY responses',
-					test: `${ site.url }/wp-json${ CACHE }`,
+					test: `${ site.url }/wp-json${ SELF_TEST.cache }`,
 					'has_rest': true,
 					direct: true,
 				},
 				'wp_http_query_cors': {
 					label: 'CORS allows HTTP QUERY requests from other sites',
-					test: `${ site.url }/wp-json${ CORS }`,
+					test: `${ site.url }/wp-json${ SELF_TEST.cors }`,
 					'has_rest': true,
 					direct: true,
 				},
@@ -593,9 +599,9 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 
 		it( 'returns good from the endpoints Site Health calls, in its result shape', async () => {
 			for ( const [ route, key, label ] of [
-				[ SERVER, 'wp_http_query_reaches_wordpress', 'HTTP QUERY requests reach WordPress' ],
-				[ CACHE, 'wp_http_query_cache', 'No cache was seen storing HTTP QUERY responses' ],
-				[ CORS, 'wp_http_query_cors', 'CORS allows HTTP QUERY requests from other sites' ],
+				[ SELF_TEST.server, 'wp_http_query_reaches_wordpress', 'HTTP QUERY requests reach WordPress' ],
+				[ SELF_TEST.cache, 'wp_http_query_cache', 'No cache was seen storing HTTP QUERY responses' ],
+				[ SELF_TEST.cors, 'wp_http_query_cors', 'CORS allows HTTP QUERY requests from other sites' ],
 			] ) {
 				const result: HealthResult = await ( await admin.rest( 'GET', `${ route }?_locale=user` ) ).json();
 				expect( result ).toMatchObject( { label, status: 'good', test: key, badge: { label: 'HTTP QUERY', color: 'blue' } } );
@@ -607,13 +613,13 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 
 	describe( 'the diagnose route (browser results)', () => {
 		it( 'classifies what the browser saw', async () => {
-			const res = await admin.rest( 'POST', DIAGNOSE, {
+			const res = await admin.rest( 'POST', SELF_TEST.diagnose, {
 				json: { check: 'echo', marker: MARKER, response: { status: 405, headers: { server: 'nginx' }, body: '' } },
 			} );
 			expect( res.status ).toBe( 200 );
 			expect( await res.json() ).toMatchObject( { verdict: 'not_allowed', status: 'critical', 'http_statuses': [ 405 ] } );
 
-			const cache = await admin.rest( 'POST', DIAGNOSE, {
+			const cache = await admin.rest( 'POST', SELF_TEST.diagnose, {
 				json: { check: 'cache', first: fingerprint( A, 'f1' ), second: fingerprint( B, 'f2' ) },
 			} );
 			expect( await cache.json() ).toMatchObject( { verdict: 'clean', status: 'good' } );
@@ -621,22 +627,14 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 
 		it( 'refuses a signed-out caller and a bad nonce', async () => {
 			const json = { check: 'echo', marker: MARKER, response: { status: 200 } };
-			expect( ( await rest( site, 'POST', DIAGNOSE, { json } ) ).status ).toBe( 401 );
-			expect( ( await admin.rest( 'POST', DIAGNOSE, { json, nonce: '0123456789' } ) ).status ).toBe( 403 );
+			expect( ( await rest( site, 'POST', SELF_TEST.diagnose, { json } ) ).status ).toBe( 401 );
+			expect( ( await admin.rest( 'POST', SELF_TEST.diagnose, { json, nonce: '0123456789' } ) ).status ).toBe( 403 );
 		} );
 	} );
 
 	describe( 'classification (pure functions, fabricated responses)', () => {
 		it( 'maps each echo outcome to a verdict and message', () => {
-			const out = evalJson< Record< string, Check > >(
-				site,
-				`$out = array();
-				foreach ( $input['cases'] as $name => $c ) {
-					$out[ $name ] = \\WPHttpQuery\\diagnose_echo_response( $c['response'], $input['marker'], $c['authenticated'] ?? true );
-				}
-				echo wp_json_encode( $out );`,
-				{ marker: MARKER, cases: ECHO_CASES }
-			);
+			const out = fromPhp.echo;
 
 			for ( const [ name, c ] of Object.entries( ECHO_CASES ) ) {
 				expect( out[ name ], name ).toMatchObject( {
@@ -652,15 +650,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 		} );
 
 		it( 'flags a repeated hash or fresh value as a cache storing QUERY, and passes distinct answers', () => {
-			const out = evalJson< Record< string, Check > >(
-				site,
-				`$out = array();
-				foreach ( $input as $name => $c ) {
-					$out[ $name ] = \\WPHttpQuery\\diagnose_cache_probe( $c['first'], $c['second'] );
-				}
-				echo wp_json_encode( $out );`,
-				Object.fromEntries( Object.entries( CACHE_CASES ).map( ( [ k, v ] ) => [ k, { first: v.first, second: v.second } ] ) )
-			);
+			const out = fromPhp.cache;
 
 			for ( const [ name, c ] of Object.entries( CACHE_CASES ) ) {
 				expect( out[ name ], name ).toMatchObject( { verdict: c.verdict, status: c.status } );
@@ -677,18 +667,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 		} );
 
 		it( 'reads a preflight’s Access-Control-Allow-Methods the way a browser does, and names the likely cause', () => {
-			const out = evalJson< Record< string, Check > >(
-				site,
-				`$out = array();
-				foreach ( $input['cases'] as $name => $c ) {
-					$out[ $name ] = \\WPHttpQuery\\diagnose_cors_preflight( $c, $input['origin'] );
-				}
-				echo wp_json_encode( $out );`,
-				{
-					origin: CORS_ORIGIN,
-					cases: Object.fromEntries( Object.entries( CORS_CASES ).map( ( [ k, v ] ) => [ k, v.response ] ) ),
-				}
-			);
+			const out = fromPhp.cors;
 
 			for ( const [ name, c ] of Object.entries( CORS_CASES ) ) {
 				expect( out[ name ], name ).toMatchObject( {
@@ -704,15 +683,7 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 		} );
 
 		it( 'hints at the cache layer from response headers', () => {
-			const out = evalJson< Record< string, { header: string; hint: string }[] > >(
-				site,
-				`$out = array();
-				foreach ( $input as $name => $headers ) {
-					$out[ $name ] = \\WPHttpQuery\\cache_header_hints( (array) $headers );
-				}
-				echo wp_json_encode( $out, JSON_FORCE_OBJECT );`,
-				Object.fromEntries( Object.entries( HINT_CASES ).map( ( [ k, v ] ) => [ k, v.headers ] ) )
-			);
+			const out = fromPhp.hints;
 
 			for ( const [ name, c ] of Object.entries( HINT_CASES ) ) {
 				const hints = Object.fromEntries( Object.values( out[ name ] ).map( ( h ) => [ h.header, h.hint ] ) );

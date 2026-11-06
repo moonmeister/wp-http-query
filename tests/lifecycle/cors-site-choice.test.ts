@@ -12,28 +12,23 @@
  * preflight shows: QUERY allowed, REST CORS off, or a list without QUERY.
  *
  * Runs in the serial lifecycle suite because it changes site state: the test
- * fixture's CORS option, set over WP-CLI and put back in afterAll. Every
- * request sends Connection: close (see FRESH in http.ts).
+ * fixture's CORS option, set over WP-CLI and put back in afterAll.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { CORE_COLLECTIONS, CORE_CORS_METHODS, ORIGIN, rest, tokens } from '../http';
-import { wp } from '../seed';
-import { NO_LOCAL_CLI, type Site, sites } from '../sites';
+import { afterAll, beforeAll, expect, it } from 'vitest';
+import { CORE_COLLECTIONS, CORE_CORS_METHODS, ORIGIN, rest, SELF_TEST, tokens } from '../http';
+import { describeLocalSites, type Site } from '../sites';
 import { Session } from './session';
-import { FIXTURE_CORS, setOption, snapshotOption } from './site-state';
+import { deleteOption, FIXTURE_CORS, setOption, snapshotOptions } from './site-state';
 
 const ROUTE = CORE_COLLECTIONS[ 0 ];
 
-/** The self-test's CORS check, which Site Health also calls. */
-const CORS_CHECK = '/wp-http-query/v1/self-test/cors';
-
-/** Sets the fixture's CORS scenario for the length of fn, then deletes it in one WP-CLI call. */
+/** Sets the fixture's CORS scenario for the length of fn, then deletes it. */
 async function withCorsScenario< T >( site: Site, value: Record< string, unknown >, fn: () => Promise< T > ): Promise< T > {
 	setOption( site, FIXTURE_CORS, value );
 	try {
 		return await fn();
 	} finally {
-		wp( site, [ 'option', 'delete', FIXTURE_CORS ] );
+		deleteOption( site, FIXTURE_CORS );
 	}
 }
 
@@ -47,25 +42,18 @@ function allowHeaders( res: Response ): string[] {
 	);
 }
 
-describe.each( sites )( 'CORS, as the site configured it: $label', ( site ) => {
-	if ( ! site.localCli ) {
-		it.skip( NO_LOCAL_CLI, () => {} );
-		return;
-	}
-
+describeLocalSites( 'CORS, as the site configured it: $label', ( site ) => {
 	const admin = new Session( site );
-	let nonce = '';
 	let restore = () => {};
 	beforeAll( async () => {
-		restore = snapshotOption( site, FIXTURE_CORS );
+		restore = snapshotOptions( site, [ FIXTURE_CORS ] );
 		await admin.logIn();
-		nonce = await admin.restNonce();
 	} );
 	afterAll( () => restore() );
 
-	/** The CORS check's verdict, status and message, as the self-test and Site Health get them. */
+	/** The self-test's CORS check, which Site Health also calls: verdict, status and message. */
 	const corsCheck = async (): Promise< { verdict: string; status: string; message: string } > =>
-		( await ( await admin.rest( 'GET', CORS_CHECK, { nonce } ) ).json() ).check;
+		( await ( await admin.rest( 'GET', SELF_TEST.cors ) ).json() ).check;
 
 	/** Under a CORS scenario: what fn gets, and what the CORS check reports. */
 	const withCheck = < T >( scenario: Record< string, unknown >, fn: () => Promise< T > ) =>

@@ -11,41 +11,38 @@
  * Issue: #22
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ECHO, FIXTURE_OPTED_IN_ROUTE, ORIGIN, rest, tokens } from '../http';
+import { CORE_COLLECTIONS, ECHO, FIXTURE_OPTED_IN_ROUTE, ORIGIN, rest, tokens } from '../http';
 import { wp } from '../seed';
-import { networkSites, NO_LOCAL_CLI, sites } from '../sites';
+import { describeLocalSites, networkSites } from '../sites';
 import {
+	ACTIVATE_PLUGIN_PHP,
 	activatePlugin,
 	deactivatePlugin,
 	optionExists,
 	PLUGIN,
 	PRESETS_OPTION,
 	setOption,
-	snapshotOption,
+	snapshotOptions,
 	uninstallPluginKeepingFiles,
 } from './site-state';
 
 /** In the fixture's preset, so it has QUERY while the plugin is active. */
-const PRESET_ROUTE = '/wp/v2/posts';
+const PRESET_ROUTE = CORE_COLLECTIONS[ 0 ];
 
-describe.each( sites )( 'plugin lifecycle: $label', ( site ) => {
-	if ( ! site.localCli ) {
-		it.skip( NO_LOCAL_CLI, () => {} );
-		return;
-	}
-
+describeLocalSites( 'plugin lifecycle: $label', ( site ) => {
 	let restorePresets: ( () => void )[] = [];
 
 	beforeAll( () => {
-		// On a network, uninstall deletes the option from every site.
-		restorePresets = ( site.network ? networkSites : [ site ] ).map( ( s ) => snapshotOption( s, PRESETS_OPTION ) );
-		activatePlugin( site );
+		// On a network, uninstall deletes the option from every site. This site
+		// goes first: its snapshot and restore also make sure the plugin is active.
+		const others = site.network ? networkSites.filter( ( s ) => s !== site ) : [];
+		restorePresets = [
+			snapshotOptions( site, [ PRESETS_OPTION ], { setUp: ACTIVATE_PLUGIN_PHP, tearDown: ACTIVATE_PLUGIN_PHP } ),
+			...others.map( ( s ) => snapshotOptions( s, [ PRESETS_OPTION ] ) ),
+		];
 	} );
 
-	afterAll( () => {
-		activatePlugin( site );
-		restorePresets.forEach( ( restore ) => restore() );
-	} );
+	afterAll( () => restorePresets.forEach( ( restore ) => restore() ) );
 
 	describe( 'deactivated', () => {
 		beforeAll( () => deactivatePlugin( site ) );

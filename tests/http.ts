@@ -7,16 +7,22 @@ import type { Site } from './sites';
  */
 export const ECHO = '/wp-http-query/v1/echo';
 
-export const ORIGIN = 'http://example.test';
+/** The self-test's REST routes. The fingerprint route is the public cache probe. */
+export const SELF_TEST = {
+	server: '/wp-http-query/v1/self-test/server',
+	cache: '/wp-http-query/v1/self-test/cache',
+	cors: '/wp-http-query/v1/self-test/cors',
+	diagnose: '/wp-http-query/v1/self-test/diagnose',
+	fingerprint: '/wp-http-query/v1/self-test/fingerprint',
+};
 
-/**
- * No keep-alive, sent by rest() and the lifecycle suite's Session. Lifecycle
- * steps spend seconds in WP-CLI between requests, and a pooled socket Apache
- * closed in the meantime fails the next fetch with "other side closed". A
- * network's sites share one origin, so one pool: there it bites on the first
- * request to the second site.
- */
-export const FRESH = { connection: 'close' };
+/** Settings → HTTP QUERY. */
+export const SETTINGS_PAGE = '/wp-admin/options-general.php?page=wp-http-query';
+
+/** The example plugin's route, examples/query-route-example/. */
+export const BOOKS = '/query-route-example/v1/books';
+
+export const ORIGIN = 'http://example.test';
 
 /** Core's default Access-Control-Allow-Methods list. */
 export const CORE_CORS_METHODS = [ 'OPTIONS', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE' ];
@@ -51,7 +57,7 @@ export function rest(
 	route: string,
 	opts: { json?: unknown; form?: Record< string, string >; headers?: Record< string, string > } = {}
 ): Promise< Response > {
-	const headers: Record< string, string > = { ...FRESH, ...opts.headers };
+	const headers: Record< string, string > = { ...opts.headers };
 	let body: string | undefined;
 
 	if ( opts.json !== undefined ) {

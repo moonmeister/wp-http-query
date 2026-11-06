@@ -195,9 +195,14 @@ they drift. Change the example and the guide together.
 
 1. Put it in the file for the decision it checks, or create `tests/<adr-or-gap>-<topic>.test.ts`
    with a header naming the decision and issue.
-2. Wrap it in `describe.each( sites )` so it runs against every test site.
+2. Wrap it in `describe.each( sites )` so it runs against every test site, or in
+   `describeLocalSites()` ([`tests/sites.ts`](tests/sites.ts)) if it needs WP-CLI: a site whose
+   URL is overridden then gets a skip note instead.
 3. Use the helpers in [`tests/http.ts`](tests/http.ts): `rest( site, 'QUERY', route, { json } )`,
-   `{ form }` for form-encoded bodies, and `tokens()` for comma-separated headers.
+   `{ form }` for form-encoded bodies, and `tokens()` for comma-separated headers. For site state,
+   `snapshotOptions()` in [`tests/lifecycle/site-state.ts`](tests/lifecycle/site-state.ts) and
+   `evalJson()` in [`tests/seed.ts`](tests/seed.ts) batch WP-CLI work into one `wp eval`: each
+   WP-CLI call costs about a second.
 
 ## Compatibility matrix
 

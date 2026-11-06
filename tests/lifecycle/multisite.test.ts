@@ -19,17 +19,17 @@
  * Issue: #46
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { rest } from '../http';
-import { wp } from '../seed';
+import { CORE_COLLECTIONS, rest } from '../http';
+import { evalJson, wp } from '../seed';
 import { networkSites, sites } from '../sites';
 import {
-	activatePlugin,
+	ACTIVATE_PLUGIN_PHP,
 	deleteOption,
 	FIXTURE_PRESET_FILTER_OFF,
 	PLUGIN,
 	PRESETS_OPTION,
 	setOption,
-	snapshotOption,
+	snapshotOptions,
 	uninstallPluginKeepingFiles,
 } from './site-state';
 
@@ -42,27 +42,27 @@ const BATCH = 100;
 const FILLER = 'wphq-batch-';
 
 /** A preset route; the fixture's own route opt-ins don't include it. */
-const PRESET_ROUTE = '/wp/v2/posts';
+const PRESET_ROUTE = CORE_COLLECTIONS[ 0 ];
 
-/** Runs PHP on the main site through `wp eval` and returns its trimmed output. */
-const evalPhp = ( php: string ): string => wp( main, [ 'eval', php ] ).trim();
+/** Runs PHP on the main site through `wp eval` and returns what it returns. */
+const evalPhp = < T = unknown >( php: string ): T => evalJson< T >( main, php );
 
 describe.skipIf( ! sites.includes( main ) || ! main.localCli )( 'multisite network', () => {
-	const restore: ( () => void )[] = [];
+	let restore: ( () => void )[] = [];
 
 	beforeAll( () => {
-		for ( const site of [ main, sub ] ) {
-			restore.push( snapshotOption( site, PRESETS_OPTION ), snapshotOption( site, FIXTURE_PRESET_FILTER_OFF ) );
-			// The fixture's presets filter would force the preset on everywhere.
-			setOption( site, FIXTURE_PRESET_FILTER_OFF, 1 );
-			deleteOption( site, PRESETS_OPTION );
-		}
+		// The fixture's presets filter would force the preset on everywhere. The
+		// main site's restore network-activates the plugin again first.
+		restore = [ main, sub ].map( ( site ) =>
+			snapshotOptions( site, [ PRESETS_OPTION, FIXTURE_PRESET_FILTER_OFF ], {
+				set: { [ FIXTURE_PRESET_FILTER_OFF ]: 1 },
+				delete: [ PRESETS_OPTION ],
+				tearDown: site === main ? ACTIVATE_PLUGIN_PHP : '',
+			} )
+		);
 	} );
 
-	afterAll( () => {
-		activatePlugin( main );
-		restore.forEach( ( fn ) => fn() );
-	} );
+	afterAll( () => restore.forEach( ( fn ) => fn() ) );
 
 	it( 'keeps the preset setting per site', async () => {
 		for ( const [ on, off ] of [ [ sub, main ], [ main, sub ] ] ) {
@@ -89,19 +89,17 @@ describe.skipIf( ! sites.includes( main ) || ! main.localCli )( 'multisite netwo
 
 		// The option on every site, and one site each archived, spam and deleted:
 		// get_sites() includes them by default, so uninstall must clean them too.
-		const total = Number(
-			evalPhp( `
-				$ids = get_sites( array( 'fields' => 'ids', 'number' => 0 ) );
-				foreach ( $ids as $id ) {
-					update_blog_option( $id, '${ PRESETS_OPTION }', array( 'core-collections' ) );
-				}
-				// Only this file's own sites: never flag a site a developer added by hand.
-				$fillers = get_sites( array( 'fields' => 'ids', 'search' => '${ FILLER }', 'search_columns' => array( 'path' ), 'number' => 3 ) );
-				foreach ( array( 'archived', 'spam', 'deleted' ) as $i => $flag ) {
-					update_blog_status( $fillers[ $i ], $flag, 1 );
-				}
-				echo count( $ids );` )
-		);
+		const total = evalPhp< number >( `
+			$ids = get_sites( array( 'fields' => 'ids', 'number' => 0 ) );
+			foreach ( $ids as $id ) {
+				update_blog_option( $id, '${ PRESETS_OPTION }', array( 'core-collections' ) );
+			}
+			// Only this file's own sites: never flag a site a developer added by hand.
+			$fillers = get_sites( array( 'fields' => 'ids', 'search' => '${ FILLER }', 'search_columns' => array( 'path' ), 'number' => 3 ) );
+			foreach ( array( 'archived', 'spam', 'deleted' ) as $i => $flag ) {
+				update_blog_status( $fillers[ $i ], $flag, 1 );
+			}
+			return count( $ids );` );
 		expect( total ).toBeGreaterThan( BATCH );
 
 		// Rows, straight from each site's options table: nothing registered can stand in.
@@ -111,12 +109,12 @@ describe.skipIf( ! sites.includes( main ) || ! main.localCli )( 'multisite netwo
 			foreach ( get_sites( array( 'fields' => 'ids', 'number' => 0 ) ) as $id ) {
 				$left += (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->get_blog_prefix( $id )}options WHERE option_name = %s", '${ PRESETS_OPTION }' ) );
 			}
-			echo $left;`;
-		expect( Number( evalPhp( withOption ) ) ).toBe( total );
+			return $left;`;
+		expect( evalPhp( withOption ) ).toBe( total );
 
 		uninstallPluginKeepingFiles( main );
 
-		expect( Number( evalPhp( withOption ) ) ).toBe( 0 );
+		expect( evalPhp( withOption ) ).toBe( 0 );
 		expect( wp( main, [ 'plugin', 'list', `--name=${ PLUGIN }`, '--field=status' ] ).trim() ).toBe( 'inactive' );
 	} );
 } );
