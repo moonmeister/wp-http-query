@@ -17,8 +17,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The plugin's minimum supported PHP (WordPress core's too), and the version the local sites use.
-        php: ['7.4', '8.4']
+        # The plugin's minimum supported PHP (WordPress core's too), the first PHP 8, and the version
+        # the local sites use. Matrix jobs run in parallel, so each extra version costs no wall time.
+        php: ['7.4', '8.0', '8.4']
     env:
       WP_ENV_PHP_VERSION: ${{ matrix.php }}
     steps:
