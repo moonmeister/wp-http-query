@@ -58,7 +58,7 @@ pretty permalinks, and default settings. The echo route is admins only. It opens
    curl -X QUERY http://localhost:8873/wp-json/wp/v2/posts -H 'Content-Type: application/json' -d '{"search":"hello"}'
    ```
 
-4. Click **Test your server**. It runs four checks, from your browser and from the server, and
+4. Click **Test your server**. It runs five checks, from your browser and from the server, and
    explains each result.
 
 `make demo-down` stops it (data kept), `make demo-destroy` removes it (asks first). The test-site

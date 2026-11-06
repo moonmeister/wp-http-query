@@ -186,26 +186,22 @@ const ALWAYS = { 'Access-Control-Allow-Headers': 'Authorization, X-WP-Nonce, Con
 const CORS_ON = { ...ALWAYS, 'Access-Control-Allow-Origin': CORS_ORIGIN, 'Access-Control-Allow-Credentials': 'true', Vary: 'Origin' };
 
 /**
- * Fabricated preflight responses => expected verdict. filterable: false is
- * a core before 7.2, where the plugin wraps core's handler.
+ * Fabricated preflight responses => expected verdict.
  */
-const CORS_CASES: Record< string, { response: Observation; filterable: boolean; verdict: string; status: string; says?: string[]; never?: string } > = {
+const CORS_CASES: Record< string, { response: Observation; verdict: string; status: string; says?: string[] } > = {
 	'QUERY in the list': {
 		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': `${ CORE_LIST }, QUERY` } ),
-		filterable: false,
 		verdict: 'cors_query',
 		status: 'good',
 		says: [ `${ CORE_LIST }, QUERY` ],
 	},
 	'QUERY in the list, repeated headers joined': {
 		response: { status: 200, headers: { ...CORS_ON, 'Access-Control-Allow-Methods': [ 'GET', 'QUERY' ] } as unknown as Record< string, string > },
-		filterable: true,
 		verdict: 'cors_query',
 		status: 'good',
 	},
 	'wildcard origin and methods': {
 		response: seen( 200, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': '*', 'Access-Control-Allow-Headers': '*' } ),
-		filterable: true,
 		verdict: 'cors_query',
 		status: 'good',
 		says: [ 'without cookies' ],
@@ -214,7 +210,6 @@ const CORS_CASES: Record< string, { response: Observation; filterable: boolean; 
 	// a QUERY without cookies passes either way.
 	'wildcard methods, credentials allowed': {
 		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': '*' } ),
-		filterable: true,
 		verdict: 'cors_query',
 		status: 'good',
 		says: [ 'without cookies' ],
@@ -222,14 +217,12 @@ const CORS_CASES: Record< string, { response: Observation; filterable: boolean; 
 	// A browser refuses a preflight whose Allow-Origin doesn't admit its origin.
 	'QUERY listed, another origin allowed': {
 		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Origin': 'https://allowed.example', 'Access-Control-Allow-Methods': `${ CORE_LIST }, QUERY` } ),
-		filterable: true,
 		verdict: 'cors_other_origin',
 		status: 'recommended',
 		says: [ '(https://allowed.example) doesn’t admit the test’s origin, https://cross-origin.example' ],
 	},
 	'QUERY listed, no Allow-Origin': {
 		response: seen( 200, { 'Access-Control-Allow-Methods': `${ CORE_LIST }, QUERY` } ),
-		filterable: false,
 		verdict: 'cors_other_origin',
 		status: 'recommended',
 		says: [ '(none)' ],
@@ -237,41 +230,35 @@ const CORS_CASES: Record< string, { response: Observation; filterable: boolean; 
 	// Methods are case-sensitive, and fetch normalizes only the standard ones.
 	'lower-case query': {
 		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': 'GET, query' } ),
-		filterable: true,
 		verdict: 'cors_no_query',
 		status: 'critical',
 	},
 	// Fetch refuses a preflight whose list doesn't parse, even if it names what's needed.
 	'malformed methods list': {
 		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': 'QUERY, GET POST' } ),
-		filterable: true,
 		verdict: 'cors_no_query',
 		status: 'critical',
 		says: [ 'isn’t a valid list' ],
 	},
 	'malformed headers list': {
 		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Headers': 'Content-Type, X Custom', 'Access-Control-Allow-Methods': 'QUERY' } ),
-		filterable: true,
 		verdict: 'cors_no_content_type',
 		status: 'critical',
 		says: [ 'isn’t a valid list' ],
 	},
 	'empty list entries are skipped': {
 		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': 'GET, , QUERY,' } ),
-		filterable: true,
 		verdict: 'cors_query',
 		status: 'good',
 	},
 	'Content-Type not among the allowed headers': {
 		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Headers': 'Authorization, X-WP-Nonce', 'Access-Control-Allow-Methods': `${ CORE_LIST }, QUERY` } ),
-		filterable: true,
 		verdict: 'cors_no_content_type',
 		status: 'critical',
 		says: [ '(Authorization, X-WP-Nonce) leaves out Content-Type' ],
 	},
 	'no Access-Control-Allow-Headers': {
 		response: seen( 200, { 'Access-Control-Allow-Origin': CORS_ORIGIN, 'Access-Control-Allow-Methods': 'QUERY' } ),
-		filterable: false,
 		verdict: 'cors_no_content_type',
 		status: 'critical',
 		says: [ '(none)' ],
@@ -279,41 +266,29 @@ const CORS_CASES: Record< string, { response: Observation; filterable: boolean; 
 	// Header names are case-insensitive.
 	'lower-case content-type allowed': {
 		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Allow-Methods': 'QUERY' } ),
-		filterable: true,
 		verdict: 'cors_query',
 		status: 'good',
 	},
 	'CORS off: only the headers sent on every response': {
 		response: seen( 200, ALWAYS ),
-		filterable: false,
 		verdict: 'cors_off',
 		status: 'recommended',
 		says: [ 'the plugin respects that' ],
 	},
-	'core’s list before 7.2: another plugin overrides': {
-		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': CORE_LIST } ),
-		filterable: false,
-		verdict: 'cors_no_query',
-		status: 'critical',
-		says: [ 'another plugin that handles CORS' ],
-		never: 'rest_allowed_cors_methods',
-	},
-	'a restricted list on 7.2+: a filter callback removes it': {
+	'a restricted list: a filter callback or another plugin removes it': {
 		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': 'GET, OPTIONS' } ),
-		filterable: true,
 		verdict: 'cors_no_query',
 		status: 'critical',
 		says: [ '(GET, OPTIONS) leaves out QUERY', 'rest_allowed_cors_methods callback' ],
 	},
 	'an origin but no methods': {
 		response: seen( 200, { 'Access-Control-Allow-Origin': CORS_ORIGIN } ),
-		filterable: false,
 		verdict: 'cors_no_query',
 		status: 'critical',
 		says: [ 'without Access-Control-Allow-Methods' ],
 	},
-	'OPTIONS refused before WordPress': { response: seen( 405, {}, '<html>405 Not Allowed</html>' ), filterable: false, verdict: 'inconclusive', status: 'recommended', says: [ 'HTTP 405' ] },
-	'network error': { response: { status: 0, error: 'cURL error 28: timed out' }, filterable: true, verdict: 'inconclusive', status: 'recommended', says: [ 'cURL error 28' ] },
+	'OPTIONS refused before WordPress': { response: seen( 405, {}, '<html>405 Not Allowed</html>' ), verdict: 'inconclusive', status: 'recommended', says: [ 'HTTP 405' ] },
+	'network error': { response: { status: 0, error: 'cURL error 28: timed out' }, verdict: 'inconclusive', status: 'recommended', says: [ 'cURL error 28' ] },
 };
 
 /** Fabricated headers => hints expected among cache_header_hints(). */
@@ -688,17 +663,17 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 			] );
 		} );
 
-		it( 'reads a preflight’s Access-Control-Allow-Methods the way a browser does, and names the likely cause per core', () => {
+		it( 'reads a preflight’s Access-Control-Allow-Methods the way a browser does, and names the likely cause', () => {
 			const out = evalJson< Record< string, Check > >(
 				site,
 				`$out = array();
 				foreach ( $input['cases'] as $name => $c ) {
-					$out[ $name ] = \\WPHttpQuery\\diagnose_cors_preflight( $c['response'], $input['origin'], $c['filterable'] );
+					$out[ $name ] = \\WPHttpQuery\\diagnose_cors_preflight( $c, $input['origin'] );
 				}
 				echo wp_json_encode( $out );`,
 				{
 					origin: CORS_ORIGIN,
-					cases: Object.fromEntries( Object.entries( CORS_CASES ).map( ( [ k, v ] ) => [ k, { response: v.response, filterable: v.filterable } ] ) ),
+					cases: Object.fromEntries( Object.entries( CORS_CASES ).map( ( [ k, v ] ) => [ k, v.response ] ) ),
 				}
 			);
 
@@ -711,9 +686,6 @@ describe.each( sites )( 'self-test: $label', ( site ) => {
 				expect( out[ name ].message, name ).toMatch( /\S/ );
 				for ( const says of c.says ?? [] ) {
 					expect( out[ name ].message, name ).toContain( says );
-				}
-				if ( c.never ) {
-					expect( out[ name ].message, name ).not.toContain( c.never );
 				}
 			}
 		} );

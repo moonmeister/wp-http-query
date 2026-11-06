@@ -357,7 +357,7 @@ function run_cors_check(): array {
 		false
 	);
 
-	return diagnose_cors_preflight( $response, CORS_TEST_ORIGIN, core_cors_is_filterable() ) + array(
+	return diagnose_cors_preflight( $response, CORS_TEST_ORIGIN ) + array(
 		'url'       => $url,
 		'signed_in' => false,
 	);

@@ -506,17 +506,16 @@ function cors_token_list( string $value ): ?array {
  * Success also needs Access-Control-Allow-Origin to admit the probe's origin
  * and Access-Control-Allow-Headers to admit Content-Type (the preflight asks
  * for it, as a JSON QUERY needs it), and both lists to parse (see
- * cors_token_list()), or a browser refuses the preflight. Access-Control-Allow-Headers and
- * -Expose-Headers don't count as CORS being on:
- * WP_REST_Server::serve_request() sends them on every REST response, CORS on
- * or off.
+ * cors_token_list()), or a browser refuses the preflight.
+ * Access-Control-Allow-Headers and -Expose-Headers don't count as CORS being
+ * on: WP_REST_Server::serve_request() sends them on every REST response, CORS
+ * on or off.
  *
- * @param array  $response   An observation (see observation()) of the OPTIONS response.
- * @param string $origin     The Origin the preflight was sent with.
- * @param bool   $filterable Whether core's method list is filterable (7.2+, core_cors_is_filterable()).
+ * @param array  $response An observation (see observation()) of the OPTIONS response.
+ * @param string $origin   The Origin the preflight was sent with.
  * @return array{verdict: string, status: string, http_statuses: int[], message: string}
  */
-function diagnose_cors_preflight( array $response, string $origin, bool $filterable ): array {
+function diagnose_cors_preflight( array $response, string $origin ): array {
 	$seen    = observation( $response );
 	$status  = $seen['status'];
 	$headers = $seen['headers'];
@@ -604,9 +603,7 @@ function diagnose_cors_preflight( array $response, string $origin, bool $filtera
 		)
 		: __( 'CORS is on, but the preflight came back without Access-Control-Allow-Methods, so browsers refuse to send QUERY from other sites.', 'wp-http-query' );
 
-	$cause = $filterable
-		? __( 'Something removes it from the list the plugin adds it to: most likely a rest_allowed_cors_methods callback, or another plugin or a server rule that sends its own Access-Control-Allow-Methods after WordPress’s. Add QUERY back there.', 'wp-http-query' )
-		: __( 'Something sends its own Access-Control-Allow-Methods after the plugin’s: most likely another plugin that handles CORS, or a server rule. Add QUERY to its list.', 'wp-http-query' );
+	$cause = __( 'Something removes it from the list the plugin adds it to: most likely a rest_allowed_cors_methods callback, or another plugin or a server rule that sends its own Access-Control-Allow-Methods after WordPress’s. Add QUERY back there.', 'wp-http-query' );
 
 	return verdict( 'cors_no_query', $found . ' ' . $cause, array( $status ) );
 }
