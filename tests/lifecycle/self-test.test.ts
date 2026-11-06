@@ -246,6 +246,17 @@ const CORS_CASES: Record< string, { response: Observation; verdict: string; stat
 		status: 'critical',
 		says: [ 'isn’t a valid list' ],
 	},
+	// A control character isn't HTTP whitespace, so it can't be trimmed away.
+	'vertical tab in the methods list': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': 'QUERY, \vGET' } ),
+		verdict: 'cors_no_query',
+		status: 'critical',
+	},
+	'vertical tab in the headers list': {
+		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Headers': 'Content-Type, \vX-Custom', 'Access-Control-Allow-Methods': 'QUERY' } ),
+		verdict: 'cors_no_content_type',
+		status: 'critical',
+	},
 	'empty list entries are skipped': {
 		response: seen( 200, { ...CORS_ON, 'Access-Control-Allow-Methods': 'GET, , QUERY,' } ),
 		verdict: 'cors_query',

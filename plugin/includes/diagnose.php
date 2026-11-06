@@ -486,10 +486,17 @@ function diagnose_cache_probe( array $first, array $second ): array {
  * @return string[]|null
  */
 function cors_token_list( string $value ): ?array {
-	$tokens = array_values( array_filter( array_map( 'trim', explode( ',', $value ) ), 'strlen' ) );
+	// HTTP whitespace only (RFC 9110 OWS): trim()'s default set would also
+	// hide control characters, such as a vertical tab, that make it invalid.
+	$tokens = array_values(
+		array_filter(
+			array_map( static fn ( string $entry ): string => trim( $entry, " \t" ), explode( ',', $value ) ),
+			'strlen'
+		)
+	);
 
 	foreach ( $tokens as $token ) {
-		if ( ! preg_match( '/^[!#$%&\'*+.^_`|~0-9A-Za-z-]+$/', $token ) ) {
+		if ( ! preg_match( '/^[!#$%&\'*+.^_`|~0-9A-Za-z-]+$/D', $token ) ) {
 			return null;
 		}
 	}
