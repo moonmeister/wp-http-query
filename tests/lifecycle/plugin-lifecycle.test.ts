@@ -12,17 +12,16 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CORE_COLLECTIONS, ECHO, FIXTURE_OPTED_IN_ROUTE, ORIGIN, rest, tokens } from '../http';
-import { wp } from '../seed';
 import { describeLocalSites, networkSites } from '../sites';
 import {
 	ACTIVATE_PLUGIN_PHP,
 	activatePlugin,
+	changeSite,
 	deactivatePlugin,
 	optionExists,
-	PLUGIN,
+	pluginStatus,
 	PRESETS_OPTION,
 	setOption,
-	snapshotOptions,
 	uninstallPluginKeepingFiles,
 } from './site-state';
 
@@ -37,8 +36,8 @@ describeLocalSites( 'plugin lifecycle: $label', ( site ) => {
 		// goes first: its snapshot and restore also make sure the plugin is active.
 		const others = site.network ? networkSites.filter( ( s ) => s !== site ) : [];
 		restorePresets = [
-			snapshotOptions( site, [ PRESETS_OPTION ], { setUp: ACTIVATE_PLUGIN_PHP, tearDown: ACTIVATE_PLUGIN_PHP } ),
-			...others.map( ( s ) => snapshotOptions( s, [ PRESETS_OPTION ] ) ),
+			changeSite( site, { snapshot: [ PRESETS_OPTION ], setUp: ACTIVATE_PLUGIN_PHP, tearDown: ACTIVATE_PLUGIN_PHP } ),
+			...others.map( ( s ) => changeSite( s, { snapshot: [ PRESETS_OPTION ] } ) ),
 		];
 	} );
 
@@ -91,7 +90,7 @@ describeLocalSites( 'plugin lifecycle: $label', ( site ) => {
 		uninstallPluginKeepingFiles( site );
 		expect( optionExists( site, PRESETS_OPTION ) ).toBe( false );
 		// --skip-delete kept the files, so the plugin can come back.
-		expect( wp( site, [ 'plugin', 'list', `--name=${ PLUGIN }`, '--field=status' ] ).trim() ).toBe( 'inactive' );
+		expect( pluginStatus( site ) ).toBe( 'inactive' );
 
 		activatePlugin( site );
 	} );

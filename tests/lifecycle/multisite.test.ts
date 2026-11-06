@@ -20,16 +20,16 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CORE_COLLECTIONS, rest } from '../http';
-import { evalJson, wp } from '../seed';
+import { evalJson } from '../seed';
 import { networkSites, sites } from '../sites';
 import {
 	ACTIVATE_PLUGIN_PHP,
+	changeSite,
 	deleteOption,
-	FIXTURE_PRESET_FILTER_OFF,
-	PLUGIN,
+	pluginStatus,
+	PRESET_SETTING_UNSET,
 	PRESETS_OPTION,
 	setOption,
-	snapshotOptions,
 	uninstallPluginKeepingFiles,
 } from './site-state';
 
@@ -54,11 +54,7 @@ describe.skipIf( ! sites.includes( main ) || ! main.localCli )( 'multisite netwo
 		// The fixture's presets filter would force the preset on everywhere. The
 		// main site's restore network-activates the plugin again first.
 		restore = [ main, sub ].map( ( site ) =>
-			snapshotOptions( site, [ PRESETS_OPTION, FIXTURE_PRESET_FILTER_OFF ], {
-				set: { [ FIXTURE_PRESET_FILTER_OFF ]: 1 },
-				delete: [ PRESETS_OPTION ],
-				tearDown: site === main ? ACTIVATE_PLUGIN_PHP : '',
-			} )
+			changeSite( site, { ...PRESET_SETTING_UNSET, tearDown: site === main ? ACTIVATE_PLUGIN_PHP : '' } )
 		);
 	} );
 
@@ -115,6 +111,6 @@ describe.skipIf( ! sites.includes( main ) || ! main.localCli )( 'multisite netwo
 		uninstallPluginKeepingFiles( main );
 
 		expect( evalPhp( withOption ) ).toBe( 0 );
-		expect( wp( main, [ 'plugin', 'list', `--name=${ PLUGIN }`, '--field=status' ] ).trim() ).toBe( 'inactive' );
+		expect( pluginStatus( main ) ).toBe( 'inactive' );
 	} );
 } );

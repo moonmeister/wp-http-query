@@ -14,7 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ECHO, type Echo, rest } from '../http';
 import { describeLocalSites } from '../sites';
 import { Session } from './session';
-import { deleteOption, FIXTURE_DEMO_ROUTE_OFF, snapshotOptions } from './site-state';
+import { changeSite, deleteOption, FIXTURE_DEMO_ROUTE_OFF } from './site-state';
 
 // Letters only: multisite rejects usernames with anything else.
 const SUBSCRIBER = 'wphqdemosubscriber';
@@ -41,7 +41,7 @@ describeLocalSites( 'demo route: $label', ( site ) => {
 	let restore = () => {};
 
 	beforeAll( async () => {
-		restore = snapshotOptions( site, [ FIXTURE_DEMO_ROUTE_OFF ], {
+		restore = changeSite( site, {
 			set: { [ FIXTURE_DEMO_ROUTE_OFF ]: 1 },
 			setUp: `${ DELETE_SUBSCRIBER_PHP }
 				$id = wp_insert_user( array(
@@ -55,8 +55,7 @@ describeLocalSites( 'demo route: $label', ( site ) => {
 				}`,
 			tearDown: DELETE_SUBSCRIBER_PHP,
 		} );
-		await admin.logIn();
-		await subscriber.logIn();
+		await Promise.all( [ admin.logIn(), subscriber.logIn() ] );
 	} );
 
 	afterAll( () => restore() );

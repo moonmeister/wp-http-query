@@ -18,7 +18,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import { CORE_COLLECTIONS, CORE_CORS_METHODS, ORIGIN, rest, SELF_TEST, tokens } from '../http';
 import { describeLocalSites, type Site } from '../sites';
 import { Session } from './session';
-import { deleteOption, FIXTURE_CORS, setOption, snapshotOptions } from './site-state';
+import { changeSite, deleteOption, FIXTURE_CORS, setOption } from './site-state';
 
 const ROUTE = CORE_COLLECTIONS[ 0 ];
 
@@ -46,7 +46,7 @@ describeLocalSites( 'CORS, as the site configured it: $label', ( site ) => {
 	const admin = new Session( site );
 	let restore = () => {};
 	beforeAll( async () => {
-		restore = snapshotOptions( site, [ FIXTURE_CORS ] );
+		restore = changeSite( site, { snapshot: [ FIXTURE_CORS ] } );
 		await admin.logIn();
 	} );
 	afterAll( () => restore() );

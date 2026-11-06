@@ -41,23 +41,29 @@ export const ACTIVATE_PLUGIN_PHP = `
 		throw new Exception( $activated->get_error_message() );
 	}`;
 
-export interface OptionChanges {
+export interface SiteChanges {
+	/** Options to snapshot and restore without changing them. Those in `set` and `delete` are snapshotted too. */
+	snapshot?: string[];
 	/** Options to store, name => value. */
 	set?: Record< string, unknown >;
 	/** Options to delete. */
 	delete?: string[];
-	/** More PHP to run in the same `wp eval`, after the changes. */
+	/** More PHP for the same `wp eval`, run after the option changes. */
 	setUp?: string;
-	/** More PHP for restore() to run in its `wp eval`, before putting the options back. */
+	/** More PHP for the restoring `wp eval`, run before the options are put back. */
 	tearDown?: string;
 }
 
 /**
- * Snapshots options, applies `changes`, and returns a function that puts the
- * options back: each stored value if there was one, otherwise no row at all.
- * One `wp eval` each way.
+ * Changes site state for a test file in one `wp eval`, and returns a function
+ * that undoes it in one more: tearDown's PHP, then every snapshotted option
+ * back as it was, its stored value or no row at all.
  */
-export function snapshotOptions( site: Site, names: string[], changes: OptionChanges = {} ): () => void {
+export function changeSite( site: Site, changes: SiteChanges ): () => void {
+	const set = changes.set ?? {};
+	const del = changes.delete ?? [];
+	const names = [ ...new Set( [ ...( changes.snapshot ?? [] ), ...Object.keys( set ), ...del ] ) ];
+
 	// The sentinel tells a missing row from any stored value; passing a default
 	// also keeps a registered default from standing in for a missing row.
 	const prior = evalJson< Record< string, { value: unknown } | null > >(
@@ -76,7 +82,7 @@ export function snapshotOptions( site: Site, names: string[], changes: OptionCha
 		}
 		${ changes.setUp ?? '' }
 		return $prior;`,
-		{ names, set: changes.set ?? {}, delete: changes.delete ?? [] }
+		{ names, set, delete: del }
 	);
 
 	return () => {
@@ -91,15 +97,24 @@ export function snapshotOptions( site: Site, names: string[], changes: OptionCha
 	};
 }
 
-/** WP-CLI's --network on a network site, where the plugin is network-activated. */
-const networkFlag = ( site: Site ): string[] => ( site.network ? [ '--network' ] : [] );
+/** The stored preset setting in charge, and unset: the fixture's presets filter switched off. */
+export const PRESET_SETTING_UNSET: SiteChanges = {
+	set: { [ FIXTURE_PRESET_FILTER_OFF ]: 1 },
+	delete: [ PRESETS_OPTION ],
+};
 
 export function activatePlugin( site: Site ): void {
-	wp( site, [ 'plugin', 'activate', PLUGIN, ...networkFlag( site ) ] );
+	evalJson( site, ACTIVATE_PLUGIN_PHP );
 }
 
 export function deactivatePlugin( site: Site ): void {
-	wp( site, [ 'plugin', 'deactivate', PLUGIN, ...networkFlag( site ) ] );
+	// --network on a network site, where the plugin is network-activated.
+	wp( site, [ 'plugin', 'deactivate', PLUGIN, ...( site.network ? [ '--network' ] : [] ) ] );
+}
+
+/** The plugin's status as `wp plugin list` reports it: active, active-network or inactive. */
+export function pluginStatus( site: Site ): string {
+	return wp( site, [ 'plugin', 'list', `--name=${ PLUGIN }`, '--field=status' ] ).trim();
 }
 
 /**

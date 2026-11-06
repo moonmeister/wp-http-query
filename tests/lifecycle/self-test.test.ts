@@ -20,7 +20,7 @@ import { evalJson } from '../seed';
 import { describeLocalSites } from '../sites';
 import { clickTestButton, type StubElement } from './self-test-button';
 import { Session } from './session';
-import { FIXTURE_DEMO_ROUTE_OFF, snapshotOptions } from './site-state';
+import { changeSite, FIXTURE_DEMO_ROUTE_OFF } from './site-state';
 
 const CORS_ORIGIN = 'https://cross-origin.example';
 
@@ -332,6 +332,9 @@ const FROM_PHP = `
 	}
 	return $out;`;
 
+/** The self-test script's data, wpHttpQuerySelfTest, from the settings page. */
+const scriptData = ( page: string ) => JSON.parse( page.match( /var wpHttpQuerySelfTest = (\{.*?\});\n/ )?.[ 1 ] ?? 'null' );
+
 const pick = < T, U >( cases: Record< string, T >, fn: ( c: T ) => U ) =>
 	Object.fromEntries( Object.entries( cases ).map( ( [ name, c ] ) => [ name, fn( c ) ] ) );
 
@@ -344,7 +347,7 @@ describeLocalSites( 'self-test: $label', ( site ) => {
 
 	beforeAll( async () => {
 		// The echo route at its default: admins only.
-		restore = snapshotOptions( site, [ FIXTURE_DEMO_ROUTE_OFF ], { set: { [ FIXTURE_DEMO_ROUTE_OFF ]: 1 } } );
+		restore = changeSite( site, { set: { [ FIXTURE_DEMO_ROUTE_OFF ]: 1 } } );
 		fromPhp = evalJson< FromPhp >( site, FROM_PHP, {
 			marker: MARKER,
 			echo: ECHO_CASES,
@@ -366,7 +369,7 @@ describeLocalSites( 'self-test: $label', ( site ) => {
 			const tag = page.match( /<script[^>]*id="wp-http-query-self-test-js"[^>]*>/ )?.[ 0 ] ?? '';
 			expect( tag ).toMatch( / src="[^"]*\/wp-content\/plugins\/wp-http-query\/assets\/self-test\.js\?ver=\d+"/ );
 
-			const data = JSON.parse( page.match( /var wpHttpQuerySelfTest = (\{.*?\});\n/ )?.[ 1 ] ?? 'null' );
+			const data = scriptData( page );
 			expect( data.echoUrl ).toBe( `${ site.url }/wp-json${ ECHO }` );
 			expect( data.fingerprintUrl ).toBe( `${ site.url }/wp-json${ SELF_TEST.fingerprint }` );
 			expect( data.serverUrl ).toBe( `${ site.url }/wp-json${ SELF_TEST.server }` );
@@ -396,9 +399,8 @@ describeLocalSites( 'self-test: $label', ( site ) => {
 	} );
 
 	describe( 'the button (the shipped self-test.js, run against this site)', () => {
-		const config = async () => JSON.parse( ( await admin.html( SETTINGS_PAGE ) ).match( /var wpHttpQuerySelfTest = (\{.*?\});\n/ )?.[ 1 ] ?? 'null' );
 		const run = async ( intercept?: ( request: Request ) => Response | undefined ) =>
-			clickTestButton( admin, `${ site.url }${ SETTINGS_PAGE }`, await config(), intercept );
+			clickTestButton( admin, `${ site.url }${ SETTINGS_PAGE }`, scriptData( await admin.html( SETTINGS_PAGE ) ), intercept );
 		const boxes = ( output: StubElement ) => output.findAll( ( el ) => el.getAttribute( 'data-check' ) !== undefined );
 		const text = ( els: StubElement[] ) => els.map( ( el ) => el.textContent );
 
@@ -598,16 +600,20 @@ describeLocalSites( 'self-test: $label', ( site ) => {
 		} );
 
 		it( 'returns good from the endpoints Site Health calls, in its result shape', async () => {
-			for ( const [ route, key, label ] of [
+			const tests = [
 				[ SELF_TEST.server, 'wp_http_query_reaches_wordpress', 'HTTP QUERY requests reach WordPress' ],
 				[ SELF_TEST.cache, 'wp_http_query_cache', 'No cache was seen storing HTTP QUERY responses' ],
 				[ SELF_TEST.cors, 'wp_http_query_cors', 'CORS allows HTTP QUERY requests from other sites' ],
-			] ) {
-				const result: HealthResult = await ( await admin.rest( 'GET', `${ route }?_locale=user` ) ).json();
+			];
+			const results: HealthResult[] = await Promise.all(
+				tests.map( async ( [ route ] ) => ( await admin.rest( 'GET', `${ route }?_locale=user` ) ).json() )
+			);
+			tests.forEach( ( [ , key, label ], i ) => {
+				const result = results[ i ];
 				expect( result ).toMatchObject( { label, status: 'good', test: key, badge: { label: 'HTTP QUERY', color: 'blue' } } );
 				expect( result.description ).toContain( 'HTTP status: 200' );
 				expect( result.actions ).toContain( 'options-general.php?page=wp-http-query' );
-			}
+			} );
 		} );
 	} );
 

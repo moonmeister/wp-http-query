@@ -97,16 +97,14 @@ describe.each( sites )( 'ADR 0005 reach: $label', ( site ) => {
 
 /** The tests that need the posts tests/global-setup.ts seeds over WP-CLI. */
 describeLocalSites( 'ADR 0005 reach, seeded posts: $label', ( site ) => {
-	let ids: Record< string, number > = {};
+	const [ zebra ] = SEED_POSTS;
+	let id: number;
 
 	beforeAll( async () => {
-		ids = Object.fromEntries(
-			await Promise.all( SEED_POSTS.map( async ( { slug } ) => [ slug, await seededPostId( site, slug ) ] ) )
-		);
+		id = await seededPostId( site, zebra.slug );
 	} );
 
 	it( 'matches a parameterized route by its registered regex key', async () => {
-		const id = ids[ SEED_POSTS[ 0 ].slug ];
 		const res = await rest( site, 'QUERY', `/wp/v2/posts/${ id }`, { json: {} } );
 		expect( res.status ).toBe( 200 );
 		expect( ( await res.json() ).id ).toBe( id );
@@ -114,7 +112,7 @@ describeLocalSites( 'ADR 0005 reach, seeded posts: $label', ( site ) => {
 
 	it( 'adds QUERY to the GET handler only, never to write handlers on the same route', async () => {
 		// One GET handler, one EDITABLE (POST, PUT, PATCH), one DELETE.
-		const item = await handlerMethods( site, `/wp/v2/posts/${ ids[ SEED_POSTS[ 0 ].slug ] }` );
+		const item = await handlerMethods( site, `/wp/v2/posts/${ id }` );
 		const collection = await handlerMethods( site, '/wp/v2/posts' );
 
 		for ( const methods of [ ...item, ...collection ] ) {
@@ -125,12 +123,11 @@ describeLocalSites( 'ADR 0005 reach, seeded posts: $label', ( site ) => {
 
 	describe( 'a real collection (gap 3 end to end, #22)', () => {
 		it( 'filters QUERY /wp/v2/posts by a form-encoded search', async () => {
-			const [ zebra ] = SEED_POSTS;
 			const res = await rest( site, 'QUERY', '/wp/v2/posts', { form: { search: zebra.term } } );
 			expect( res.status ).toBe( 200 );
 
 			const posts: { id: number }[] = await res.json();
-			expect( posts.map( ( p ) => p.id ) ).toEqual( [ ids[ zebra.slug ] ] );
+			expect( posts.map( ( p ) => p.id ) ).toEqual( [ id ] );
 		} );
 	} );
 } );

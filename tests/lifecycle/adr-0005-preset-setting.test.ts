@@ -18,7 +18,15 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import { CORE_COLLECTIONS, FIXTURE_OPTED_IN_ROUTE, rest } from '../http';
 import { wpWithStderr } from '../seed';
 import { describeLocalSites, type Site } from '../sites';
-import { deleteOption, FIXTURE_PRESET_FILTER_OFF, getOption, PRESETS_OPTION, setOption, snapshotOptions } from './site-state';
+import {
+	changeSite,
+	deleteOption,
+	FIXTURE_PRESET_FILTER_OFF,
+	getOption,
+	PRESET_SETTING_UNSET,
+	PRESETS_OPTION,
+	setOption,
+} from './site-state';
 
 /** QUERY status per route, the requests sent together. */
 async function statuses( site: Site, routes: string[] ): Promise< Record< string, number > > {
@@ -32,10 +40,7 @@ describeLocalSites( 'ADR 0005 preset setting: $label', ( site ) => {
 	let restore = () => {};
 
 	beforeAll( () => {
-		restore = snapshotOptions( site, [ PRESETS_OPTION, FIXTURE_PRESET_FILTER_OFF ], {
-			set: { [ FIXTURE_PRESET_FILTER_OFF ]: 1 },
-			delete: [ PRESETS_OPTION ],
-		} );
+		restore = changeSite( site, PRESET_SETTING_UNSET );
 	} );
 
 	afterAll( () => restore() );

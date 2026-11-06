@@ -16,13 +16,14 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import { CORE_COLLECTIONS, ECHO, FIXTURE_OPTED_IN_ROUTE, rest, SETTINGS_PAGE } from '../http';
 import { describeLocalSites, type Site } from '../sites';
 import {
+	changeSite,
 	deleteOption,
 	FIXTURE_DEMO_ROUTE_OFF,
 	FIXTURE_PRESET_FILTER_OFF,
 	getOption,
 	PRESETS_OPTION,
+	PRESET_SETTING_UNSET,
 	setOption,
-	snapshotOptions,
 } from './site-state';
 import { Session } from './session';
 
@@ -83,10 +84,7 @@ describeLocalSites( 'settings page: $label', ( site ) => {
 	let restore = () => {};
 
 	beforeAll( async () => {
-		restore = snapshotOptions( site, [ PRESETS_OPTION, FIXTURE_PRESET_FILTER_OFF, FIXTURE_DEMO_ROUTE_OFF ], {
-			set: { [ FIXTURE_PRESET_FILTER_OFF ]: 1 },
-			delete: [ PRESETS_OPTION ],
-		} );
+		restore = changeSite( site, { ...PRESET_SETTING_UNSET, snapshot: [ FIXTURE_DEMO_ROUTE_OFF ] } );
 		await admin.logIn();
 	} );
 
