@@ -228,7 +228,7 @@ matrix/
   compose.yaml        The stack matrix
   run.sh              Runs everything, emits results/results.json
   results/            Machine-readable results + generated MATRIX.md
-experiments/          One-off research: blast radius, cache survey, plugin spike
+experiments/          One-off research: blast radius, cache survey, plugin spike, method constants
 ```
 
 Everything above needs only this repo. One experiment, the ADR 0002 blast-radius run, also needs
