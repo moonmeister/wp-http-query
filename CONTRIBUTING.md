@@ -25,7 +25,7 @@ The first run installs npm dependencies, downloads the WordPress nightly build a
 then runs the tests. Expect a few minutes. Later starts take seconds.
 
 CI runs the same `make check` on every PR and on pushes to `main` ([`.github/workflows/test.yml`](.github/workflows/test.yml)).
-It also runs `make lint` (WordPress Coding Standards and PHP 8.0+ compatibility for `plugin/`) on every PR and on pushes to `main` ([`.github/workflows/lint.yml`](.github/workflows/lint.yml)).
+It also runs `make lint` (WordPress Coding Standards and PHP 7.4+ compatibility for `plugin/`) on every PR and on pushes to `main` ([`.github/workflows/lint.yml`](.github/workflows/lint.yml)).
 
 You get one WordPress site, **nightly**, at <http://localhost:8872>, running the latest nightly
 build with `plugin/` and the [example plugin](examples/query-route-example/) mounted and active.

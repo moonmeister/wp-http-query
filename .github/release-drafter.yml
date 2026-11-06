@@ -79,4 +79,4 @@ no-changes-template: '- No changes'
 template: |
   $CHANGES
 
-  Install: download `wp-http-query-$RESOLVED_VERSION.zip` below (attached when the release is published), then Plugins → Add New → Upload Plugin. Requires WordPress 7.2+ and PHP 8.0+.
+  Install: download `wp-http-query-$RESOLVED_VERSION.zip` below (attached when the release is published), then Plugins → Add New → Upload Plugin. Requires WordPress 7.2+ and PHP 7.4+.

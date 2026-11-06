@@ -29,7 +29,7 @@ It stores one option and adds no tables, cron jobs or cache headers.
 
 ## Requirements
 
-- PHP 8.0 or later.
+- PHP 7.4 or later.
 - WordPress 7.2 or later, including its betas and release candidates. Tested on nightly builds
   (7.2-beta4, as of 2026-11-05).
 - A web server that passes `QUERY` through to PHP. Most do. See
