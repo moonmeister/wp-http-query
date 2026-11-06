@@ -4,7 +4,7 @@
  * Decided 2026-11-04 for the plugin: reach is opt-in, NEVER every route by
  * default. QUERY reaches a route only when:
  *
- * - the route registers it, with 'QUERY' or WPHttpQuery\QUERYABLE in methods,
+ * - the route registers it, with 'QUERY' in methods,
  * - a site lists the route key in the wp_http_query_routes filter, or
  * - a site enables a preset that lists it (wp_http_query_presets).
  *
@@ -99,7 +99,7 @@ describe.each( sites )( 'ADR 0005 reach: $label', ( site ) => {
 			}
 		} );
 
-		it( 'dispatches QUERY on a route registered with WPHttpQuery\\QUERYABLE', async () => {
+		it( 'dispatches QUERY on a route that lists QUERY in its methods', async () => {
 			const res = await rest( site, 'QUERY', '/wp-http-query-test/v1/queryable', { json: { a: 1 } } );
 			expect( res.status ).toBe( 200 );
 			expect( await res.json() ).toMatchObject( { method: 'QUERY', params: { a: 1 } } );

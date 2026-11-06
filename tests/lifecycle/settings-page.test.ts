@@ -33,7 +33,7 @@ import { Session } from './session';
 const PAGE = '/wp-admin/options-general.php?page=wp-http-query';
 const CHECKBOX = 'id="wp_http_query_presets-core-collections"';
 const PRESET_ROUTE = '/wp/v2/posts';
-/** Registered by the test fixture with QUERYABLE in its methods. */
+/** Registered by the test fixture with 'QUERY' in its methods. */
 const SELF_REGISTERED_ROUTE = '/wp-http-query-test/v1/queryable';
 
 /** A logged-in wp-admin session that can also submit the settings page's form. */

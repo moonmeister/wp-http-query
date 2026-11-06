@@ -6,7 +6,8 @@ WordPress.org plugin directory comes later ([#45](../../issues/45)).
 **The version never lives on `main`.** The plugin header says `Version: 0.0.0-dev` and
 `plugin/readme.txt` says `Stable tag: 0.0.0-dev`, permanently. Nothing commits a version bump.
 The real version is stamped in when the zip is built: `make dist VERSION=0.1.0` copies `plugin/`,
-rewrites those two fields in the copy only, and zips it as `dist/wp-http-query-0.1.0.zip`.
+rewrites those two fields and the `WP_HTTP_QUERY_VERSION` constant in the copy only, and zips it
+as `dist/wp-http-query-0.1.0.zip`.
 
 The version and the notes come from **pull request titles**, which must use conventional prefixes
 (see [CONTRIBUTING.md](CONTRIBUTING.md#pull-request-titles)).
@@ -50,7 +51,7 @@ Configuration for the autolabeler and the draft is in
    [`release.yml`](.github/workflows/release.yml), which attaches the zip within a minute or two
    (watch it in the Actions tab or with `gh run watch`).
 4. **Check the zip.** Download `wp-http-query-<version>.zip` from the release: `unzip -l` shows one
-   top-level folder, `wp-http-query/`, and its header says `Version: <version>`. Installing it on a
+   top-level folder, `wp-http-query/`, and its header says `Version: <version>`, as does `WP_HTTP_QUERY_VERSION`. Installing it on a
    test site (Plugins → Add New → Upload Plugin) and activating it is the real check.
 
 If the zip didn't attach, re-run the failed *Release* run from the Actions tab; the upload

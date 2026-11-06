@@ -29,6 +29,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/*
+ * The plugin's version, global so integrators can feature-detect the plugin
+ * without referencing anything that disappears when it's removed:
+ * defined( 'WP_HTTP_QUERY_VERSION' ). It's also what a future core needs to
+ * deactivate old versions on upgrade, as it does for Gutenberg with
+ * GUTENBERG_VERSION. Always 0.0.0-dev here: scripts/dist.sh stamps the real
+ * version into the zip, as it does the header's Version.
+ */
+define( 'WP_HTTP_QUERY_VERSION', '0.0.0-dev' );
+
 const METHOD     = 'QUERY';
 const NAMESPACE_ = 'wp-http-query/v1';
 
@@ -50,12 +60,6 @@ function advertised_query_types(): array {
 		array( 'application/json' )
 	);
 }
-
-/**
- * Userland stand-in for core's future WP_REST_Server::QUERYABLE (ADR 0002,
- * option B). Use it in 'methods' when registering a route that answers QUERY.
- */
-const QUERYABLE = METHOD;
 
 /** This file's path, for plugin_basename() and plugins_url(). */
 const PLUGIN_FILE = __FILE__;

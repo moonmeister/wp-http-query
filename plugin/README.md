@@ -264,14 +264,14 @@ Tested on nginx 1.30.6 (2026-11-05): `GET` and `QUERY` get through, `DELETE` get
 
 ```php
 register_rest_route( 'my-plugin/v1', '/things', array(
-	'methods'             => array( WP_REST_Server::READABLE, \WPHttpQuery\QUERYABLE ),
+	'methods'             => array( WP_REST_Server::READABLE, 'QUERY' ),
 	'callback'            => 'my_plugin_list_things',
 	'permission_callback' => '__return_true',
 ) );
 ```
 
-`\WPHttpQuery\QUERYABLE` is `'QUERY'`, standing in for core's future `WP_REST_Server::QUERYABLE`.
-`array( 'GET', 'QUERY' )` and `'GET, QUERY'` are equivalent.
+Use the string `'QUERY'`, not anything from this plugin, so your route keeps working if the plugin
+is removed. `array( 'GET', 'QUERY' )` and `'GET, QUERY'` are equivalent.
 
 A full, tested version, with feature detection and the read-only check, is in
 [docs/integrating.md](../docs/integrating.md).
