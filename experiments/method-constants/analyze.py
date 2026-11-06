@@ -28,6 +28,11 @@ def load(out, key):
     return d, rows
 
 
+def unique(rows):
+    """One row per source location: the searches overlap, so a line can match two."""
+    return list({(r[0], r[2], r[3]): r for r in rows}.values())
+
+
 def summary(rows):
     plugins = {r[0]: r[1] for r in rows}
     return len(rows), len(plugins), sum(plugins.values())
@@ -52,14 +57,14 @@ def main(out, lines_key=None):
         n, p, i = summary(data[key])
         print(f"| `{key}` | `{meta['id']}` | {n:,} | {p:,} | {i:,} |")
 
-    comparisons = [r for k in ("eq_after", "eq_before") for r in data[k]
-                   if not REGISTRATION.search(r[4])]
+    comparisons = unique([r for k in ("eq_after", "eq_before") for r in data[k]
+                          if not REGISTRATION.search(r[4])])
     # A line that also checks a literal 'GET' keeps working.
     vs_request = [r for r in comparisons if REQUEST_METHOD.search(r[4]) and not re.search(r"['\"]GET['\"]", r[4])]
     token = [r for r in comparisons if not REQUEST_METHOD.search(r[4])]
     schema_copy = [r for r in token if SCHEMA_ARGS.search(r[4])]
     one_method = data["one_method"]
-    breaks = vs_request + one_method
+    breaks = unique(vs_request + one_method)
     # in_array hits on the request method all also list a literal 'GET', so they keep working.
     in_array_req = [r for r in data["in_array"] if REQUEST_METHOD.search(r[4])]
 
