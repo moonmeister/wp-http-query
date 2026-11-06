@@ -111,44 +111,37 @@ for file in "${files[@]}"; do
 done
 
 # Stamp the version into the staged copy, never into plugin/. Only the first matching line
-# changes (WordPress reads the first one too), and its alignment is kept.
-# Usage: stamp <file relative to the staged plugin> <field name>
+# changes (WordPress reads the first one too), and everything around the value is kept.
+# Usage: stamp <file relative to the staged plugin> <what, for the error> <prefix> <value> <suffix>
+# where prefix, value and suffix are awk EREs that together match the whole line.
 stamp() {
-	local file="$stage/$SLUG/$1" field=$2
-	if ! awk -v v="$version" -v field="$field" '
-		!done && $0 ~ ("^[[:space:]*#@]*" field ":[[:space:]]*[^[:space:]]+[[:space:]]*$") {
-			match($0, field ":[[:space:]]*")
-			print substr($0, 1, RSTART + RLENGTH - 1) v
+	local file="$stage/$SLUG/$1"
+	if ! awk -v v="$version" -v pre="$3" -v val="$4" -v post="$5" '
+		!done && $0 ~ ("^" pre val post "$") {
+			match($0, "^" pre)
+			head = substr($0, 1, RLENGTH)
+			rest = substr($0, RLENGTH + 1)
+			match(rest, "^" val)
+			print head v substr(rest, RLENGTH + 1)
 			done = 1
 			next
 		}
 		{ print }
 		END { exit !done }
 	' "$file" >"$file.tmp"; then
-		echo "error: plugin/$1 has no '$field:' line to stamp the version into" >&2
+		echo "error: plugin/$1 has no $2 line to stamp the version into" >&2
 		exit 1
 	fi
 	mv "$file.tmp" "$file"
 }
-stamp wp-http-query.php 'Version'
-
-# The WP_HTTP_QUERY_VERSION constant, the same way: its first define() line only.
-main="$stage/$SLUG/wp-http-query.php"
-if ! awk -v v="$version" -v q="'" '
-	!done && $0 ~ ("^define\\( " q "WP_HTTP_QUERY_VERSION" q ", " q "[^" q "]*" q " \\);$") {
-		print "define( " q "WP_HTTP_QUERY_VERSION" q ", " q v q " );"
-		done = 1
-		next
-	}
-	{ print }
-	END { exit !done }
-' "$main" >"$main.tmp"; then
-	echo "error: plugin/wp-http-query.php has no WP_HTTP_QUERY_VERSION define() line to stamp the version into" >&2
-	exit 1
-fi
-mv "$main.tmp" "$main"
+# Header fields: `Version: 0.0.0-dev`, after optional comment markers.
+stamp_field() {
+	stamp "$1" "'$2:'" "[[:space:]*#@]*$2:[[:space:]]*" '[^[:space:]]+' '[[:space:]]*'
+}
+stamp_field wp-http-query.php 'Version'
+stamp wp-http-query.php "WP_HTTP_QUERY_VERSION define()" "define[(] 'WP_HTTP_QUERY_VERSION', '" "[^']*" "' [)];"
 if [ -f "$stage/$SLUG/readme.txt" ]; then
-	stamp readme.txt 'Stable tag'
+	stamp_field readme.txt 'Stable tag'
 fi
 
 out="$PWD/dist/$zip_name"

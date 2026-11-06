@@ -17,51 +17,54 @@
  *
  * Issue: #67
  */
-import { describe, expect, it } from 'vitest';
-import { ORIGIN, rest, tokens } from './http';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { CORE_CORS_METHODS, ORIGIN, rest, tokens } from './http';
 import { sites } from './sites';
 
 const ROUTE = '/wp-http-query-test/v1/already-provided';
 
 /** What the fixture's observers saw after the plugin ran. */
 interface Observed {
-	methods: unknown;
+	methods: string;
 	order: string[];
 }
 
 describe.each( sites )( 'forward compatibility: $label', ( site ) => {
+	// One QUERY serves the three tests that read its response.
+	let res: Response;
+	let observed: Observed;
+
+	beforeAll( async () => {
+		res = await rest( site, 'QUERY', ROUTE, { json: {} } );
+		expect( res.status ).toBe( 200 );
+		observed = await res.json();
+	} );
+
 	it( 'keeps a CORS list that already has QUERY as it is', async () => {
-		const res = await rest( site, 'OPTIONS', ROUTE, {
+		const preflight = await rest( site, 'OPTIONS', ROUTE, {
 			headers: { origin: ORIGIN, 'access-control-request-method': 'QUERY' },
 		} );
-		expect( res.status ).toBe( 200 );
+		expect( preflight.status ).toBe( 200 );
+
+		// What the fixture's provider returned: core's list with QUERY after GET.
+		const expected = [ ...CORE_CORS_METHODS ];
+		expected.splice( expected.indexOf( 'GET' ) + 1, 0, 'QUERY' );
 
 		// Core dedupes the list after the filter, so check what the filter returned too.
-		const expected = [ 'OPTIONS', 'GET', 'QUERY', 'POST', 'PUT', 'PATCH', 'DELETE' ];
-		expect( tokens( res.headers.get( 'x-wp-http-query-test-cors-methods' ) ) ).toEqual( expected );
-		expect( tokens( res.headers.get( 'access-control-allow-methods' ) ) ).toEqual( expected );
+		expect( tokens( preflight.headers.get( 'x-wp-http-query-test-cors-methods' ) ) ).toEqual( expected );
+		expect( tokens( preflight.headers.get( 'access-control-allow-methods' ) ) ).toEqual( expected );
 	} );
 
-	it( 'keeps a parameter order that already has POST as it is', async () => {
-		const res = await rest( site, 'QUERY', ROUTE, { json: {} } );
-		expect( res.status ).toBe( 200 );
-
-		const { order }: Observed = await res.json();
-		expect( order ).toEqual( [ 'JSON', 'POST', 'GET', 'URL', 'defaults' ] );
+	it( 'keeps a parameter order that already has POST as it is', () => {
+		expect( observed.order ).toEqual( [ 'JSON', 'POST', 'GET', 'URL', 'defaults' ] );
 	} );
 
-	it( 'keeps an opted-in handler that already has QUERY as it is', async () => {
-		const res = await rest( site, 'QUERY', ROUTE, { json: {} } );
-		expect( res.status ).toBe( 200 );
-
+	it( 'keeps an opted-in handler that already has QUERY as it is', () => {
 		// The raw registration, untouched: not rewritten, QUERY not added again.
-		const { methods }: Observed = await res.json();
-		expect( methods ).toBe( 'GET, QUERY' );
+		expect( observed.methods ).toBe( 'GET, QUERY' );
 	} );
 
-	it( 'keeps an Accept-Query the response already has', async () => {
-		const res = await rest( site, 'QUERY', ROUTE, { json: {} } );
-		expect( res.status ).toBe( 200 );
+	it( 'keeps an Accept-Query the response already has', () => {
 		expect( res.headers.get( 'accept-query' ) ).toBe( '"application/jsonpath"' );
 	} );
 } );
