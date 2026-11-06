@@ -14,10 +14,9 @@
  *   a GET query string.
  * - The permission check asks "is this a safe method?", never
  *   "is this GET?". See is_safe_method().
- * - QUERY is only registered when something supports it: the wp-http-query
- *   plugin, or a future core with WP_REST_Server::QUERYABLE. Without either,
- *   the route answers GET only. Nothing here references the plugin unguarded,
- *   so removing the plugin can't break this file.
+ * - QUERY is only registered when the wp-http-query plugin is active.
+ *   Without it, the route answers GET only. Nothing here references the
+ *   plugin unguarded, so removing the plugin can't break this file.
  *
  * The tests in tests/examples.test.ts exercise this file over HTTP. If you
  * change it, change the samples in docs/integrating.md to match.
@@ -36,18 +35,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 const ROUTE_NAMESPACE = 'query-route-example/v1';
 
 /**
- * Whether something on this site supports QUERY.
+ * Whether this site supports QUERY: today, whether wp-http-query is active.
  *
  * Call it on rest_api_init or later, not when this file loads. Plugins load
  * in alphabetical order, so wp-http-query may not have loaded yet.
  */
 function supports_query(): bool {
-	// A future core release. Not in any release as of 2026-11-05.
-	if ( defined( 'WP_REST_Server::QUERYABLE' ) ) {
-		return true;
-	}
-
-	// The wp-http-query feature plugin.
 	return defined( 'WP_HTTP_QUERY_VERSION' );
 }
 
