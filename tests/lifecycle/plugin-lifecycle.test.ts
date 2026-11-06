@@ -29,16 +29,16 @@ import {
 const PRESET_ROUTE = CORE_COLLECTIONS[ 0 ];
 
 describeLocalSites( 'plugin lifecycle: $label', ( site ) => {
-	let restorePresets: ( () => void )[] = [];
+	const restorePresets: ( () => void )[] = [];
 
 	beforeAll( () => {
 		// On a network, uninstall deletes the option from every site. This site
 		// goes first: its snapshot and restore also make sure the plugin is active.
-		const others = site.network ? networkSites.filter( ( s ) => s !== site ) : [];
-		restorePresets = [
-			changeSite( site, { snapshot: [ PRESETS_OPTION ], setUp: ACTIVATE_PLUGIN_PHP, tearDown: ACTIVATE_PLUGIN_PHP } ),
-			...others.map( ( s ) => changeSite( s, { snapshot: [ PRESETS_OPTION ] } ) ),
-		];
+		// Each restore is kept as soon as it exists, so a later failure can't drop it.
+		restorePresets.push( changeSite( site, { snapshot: [ PRESETS_OPTION ], setUp: ACTIVATE_PLUGIN_PHP, tearDown: ACTIVATE_PLUGIN_PHP } ) );
+		for ( const other of site.network ? networkSites.filter( ( s ) => s !== site ) : [] ) {
+			restorePresets.push( changeSite( other, { snapshot: [ PRESETS_OPTION ] } ) );
+		}
 	} );
 
 	afterAll( () => restorePresets.forEach( ( restore ) => restore() ) );

@@ -48,14 +48,15 @@ const PRESET_ROUTE = CORE_COLLECTIONS[ 0 ];
 const evalPhp = < T = unknown >( php: string ): T => evalJson< T >( main, php );
 
 describe.skipIf( ! sites.includes( main ) || ! main.localCli )( 'multisite network', () => {
-	let restore: ( () => void )[] = [];
+	const restore: ( () => void )[] = [];
 
 	beforeAll( () => {
 		// The fixture's presets filter would force the preset on everywhere. The
-		// main site's restore network-activates the plugin again first.
-		restore = [ main, sub ].map( ( site ) =>
-			changeSite( site, { ...PRESET_SETTING_UNSET, tearDown: site === main ? ACTIVATE_PLUGIN_PHP : '' } )
-		);
+		// main site's restore network-activates the plugin again first. Each
+		// restore is kept as soon as it exists, so a later failure can't drop it.
+		for ( const site of [ main, sub ] ) {
+			restore.push( changeSite( site, { ...PRESET_SETTING_UNSET, tearDown: site === main ? ACTIVATE_PLUGIN_PHP : '' } ) );
+		}
 	} );
 
 	afterAll( () => restore.forEach( ( fn ) => fn() ) );
